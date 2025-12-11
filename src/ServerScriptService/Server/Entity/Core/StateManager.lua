@@ -5,17 +5,20 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local EventTypes = require(Shared.Configurations.Enums.EventTypes)
-local Signal = require(Shared.Packages.GoodSignal)
+local Signal = require(Shared.Packages.Signal)
 
 local StateManager = {}
 StateManager.__index = StateManager
 
-export type StateManager = typeof(setmetatable({} :: {
-	Character: Model,
-	States: {[string]: boolean},
-	Events: {[string]: any},
-	StateChangedCallbacks: {[string]: {(IsActive: boolean) -> ()}},
-}, StateManager))
+export type StateManager = typeof(setmetatable(
+	{} :: {
+		Character: Model,
+		States: { [string]: boolean },
+		Events: { [string]: any },
+		StateChangedCallbacks: { [string]: { (IsActive: boolean) -> () } },
+	},
+	StateManager
+))
 
 function StateManager.new(Character: Model): StateManager
 	local self = setmetatable({
