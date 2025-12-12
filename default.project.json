@@ -18,7 +18,6 @@
       }
     },
 
-
     "ServerScriptService": {
       "$className": "ServerScriptService",
       "$ignoreUnknownInstances": true,

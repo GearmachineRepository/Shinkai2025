@@ -1,5 +1,5 @@
 --!strict
-local Packet = require(script.Parent:WaitForChild("Packet"))
+local Packet = require(script.Parent.Parent:WaitForChild("Packages"):WaitForChild("Packet"))
 
 return {
 	-- Combat
