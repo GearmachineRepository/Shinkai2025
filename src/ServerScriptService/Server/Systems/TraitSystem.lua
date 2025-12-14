@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local TraitData = require(Shared.Configurations.Data.TraitData)
+local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local TraitSystem = {}
 
@@ -41,7 +42,7 @@ end
 
 function TraitSystem.RollSingleTrait(PlayerData: any, SlotIndex: number): string
 	if SlotIndex < 1 or SlotIndex > MAX_TRAITS then
-		warn("Invalid trait slot:", SlotIndex)
+		DebugLogger.Warning(script.Name, "Invalid trait slot:", SlotIndex)
 		return ""
 	end
 
@@ -51,7 +52,7 @@ function TraitSystem.RollSingleTrait(PlayerData: any, SlotIndex: number): string
 	return NewTrait
 end
 
-function TraitSystem.RollBothTraits(PlayerData: any): {string}
+function TraitSystem.RollBothTraits(PlayerData: any): { string }
 	local Trait1 = TraitSystem.GetWeightedRandomTrait()
 	local Trait2 = TraitSystem.GetWeightedRandomTrait()
 
@@ -62,7 +63,7 @@ function TraitSystem.RollBothTraits(PlayerData: any): {string}
 	PlayerData.Traits[1] = Trait1
 	PlayerData.Traits[2] = Trait2
 
-	return {Trait1, Trait2}
+	return { Trait1, Trait2 }
 end
 
 function TraitSystem.GetTraitModifiers(TraitName: string)
@@ -74,7 +75,7 @@ function TraitSystem.GetTraitModifiers(TraitName: string)
 	return TraitDef.Modifiers or {}
 end
 
-function TraitSystem.GetTraitHooks(TraitName: string): {string}
+function TraitSystem.GetTraitHooks(TraitName: string): { string }
 	local TraitDef = TraitSystem.GetTraitDefinition(TraitName)
 	if not TraitDef then
 		return {}
@@ -83,7 +84,7 @@ function TraitSystem.GetTraitHooks(TraitName: string): {string}
 	return TraitDef.Hooks or {}
 end
 
-function TraitSystem.GetAllPlayerTraitHooks(PlayerData: any): {string}
+function TraitSystem.GetAllPlayerTraitHooks(PlayerData: any): { string }
 	local AllHooks = {}
 
 	for _, TraitName in PlayerData.Traits do

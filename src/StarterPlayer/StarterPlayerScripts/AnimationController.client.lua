@@ -4,6 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
+local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local Player = Players.LocalPlayer
 
@@ -14,7 +15,7 @@ local ANIMATION_IDS = {
 }
 
 local AnimationController = {}
-AnimationController.Cache = {} :: {[string]: AnimationTrack}
+AnimationController.Cache = {} :: { [string]: AnimationTrack }
 AnimationController.CurrentTrack = nil :: AnimationTrack?
 AnimationController.Character = nil :: Model?
 AnimationController.Humanoid = nil :: Humanoid?
@@ -28,13 +29,13 @@ end
 
 function AnimationController:PreloadAnimation(AnimationName: string, AnimationId: string): AnimationTrack?
 	if not self.Humanoid then
-		warn("[AnimationController] No Humanoid available")
+		DebugLogger.Warning(script.Name, "No Humanoid available")
 		return nil
 	end
-    if not self.Humanoid:FindFirstChild("Animator") then
-        warn("[AnimationController] No Animator available on Humanoid")
-        return nil
-    end
+	if not self.Humanoid:FindFirstChild("Animator") then
+		DebugLogger.Warning(script.Name, "No Animator available on Humanoid")
+		return nil
+	end
 
 	local Animation = Instance.new("Animation")
 	Animation.AnimationId = AnimationId
@@ -48,7 +49,7 @@ function AnimationController:PreloadAnimation(AnimationName: string, AnimationId
 		return Result
 	end
 
-	warn("[AnimationController] Failed to load animation:", AnimationName, Result)
+	DebugLogger.Warning(script.Name, "Failed to load animation:", AnimationName, Result)
 	return nil
 end
 
@@ -62,7 +63,7 @@ function AnimationController:Play(AnimationName: string)
 	local Track = self.Cache[AnimationName]
 
 	if not Track then
-		warn("[AnimationController] Animation not in cache:", AnimationName)
+		DebugLogger.Warning(script.Name, "Animation not in cache:", AnimationName)
 		return
 	end
 

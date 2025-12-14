@@ -9,17 +9,21 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local StatSystem = require(Server.Systems.StatSystem)
 local ProgressionSystem = require(Server.Systems.ProgressionSystem)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local DebugLogger = require(Shared.Debug.DebugLogger)
 local Maid = require(Shared.General.Maid)
 
 local TrainingController = {}
 TrainingController.__index = TrainingController
 
-export type TrainingController = typeof(setmetatable({} :: {
-	Controller: any,
-	PlayerData: any,
-	CurrentTraining: string?,
-	Maid: Maid.MaidSelf,
-}, TrainingController))
+export type TrainingController = typeof(setmetatable(
+	{} :: {
+		Controller: any,
+		PlayerData: any,
+		CurrentTraining: string?,
+		Maid: Maid.MaidSelf,
+	},
+	TrainingController
+))
 
 function TrainingController.new(CharacterController: any, PlayerData: any): TrainingController
 	local self = setmetatable({
@@ -40,14 +44,16 @@ function TrainingController:InitializeStatAttributes()
 		return
 	end
 
-	for _, StatName in {
-		"MaxStamina",
-		"Durability",
-		"RunSpeed",
-		"StrikingPower",
-		"StrikeSpeed",
-		"Muscle",
-	} do
+	for _, StatName in
+		{
+			"MaxStamina",
+			"Durability",
+			"RunSpeed",
+			"StrikingPower",
+			"StrikeSpeed",
+			"Muscle",
+		}
+	do
 		local XP = self.PlayerData.Stats[StatName .. "_XP"] or 0
 		local Stars = self.PlayerData.Stats[StatName .. "_Stars"] or 0
 		local AvailablePoints = self.PlayerData.Stats[StatName .. "_AvailablePoints"] or 0
@@ -96,12 +102,11 @@ function TrainingController:GrantStatGain(StatName: string, Amount: number, _: n
 	end
 end
 
-
 function TrainingController:AllocateStatPoint(StatName: string): boolean
 	local Success, ErrorMessage = StatSystem.AllocateStar(self.PlayerData, StatName)
 
 	if not Success then
-		warn("Failed to allocate star:", ErrorMessage)
+		DebugLogger.Warning(script.Name, "Failed to allocate star:", ErrorMessage)
 		return false
 	end
 

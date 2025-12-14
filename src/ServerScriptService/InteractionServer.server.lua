@@ -3,12 +3,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Packets = require(ReplicatedStorage.Shared.Networking.Packets)
+local DebugLogger = require(ReplicatedStorage.Shared.Debug.DebugLogger)
 
 local INTERACTABLES_FOLDER = ServerScriptService.Server:WaitForChild("Interactables")
 
 local function HandleInteraction(Player: Player, InteractableObject: Instance, IsStopAction: boolean)
 	if not InteractableObject or not InteractableObject:IsA("Model") then
-		warn("Invalid interactable object from player:", Player.Name)
+		DebugLogger.Warning(script.Name, "Invalid interactable object from player:", Player.Name)
 		return
 	end
 
@@ -29,7 +30,7 @@ local function HandleInteraction(Player: Player, InteractableObject: Instance, I
 	local Distance = (HumanoidRootPart.Position - InteractablePrimaryPart.Position).Magnitude
 
 	if Distance > MaxDistance then
-		warn("Player too far from interactable:", Player.Name)
+		DebugLogger.Warning(script.Name, "Player too far from interactable:", Player.Name)
 		return
 	end
 
@@ -37,13 +38,13 @@ local function HandleInteraction(Player: Player, InteractableObject: Instance, I
 	local InteractableModule = INTERACTABLES_FOLDER:FindFirstChild(InteractableType)
 
 	if not InteractableModule or not InteractableModule:IsA("ModuleScript") then
-		warn("No interactable module found for type:", InteractableType)
+		DebugLogger.Warning(script.Name, "No interactable module found for type:", InteractableType)
 		return
 	end
 
 	local Success, ModuleOrError = pcall(require, InteractableModule)
 	if not Success then
-		warn("Failed to load interactable module:", InteractableType, ModuleOrError)
+		DebugLogger.Warning(script.Name, "Failed to load interactable module:", InteractableType, ModuleOrError)
 		return
 	end
 
