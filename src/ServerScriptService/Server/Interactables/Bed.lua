@@ -1,6 +1,5 @@
 --!strict
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,6 +11,7 @@ local InteractableBase = require(Server.Interactables.InteractableBase)
 local FatigueBalance = require(Shared.Configurations.Balance.FatigueBalance)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local Packets = require(Shared.Networking.Packets)
+local UpdateService = require(Shared.Networking.UpdateService)
 
 export type InteractableModule = {
 	OnInteract: (Player: Player, BedModel: Model) -> (),
@@ -20,7 +20,7 @@ export type InteractableModule = {
 
 local BedInteractable = {} :: InteractableModule
 
-local ActiveSleepers: {[Player]: InteractableBase.ActiveUser} = {}
+local ActiveSleepers: { [Player]: InteractableBase.ActiveUser } = {}
 
 local WELD_NAME = "BedWeld"
 local SLEEP_ATTRIBUTE = "Sleeping"
@@ -95,7 +95,7 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 
 	Packets.PlayAnimation:FireClient(Player, "sleep")
 
-	local RestConnection = RunService.Heartbeat:Connect(function(DeltaTime)
+	local RestConnection = UpdateService.RegisterWithCleanup(function(DeltaTime: number)
 		local CurrentFatigue = Controller.StatManager:GetStat(StatTypes.BODY_FATIGUE)
 
 		if CurrentFatigue <= 0 then
@@ -108,7 +108,7 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 		local NewFatigue = math.max(0, CurrentFatigue - FatigueReduction)
 
 		Controller.StatManager:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
-	end)
+	end, 0.10)
 
 	ActiveSleepers[Player] = {
 		Connection = JumpConnection,

@@ -10,38 +10,47 @@ local StateHandlers = {}
 function StateHandlers.Setup(Controller: any)
 	local StateManager = Controller.StateManager
 	local Character = Controller.Character
+	local Maid = Controller.Maid
 
-	StateManager:OnStateChanged(StateTypes.RAGDOLLED, function(_) -- IsRagdolled
-		-- if IsRagdolled then
-		-- else
-		-- end
-	end)
+	Maid:GiveTask(StateManager:OnStateChanged(StateTypes.RAGDOLLED, function(IsRagdolled: boolean)
+		if IsRagdolled then
+			return
+		end
+	end))
 
-	StateManager:OnStateChanged(StateTypes.STUNNED, function(IsStunned)
+	Maid:GiveTask(StateManager:OnStateChanged(StateTypes.STUNNED, function(IsStunned: boolean)
 		if IsStunned then
 			Controller.Humanoid.WalkSpeed = 0
-		else
-			Controller.Humanoid.WalkSpeed = 16
+			return
 		end
-	end)
 
-	StateManager:OnStateChanged(StateTypes.ATTACKING, function(_) -- IsAttacking
-		-- if IsAttacking then
-		-- else
-		-- end
-	end)
+		if Controller.GetExpectedWalkSpeed then
+			local CurrentMode = Character:GetAttribute("MovementMode")
+			Controller.Humanoid.WalkSpeed = Controller:GetExpectedWalkSpeed(CurrentMode)
+			return
+		end
+	end))
 
-	StateManager:OnStateChanged(StateTypes.INVULNERABLE, function(IsInvulnerable)
+	Maid:GiveTask(StateManager:OnStateChanged(StateTypes.ATTACKING, function(IsAttacking: boolean)
+		if IsAttacking then
+			return
+		end
+	end))
+
+	Maid:GiveTask(StateManager:OnStateChanged(StateTypes.INVULNERABLE, function(IsInvulnerable: boolean)
 		if IsInvulnerable then
-			local ForceField = Instance.new("ForceField")
-			ForceField.Parent = Character
-		else
-			local ForceField = Character:FindFirstChildOfClass("ForceField")
-			if ForceField then
-				ForceField:Destroy()
+			if not Character:FindFirstChildOfClass("ForceField") then
+				local ForceField = Instance.new("ForceField")
+				ForceField.Parent = Character
 			end
+			return
 		end
-	end)
+
+		local ExistingForceField = Character:FindFirstChildOfClass("ForceField")
+		if ExistingForceField then
+			ExistingForceField:Destroy()
+		end
+	end))
 end
 
 return StateHandlers

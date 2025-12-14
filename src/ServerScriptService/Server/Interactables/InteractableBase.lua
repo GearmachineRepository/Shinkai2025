@@ -7,10 +7,7 @@ export type ActiveUser = {
 	ActivityConnection: RBXScriptConnection?,
 }
 
-function InteractableBase.SetupJumpExit(
-	Character: Model,
-	OnExit: () -> ()
-): RBXScriptConnection
+function InteractableBase.SetupJumpExit(Character: Model, OnExit: () -> ()): RBXScriptConnection
 	return Character:GetAttributeChangedSignal("Jumping"):Connect(function()
 		if Character:GetAttribute("Jumping") then
 			OnExit()
@@ -18,10 +15,7 @@ function InteractableBase.SetupJumpExit(
 	end)
 end
 
-function InteractableBase.ClaimInteractable(
-	InteractableModel: Model,
-	Player: Player
-): boolean
+function InteractableBase.ClaimInteractable(InteractableModel: Model, Player: Player): boolean
 	local CurrentUser = InteractableModel:GetAttribute("ActiveFor")
 	if CurrentUser then
 		return false
@@ -31,17 +25,11 @@ function InteractableBase.ClaimInteractable(
 	return true
 end
 
-function InteractableBase.ReleaseInteractable(
-	InteractableModel: Model
-)
+function InteractableBase.ReleaseInteractable(InteractableModel: Model)
 	InteractableModel:SetAttribute("ActiveFor", nil)
 end
 
-function InteractableBase.WeldToInteractable(
-	Character: Model,
-	Location: BasePart,
-	WeldName: string
-): WeldConstraint?
+function InteractableBase.WeldToInteractable(Character: Model, Location: BasePart, WeldName: string): WeldConstraint?
 	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not HumanoidRootPart then
 		return nil
@@ -58,10 +46,7 @@ function InteractableBase.WeldToInteractable(
 	return Weld
 end
 
-function InteractableBase.RemoveWeld(
-	Character: Model,
-	WeldName: string
-)
+function InteractableBase.RemoveWeld(Character: Model, WeldName: string)
 	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
 	if not HumanoidRootPart then
 		return
@@ -73,9 +58,7 @@ function InteractableBase.RemoveWeld(
 	end
 end
 
-function InteractableBase.ValidateBasicRequirements(
-	Player: Player
-): (boolean, string?)
+function InteractableBase.ValidateBasicRequirements(Player: Player): (boolean, string?)
 	local Character = Player.Character
 	if not Character then
 		return false, "No character found"
@@ -94,20 +77,27 @@ function InteractableBase.ValidateBasicRequirements(
 	return true
 end
 
-function InteractableBase.CleanupActiveUsers(
-	Player: Player,
-	ActiveUsers: {[Player]: ActiveUser}
-)
+local function CleanupTask(Task: any)
+	if not Task then
+		return
+	end
+
+	if typeof(Task) == "RBXScriptConnection" then
+		Task:Disconnect()
+		return
+	end
+
+	Task()
+end
+
+function InteractableBase.CleanupActiveUsers(Player: Player, ActiveUsers: { [Player]: ActiveUser })
 	local UserData = ActiveUsers[Player]
 	if not UserData then
 		return
 	end
 
-	UserData.Connection:Disconnect()
-
-	if UserData.ActivityConnection then
-		UserData.ActivityConnection:Disconnect()
-	end
+	CleanupTask(UserData.Connection)
+	CleanupTask(UserData.ActivityConnection)
 
 	ActiveUsers[Player] = nil
 end

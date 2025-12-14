@@ -10,6 +10,9 @@ local Logger = {}
 
 local CurrentLogLevel: LogLevel = LOG_LEVEL_INFO
 local EnableTimestamps: boolean = true
+
+local DebuggingEnabled: boolean = false
+
 local LogPrefix: string = "[Game]"
 
 function Logger.SetLogLevel(Level: LogLevel)
@@ -44,6 +47,9 @@ local function FormatMessage(Level: string, ScriptName: string?, Message: string
 end
 
 function Logger.Info(ScriptName: string?, Message: string, ...: any)
+	if not DebuggingEnabled then
+		return
+	end
 	if CurrentLogLevel > LOG_LEVEL_INFO then
 		return
 	end
@@ -53,6 +59,9 @@ function Logger.Info(ScriptName: string?, Message: string, ...: any)
 end
 
 function Logger.Warning(ScriptName: string?, Message: string, ...: any)
+	if not DebuggingEnabled then
+		return
+	end
 	if CurrentLogLevel > LOG_LEVEL_WARNING then
 		return
 	end
@@ -62,6 +71,9 @@ function Logger.Warning(ScriptName: string?, Message: string, ...: any)
 end
 
 function Logger.Error(ScriptName: string?, Message: string, ...: any)
+	if not DebuggingEnabled then
+		return
+	end
 	if CurrentLogLevel > LOG_LEVEL_ERROR then
 		return
 	end

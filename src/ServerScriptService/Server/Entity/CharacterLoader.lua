@@ -17,9 +17,9 @@ local EntityAssets = Assets:WaitForChild("Entity")
 local CharacterTemplate = EntityAssets:WaitForChild("Character")
 
 local CharacterLoader = {}
-local PlayerMaids: {[Player]: Maid.MaidSelf} = {}
-local NPCMaids: {[Model]: Maid.MaidSelf} = {}
-local ActivePromises: {[any]: typeof(Promise)} = {}
+local PlayerMaids: { [Player]: Maid.MaidSelf } = {}
+local NPCMaids: { [Model]: Maid.MaidSelf } = {}
+local ActivePromises: { [any]: typeof(Promise) } = {}
 
 local function GetSpawnLocation(): CFrame
 	local SpawnLocations = {}
@@ -121,7 +121,12 @@ function CharacterLoader.SpawnCharacter(Player: Player, PlayerData)
 	end)
 end
 
-local function TrackEntityPromise(Entity: Player|Model, PromiseObj: typeof(Promise), MaidTable: {[any]: Maid.MaidSelf}, ActivePromisesTable: {[any]: typeof(Promise)})
+local function TrackEntityPromise(
+	Entity: Player | Model,
+	PromiseObj: typeof(Promise),
+	MaidTable: { [any]: Maid.MaidSelf },
+	ActivePromisesTable: { [any]: typeof(Promise) }
+)
 	local MaidObj = MaidTable[Entity]
 	if not MaidObj then
 		MaidObj = Maid.new()
@@ -171,6 +176,38 @@ function CharacterLoader.LoadNPC(NPCCharacter: Model)
 
 	TrackEntityPromise(NPCCharacter, LoadPromise, NPCMaids, ActivePromises)
 	return LoadPromise
+end
+
+function CharacterLoader.CleanupPlayer(Player: Player)
+	local PlayerMaid = PlayerMaids[Player]
+	if PlayerMaid then
+		PlayerMaid:DoCleaning()
+		PlayerMaids[Player] = nil
+	end
+
+	ActivePromises[Player] = nil
+
+	if Player.Character then
+		local Controller = CharacterController.Get(Player.Character)
+		if Controller then
+			Controller:Destroy()
+		end
+	end
+end
+
+function CharacterLoader.CleanupNPC(NPCCharacter: Model)
+	local NPCMaid = NPCMaids[NPCCharacter]
+	if NPCMaid then
+		NPCMaid:DoCleaning()
+		NPCMaids[NPCCharacter] = nil
+	end
+
+	ActivePromises[NPCCharacter] = nil
+
+	local Controller = CharacterController.Get(NPCCharacter)
+	if Controller then
+		Controller:Destroy()
+	end
 end
 
 return CharacterLoader

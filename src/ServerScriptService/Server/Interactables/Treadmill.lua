@@ -1,6 +1,5 @@
 --!strict
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -12,6 +11,7 @@ local CharacterController = require(Server.Entity.Core.CharacterController)
 local InteractableBase = require(Server.Interactables.InteractableBase)
 local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local UpdateService = require(Shared.Networking.UpdateService)
 local Packets = require(Shared.Networking.Packets)
 
 export type InteractableModule = {
@@ -26,20 +26,27 @@ local TRAINING_ATTRIBUTE = "Training"
 local TREADMILL_MODE_ATTRIBUTE = "TreadmillMode"
 local MOVEMENT_MODE_ATTRIBUTE = "MovementMode"
 
+local UPDATE_RATE_SECONDS = 0.10
+
 local TreadmillInteractable = {} :: InteractableModule
 
-local ActiveTrainers: {[Player]: InteractableBase.ActiveUser} = {}
+local ActiveTrainers: { [Player]: InteractableBase.ActiveUser } = {}
 
 local function CleanupTreadmillEffects(Player: Player, TreadmillModel: Model)
 	Packets.StopAnimation:FireClient(Player)
 
-	local TreadmillSound = TreadmillModel.PrimaryPart:FindFirstChildWhichIsA("Sound")
+	local PrimaryPart = TreadmillModel.PrimaryPart
+	if not PrimaryPart then
+		return
+	end
+
+	local TreadmillSound = PrimaryPart:FindFirstChildWhichIsA("Sound")
 	if TreadmillSound then
 		TreadmillSound:Stop()
 		TreadmillSound:Destroy()
 	end
 
-	local Tread = TreadmillModel:FindFirstChild("Tread") :: BasePart
+	local Tread = TreadmillModel:FindFirstChild("Tread") :: BasePart?
 	if Tread then
 		local TreadBeam = Tread:FindFirstChildOfClass("Beam")
 		if TreadBeam then
@@ -66,19 +73,18 @@ local function ExitTreadmill(PlayerWhoTrained: Player, TreadmillModel: Model)
 	InteractableBase.ReleaseInteractable(TreadmillModel)
 end
 
-local function UpdateTreadmillVisuals(
-	TreadmillModel: Model,
-	StatToTrain: string,
-	Controller: any
-)
-	local Tread = TreadmillModel:FindFirstChild("Tread") :: BasePart
+local function UpdateTreadmillVisuals(TreadmillModel: Model, StatToTrain: string, Controller: any)
+	local Tread = TreadmillModel:FindFirstChild("Tread") :: BasePart?
 	if not Tread then
 		return
 	end
 
-	local Speed = if StatToTrain == StatTypes.MAX_STAMINA then TREADMILL_JOGGING_SPEED else TREADMILL_SPRINTING_SPEED
+	local BaseSpeed = if StatToTrain == StatTypes.MAX_STAMINA
+		then TREADMILL_JOGGING_SPEED
+		else TREADMILL_SPRINTING_SPEED
 	local RunSpeedStat = Controller.StatManager:GetStat(StatTypes.RUN_SPEED)
-	local TreadSpeed = Speed * (1 + (RunSpeedStat * 0.1))
+
+	local TreadSpeed = BaseSpeed * (1 + (RunSpeedStat * 0.1))
 
 	local TreadBeam = Tread:FindFirstChildOfClass("Beam")
 	if TreadBeam then
@@ -107,47 +113,83 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 
 	Character:SetAttribute(TREADMILL_MODE_ATTRIBUTE, TrainingMode)
 
-	local TreadmillSound = Assets.Sounds.TreadmillRunning:Clone()
-	TreadmillSound.Parent = TreadmillModel.PrimaryPart
-	TreadmillSound:Play()
+	local PrimaryPart = TreadmillModel.PrimaryPart
+	if PrimaryPart then
+		local TreadmillSound = Assets.Sounds.TreadmillRunning:Clone()
+		TreadmillSound.Parent = PrimaryPart
+		TreadmillSound:Play()
+	end
 
 	local AnimationName = if TrainingMode == "MaxStamina" then "jog" else "run"
 	Packets.PlayAnimation:FireClient(Player, AnimationName)
+	Character:SetAttribute(MOVEMENT_MODE_ATTRIBUTE, AnimationName)
 
 	local TrainingConfig = if TrainingMode == "MaxStamina"
 		then TrainingBalance.TrainingTypes.Stamina
 		else TrainingBalance.TrainingTypes.RunSpeed
 
-	local StatToTrain = if TrainingMode == "MaxStamina"
-		then StatTypes.MAX_STAMINA
-		else StatTypes.RUN_SPEED
+	local StatToTrain = if TrainingMode == "MaxStamina" then StatTypes.MAX_STAMINA else StatTypes.RUN_SPEED
 
-	local TrainingConnection = RunService.Heartbeat:Connect(function(DeltaTime)
+	local VisualAccumulator = 0.0
+	local StaminaAccumulator = 0.0
+	local XpAccumulator = 0.0
+
+	local PendingStaminaCost = 0.0
+	local PendingXpGain = 0.0
+
+	local TrainingConnection = UpdateService.RegisterWithCleanup(function(DeltaTime: number)
+		if not Character.Parent then
+			ExitTreadmill(Player, TreadmillModel)
+			return
+		end
+
 		if not TrainingController:CanTrain() then
 			ExitTreadmill(Player, TreadmillModel)
 			return
 		end
 
-		if StaminaController then
-			local StaminaCost = TrainingConfig.StaminaDrain * DeltaTime
-			local Success = StaminaController:ConsumeStamina(StaminaCost)
+		VisualAccumulator += DeltaTime
+		StaminaAccumulator += DeltaTime
+		XpAccumulator += DeltaTime
 
-			if not Success then
-				ExitTreadmill(Player, TreadmillModel)
-				return
+		PendingStaminaCost += TrainingConfig.StaminaDrain * DeltaTime
+		PendingXpGain += TrainingConfig.BaseXPPerSecond * DeltaTime
+
+		if VisualAccumulator >= UPDATE_RATE_SECONDS then
+			VisualAccumulator = 0
+			UpdateTreadmillVisuals(TreadmillModel, StatToTrain, Controller)
+		end
+
+		if StaminaAccumulator >= UPDATE_RATE_SECONDS then
+			StaminaAccumulator = 0
+
+			if StaminaController then
+				local Success = StaminaController:ConsumeStamina(PendingStaminaCost)
+				PendingStaminaCost = 0
+
+				if not Success then
+					ExitTreadmill(Player, TreadmillModel)
+					return
+				end
+			else
+				PendingStaminaCost = 0
 			end
 		end
 
-		Character:SetAttribute(MOVEMENT_MODE_ATTRIBUTE, AnimationName)
-		UpdateTreadmillVisuals(TreadmillModel, StatToTrain, Controller)
+		if XpAccumulator >= UPDATE_RATE_SECONDS then
+			XpAccumulator = 0
 
-		local XPGain = TrainingConfig.BaseXPPerSecond * DeltaTime
-		TrainingController:GrantStatGain(StatToTrain, XPGain)
-	end)
+			TrainingController:GrantStatGain(StatToTrain, PendingXpGain)
+			PendingXpGain = 0
+		end
+	end, 0.10)
 
-	if ActiveTrainers[Player] and ActiveTrainers[Player].ActivityConnection then
-		ActiveTrainers[Player].ActivityConnection:Disconnect()
-		ActiveTrainers[Player].ActivityConnection = TrainingConnection
+	local ActiveUser = ActiveTrainers[Player]
+	if ActiveUser then
+		if ActiveUser.ActivityConnection then
+			ActiveUser.ActivityConnection:Disconnect()
+		end
+		ActiveUser.ActivityConnection = TrainingConnection
 	end
 end
 
@@ -180,7 +222,7 @@ function TreadmillInteractable.OnInteract(Player: Player, TreadmillModel: Model)
 		return
 	end
 
-	local TrainingLocation = TreadmillModel:FindFirstChild("TrainingLocation") :: BasePart
+	local TrainingLocation = TreadmillModel:FindFirstChild("TrainingLocation") :: BasePart?
 	if not TrainingLocation then
 		InteractableBase.ReleaseInteractable(TreadmillModel)
 		return
@@ -198,11 +240,9 @@ function TreadmillInteractable.OnInteract(Player: Player, TreadmillModel: Model)
 		ExitTreadmill(Player, TreadmillModel)
 	end)
 
-	local DummyTrainingConnection = RunService.Heartbeat:Connect(function() end)
-
 	ActiveTrainers[Player] = {
 		Connection = JumpConnection,
-		ActivityConnection = DummyTrainingConnection,
+		ActivityConnection = nil,
 	}
 
 	Packets.TreadmillModeSelected:FireClient(Player)

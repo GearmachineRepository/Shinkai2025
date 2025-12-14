@@ -1,23 +1,28 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local Formulas = require(Shared.General.Formulas)
 local Maid = require(Shared.General.Maid)
+local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local SweatController = {}
 SweatController.__index = SweatController
 
-export type SweatController = typeof(setmetatable({} :: {
-	Controller: any,
-	Character: Model,
-	IsActive: boolean,
-	LastActivityTime: number,
-	SweatStartTime: number,
-	Maid: Maid.MaidSelf,
-}, SweatController))
+export type SweatController = typeof(setmetatable(
+	{} :: {
+		Controller: any,
+		Character: Model,
+		IsActive: boolean,
+		LastActivityTime: number,
+		SweatStartTime: number,
+		Maid: Maid.MaidSelf,
+		LastSweatState: boolean,
+	},
+	SweatController
+))
 
 local SWEAT_STAMINA_THRESHOLD = 0.75
 local ACTIVITY_TIMEOUT = 5
@@ -33,33 +38,27 @@ function SweatController.new(CharacterController: any): SweatController
 		LastActivityTime = 0,
 		SweatStartTime = 0,
 		Maid = Maid.new(),
+		LastSweatState = false,
 	}, SweatController)
 
 	self:SetupActivityTracking()
-
-	self.Maid:GiveTask(RunService.Heartbeat:Connect(function()
-		self:Update()
-	end))
 
 	return self
 end
 
 function SweatController:SetupActivityTracking()
-	self.Maid:GiveTask(self.Character:GetAttributeChangedSignal("MovementMode"):Connect(function()
-		self:CheckActivity()
-	end))
+	local AttributesToTrack = {
+		"MovementMode",
+		"Training",
+		"UsingSkill",
+		"Attacking",
+	}
 
-	self.Maid:GiveTask(self.Character:GetAttributeChangedSignal("Training"):Connect(function()
-		self:CheckActivity()
-	end))
-
-	self.Maid:GiveTask(self.Character:GetAttributeChangedSignal("UsingSkill"):Connect(function()
-		self:CheckActivity()
-	end))
-
-	self.Maid:GiveTask(self.Character:GetAttributeChangedSignal("Attacking"):Connect(function()
-		self:CheckActivity()
-	end))
+	for _, AttributeName in AttributesToTrack do
+		self.Maid:GiveTask(self.Character:GetAttributeChangedSignal(AttributeName):Connect(function()
+			self:CheckActivity()
+		end))
+	end
 end
 
 function SweatController:CheckActivity()
@@ -68,11 +67,7 @@ function SweatController:CheckActivity()
 	local IsUsingSkill = self.Character:GetAttribute("UsingSkill")
 	local IsAttacking = self.Character:GetAttribute("Attacking")
 
-	local IsDoingActivity = MovementMode == "jog"
-		or MovementMode == "run"
-		or IsTraining
-		or IsUsingSkill
-		or IsAttacking
+	local IsDoingActivity = MovementMode == "jog" or MovementMode == "run" or IsTraining or IsUsingSkill or IsAttacking
 
 	if IsDoingActivity then
 		self.LastActivityTime = tick()
@@ -82,7 +77,7 @@ end
 function SweatController:Update()
 	local CurrentStamina = self.Controller.StatManager:GetStat(StatTypes.STAMINA)
 	local MaxStamina = self.Controller.StatManager:GetStat(StatTypes.MAX_STAMINA)
-	local StaminaPercent = CurrentStamina / MaxStamina
+	local StaminaPercent = Formulas.SafeDivide(CurrentStamina, MaxStamina)
 
 	local TimeSinceActivity = tick() - self.LastActivityTime
 	local IsRecentlyActive = TimeSinceActivity < ACTIVITY_TIMEOUT
@@ -102,12 +97,24 @@ end
 function SweatController:StartSweating()
 	self.IsActive = true
 	self.SweatStartTime = tick()
-	self.Character:SetAttribute("Sweating", true)
+
+	if self.LastSweatState ~= true then
+		self.Character:SetAttribute("Sweating", true)
+		self.LastSweatState = true
+
+		DebugLogger.Info("SweatController", "Started sweating: %s", self.Controller.Character.Name)
+	end
 end
 
 function SweatController:StopSweating()
 	self.IsActive = false
-	self.Character:SetAttribute("Sweating", false)
+
+	if self.LastSweatState ~= false then
+		self.Character:SetAttribute("Sweating", false)
+		self.LastSweatState = false
+
+		DebugLogger.Info("SweatController", "Stopped sweating: %s", self.Controller.Character.Name)
+	end
 end
 
 function SweatController:GetStatGainMultiplier(): number
@@ -120,6 +127,7 @@ end
 
 function SweatController:Destroy()
 	self:StopSweating()
+	DebugLogger.Info("SweatController", "Destroying SweatController")
 	self.Maid:DoCleaning()
 end
 

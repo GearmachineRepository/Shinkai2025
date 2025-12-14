@@ -78,7 +78,7 @@ function TrainingController:ProcessTraining(_: number)
 	end
 end
 
-function TrainingController:GrantStatGain(StatName: string, Amount: number, _: number?)
+function TrainingController:GrantStatGain(StatName: string, Amount: number, _FatigueGainOverride: number?)
 	if Amount <= 0 then
 		return
 	end
@@ -88,7 +88,7 @@ function TrainingController:GrantStatGain(StatName: string, Amount: number, _: n
 		FinalAmount = Amount * self.Controller.SweatController:GetStatGainMultiplier()
 	end
 
-	ProgressionSystem.AwardTrainingXP(self.PlayerData, StatName, FinalAmount, self.Controller)
+	local XPAwarded = ProgressionSystem.AwardTrainingXP(self.PlayerData, StatName, FinalAmount, self.Controller)
 
 	self:UpdateAvailablePoints(StatName)
 
@@ -100,13 +100,28 @@ function TrainingController:GrantStatGain(StatName: string, Amount: number, _: n
 		local AvailablePoints = self.PlayerData.Stats[StatName .. "_AvailablePoints"]
 		Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
 	end
+
+	if XPAwarded > 0 then
+		DebugLogger.Info(
+			"TrainingController",
+			"Awarded %.2f XP to %s for %s",
+			XPAwarded,
+			self.Controller.Character.Name,
+			StatName
+		)
+	end
 end
 
 function TrainingController:AllocateStatPoint(StatName: string): boolean
 	local Success, ErrorMessage = StatSystem.AllocateStar(self.PlayerData, StatName)
 
 	if not Success then
-		DebugLogger.Warning(script.Name, "Failed to allocate star:", ErrorMessage)
+		DebugLogger.Warning(
+			"TrainingController",
+			"Failed to allocate star for %s: %s",
+			self.Controller.Character.Name,
+			ErrorMessage
+		)
 		return false
 	end
 
@@ -123,6 +138,14 @@ function TrainingController:AllocateStatPoint(StatName: string): boolean
 		self:UpdateAvailablePoints(StatName)
 	end
 
+	DebugLogger.Info(
+		"TrainingController",
+		"%s allocated star to %s (now %d stars)",
+		self.Controller.Character.Name,
+		StatName,
+		NewStars
+	)
+
 	return true
 end
 
@@ -137,6 +160,10 @@ function TrainingController:UpdateAvailablePoints(StatName: string)
 end
 
 function TrainingController:CanTrain(): boolean
+	if not self.Controller.BodyFatigueController then
+		return true
+	end
+
 	return self.Controller.BodyFatigueController:CanGainStats()
 end
 
@@ -146,6 +173,7 @@ end
 
 function TrainingController:Destroy()
 	self:StopTraining()
+	DebugLogger.Info("TrainingController", "Destroying TrainingController")
 	self.Maid:DoCleaning()
 end
 

@@ -13,10 +13,10 @@ export type PromiseLike = { cancel: (self: any) -> (), getStatus: (self: any) ->
 export type CleanupTask = RBXScriptConnection | Instance | (() -> ()) | Destroyable | Disconnectable | PromiseLike
 
 export type MaidSelf = {
-	_Tasks: { [any]: CleanupTask },
+	Tasks: { [any]: CleanupTask },
 	GiveTask: (self: MaidSelf, Task: CleanupTask) -> CleanupTask,
-	Set: (self: MaidSelf, Name: string, Task: CleanupTask) -> (),
-	_cleanupItem: (self: MaidSelf, Task: CleanupTask) -> (),
+	Set: (self: MaidSelf, Name: string, Task: CleanupTask?) -> (),
+	CleanupItem: (self: MaidSelf, Task: CleanupTask) -> (),
 	DoCleaning: (self: MaidSelf) -> (),
 }
 
@@ -24,54 +24,86 @@ local Maid = {}
 Maid.__index = Maid
 
 function Maid.new(): MaidSelf
-	local self = setmetatable({
-		_Tasks = {},
-	}, Maid)
-	return self :: any
+	return setmetatable({
+		Tasks = {},
+	}, Maid) :: any
 end
 
 function Maid:GiveTask(Task: CleanupTask): CleanupTask
-	table.insert(self._Tasks, Task)
+	table.insert(self.Tasks, Task)
 	return Task
 end
 
-function Maid:Set(Name: string, Task: CleanupTask)
-	local Old = self._Tasks[Name]
-	if Old then
-		self:_cleanupItem(Old)
+function Maid:Set(Name: string, Task: CleanupTask?)
+	local Tasks = self.Tasks
+	local OldTask = Tasks[Name]
+	if OldTask then
+		self:CleanupItem(OldTask)
 	end
-	self._Tasks[Name] = Task
+	Tasks[Name] = Task
 end
 
-function Maid:_cleanupItem(Task: CleanupTask)
+function Maid:CleanupItem(Task: CleanupTask)
 	local TaskType = typeof(Task)
 
 	if TaskType == "function" then
 		(Task :: () -> ())()
-	elseif TaskType == "RBXScriptConnection" then
-		if (Task :: RBXScriptConnection).Connected then
-			(Task :: RBXScriptConnection):Disconnect()
+		return
+	end
+
+	if TaskType == "RBXScriptConnection" then
+		local Connection = Task :: RBXScriptConnection
+		if Connection.Connected then
+			Connection:Disconnect()
 		end
-	elseif TaskType == "Instance" then
+		return
+	end
+
+	if TaskType == "Instance" then
 		(Task :: Instance):Destroy()
-	elseif TaskType == "table" then
-		if typeof((Task :: any).Destroy) == "function" then
-			(Task :: Destroyable):Destroy()
-		elseif typeof((Task :: any).Disconnect) == "function" then
-			(Task :: Disconnectable):Disconnect()
-		elseif typeof((Task :: any).cancel) == "function" and typeof((Task :: any).getStatus) == "function" then
-			if (Task :: PromiseLike):getStatus() == "Started" then
-				(Task :: PromiseLike):cancel()
-			end
+		return
+	end
+
+	if TaskType ~= "table" then
+		return
+	end
+
+	local AnyTask = Task :: any
+
+	local DestroyUnknown = AnyTask.Destroy :: any
+	if type(DestroyUnknown) == "function" then
+		(DestroyUnknown :: (any) -> ())(AnyTask)
+		return
+	end
+
+	local DisconnectUnknown = AnyTask.Disconnect :: any
+	if type(DisconnectUnknown) == "function" then
+		(DisconnectUnknown :: (any) -> ())(AnyTask)
+		return
+	end
+
+	local CancelUnknown = AnyTask.cancel :: any
+	local GetStatusUnknown = AnyTask.getStatus :: any
+	if type(CancelUnknown) == "function" and type(GetStatusUnknown) == "function" then
+		local GetStatus = GetStatusUnknown :: (any) -> string
+		if GetStatus(AnyTask) == "Started" then
+			local Cancel = CancelUnknown :: (any) -> ()
+			Cancel(AnyTask)
 		end
 	end
 end
 
 function Maid:DoCleaning()
-	for Key, Task in self._Tasks do
-		self:_cleanupItem(Task)
-		self._Tasks[Key] = nil
+	local Tasks = self.Tasks :: { [any]: CleanupTask }
+
+	local Key, Value = next(Tasks)
+	while Value ~= nil do
+		Tasks[Key] = nil
+		self:CleanupItem(Value :: CleanupTask)
+		Key, Value = next(Tasks)
 	end
 end
+
+Maid.Destroy = Maid.DoCleaning
 
 return Maid

@@ -20,6 +20,9 @@ local TRAINABLE_STATS = {
 	StatTypes.MAX_STAMINA,
 }
 
+local RATE_LIMIT_WINDOW = 0.5
+local LastAllocationTimes: { [number]: number } = {}
+
 local function IsTrainableStat(StatName: string): boolean
 	for _, Stat in TRAINABLE_STATS do
 		if Stat == StatName then
@@ -29,34 +32,57 @@ local function IsTrainableStat(StatName: string): boolean
 	return false
 end
 
+local function IsRateLimited(UserId: number): boolean
+	local Now = tick()
+	local LastTime = LastAllocationTimes[UserId] or 0
+
+	if Now - LastTime < RATE_LIMIT_WINDOW then
+		return true
+	end
+
+	LastAllocationTimes[UserId] = Now
+	return false
+end
+
 local function HandleAllocateStatPoint(Player: Player, StatName: string)
+	if IsRateLimited(Player.UserId) then
+		DebugLogger.Warning("StatAllocationHandler", "Rate limited: %s", Player.Name)
+		return
+	end
+
 	if not IsTrainableStat(StatName) then
-		DebugLogger.Warning(script.Name, "Player attempted to allocate invalid stat:", Player.Name, StatName)
+		DebugLogger.Warning("StatAllocationHandler", "Invalid stat from %s: %s", Player.Name, StatName)
 		return
 	end
 
 	local Character = Player.Character
 	if not Character then
-		DebugLogger.Warning(script.Name, "Player has no character:", Player.Name)
+		DebugLogger.Warning("StatAllocationHandler", "No character: %s", Player.Name)
 		return
 	end
 
 	local Controller = CharacterController.Get(Character)
 	if not Controller then
-		DebugLogger.Warning(script.Name, "Player character has no controller:", Player.Name)
+		DebugLogger.Warning("StatAllocationHandler", "No controller: %s", Player.Name)
 		return
 	end
 
 	local TrainingController = Controller.TrainingController
 	if not TrainingController then
-		DebugLogger.Warning(script.Name, "Player has no training controller:", Player.Name)
+		DebugLogger.Warning("StatAllocationHandler", "No TrainingController: %s", Player.Name)
 		return
 	end
 
 	local Success = TrainingController:AllocateStatPoint(StatName)
-	if not Success then
-		DebugLogger.Warning(script.Name, "Player failed to allocate stat point:", Player.Name, StatName)
+	if Success then
+		DebugLogger.Info("StatAllocationHandler", "%s allocated point to %s", Player.Name, StatName)
+	else
+		DebugLogger.Info("StatAllocationHandler", "%s failed to allocate %s", Player.Name, StatName)
 	end
 end
 
 Packets.AllocateStatPoint.OnServerEvent:Connect(HandleAllocateStatPoint)
+
+game:GetService("Players").PlayerRemoving:Connect(function(Player: Player)
+	LastAllocationTimes[Player.UserId] = nil
+end)

@@ -10,11 +10,14 @@ local Maid = require(Shared.General.Maid)
 local HungerController = {}
 HungerController.__index = HungerController
 
-export type HungerController = typeof(setmetatable({} :: {
-	Controller: any,
-	LastUpdate: number,
-	Maid: Maid.MaidSelf,
-}, HungerController))
+export type HungerController = typeof(setmetatable(
+	{} :: {
+		Controller: any,
+		LastUpdate: number,
+		Maid: Maid.MaidSelf,
+	},
+	HungerController
+))
 
 function HungerController.new(CharacterController: any): HungerController
 	local self = setmetatable({
@@ -23,7 +26,10 @@ function HungerController.new(CharacterController: any): HungerController
 		Maid = Maid.new(),
 	}, HungerController)
 
-	CharacterController.Character:SetAttribute("HungerThreshold", TrainingBalance.HungerSystem.STAT_GAIN_THRESHOLD / 100)
+	CharacterController.Character:SetAttribute(
+		"HungerThreshold",
+		TrainingBalance.HungerSystem.STAT_GAIN_THRESHOLD / 100
+	)
 	CharacterController.Character:SetAttribute("MaxFat", TrainingBalance.FatSystem.MAX_FAT)
 
 	return self
@@ -50,7 +56,7 @@ function HungerController:Update()
 	self.Controller.StatManager:SetStat(StatTypes.HUNGER, NewHunger)
 
 	if NewHunger < TrainingBalance.HungerSystem.CRITICAL_THRESHOLD then
-		self.Controller.StateManager:FireEvent("HungerCritical", {HungerPercent = self:GetHungerPercent()})
+		self.Controller.StateManager:FireEvent("HungerCritical", { HungerPercent = self:GetHungerPercent() })
 	end
 end
 

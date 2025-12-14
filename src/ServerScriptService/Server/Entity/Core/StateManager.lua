@@ -10,12 +10,21 @@ local Signal = require(Shared.Packages.Signal)
 local StateManager = {}
 StateManager.__index = StateManager
 
+export type StateChangedCallback = (IsActive: boolean) -> ()
+
+export type CallbackConnection = {
+	Disconnect: (self: CallbackConnection) -> (),
+	Connected: boolean,
+}
+
 export type StateManager = typeof(setmetatable(
 	{} :: {
 		Character: Model,
 		States: { [string]: boolean },
 		Events: { [string]: any },
-		StateChangedCallbacks: { [string]: { (IsActive: boolean) -> () } },
+
+		CallbackIdCounter: number,
+		CallbacksByState: { [string]: { [number]: StateChangedCallback } },
 	},
 	StateManager
 ))
@@ -25,7 +34,9 @@ function StateManager.new(Character: Model): StateManager
 		Character = Character,
 		States = {},
 		Events = {},
-		StateChangedCallbacks = {},
+
+		CallbackIdCounter = 0,
+		CallbacksByState = {},
 	}, StateManager)
 
 	for _, StateName in StateTypes do
@@ -54,20 +65,46 @@ function StateManager:SetState(StateName: string, Value: boolean)
 		self.Character:SetAttribute(StateName, Value)
 	end
 
-	local Callbacks = self.StateChangedCallbacks[StateName]
-	if Callbacks then
-		for _, Callback in Callbacks do
-			task.spawn(Callback, Value)
-		end
+	local CallbackTable = self.CallbacksByState[StateName]
+	if not CallbackTable or not next(CallbackTable) then
+		return
+	end
+
+	for _, Callback in CallbackTable do
+		task.defer(Callback, Value)
 	end
 end
 
-function StateManager:OnStateChanged(StateName: string, Callback: (IsActive: boolean) -> ())
-	if not self.StateChangedCallbacks[StateName] then
-		self.StateChangedCallbacks[StateName] = {}
+function StateManager:OnStateChanged(StateName: string, Callback: StateChangedCallback): CallbackConnection
+	local StateCallbacks = self.CallbacksByState[StateName]
+	if not StateCallbacks then
+		StateCallbacks = {}
+		self.CallbacksByState[StateName] = StateCallbacks
 	end
 
-	table.insert(self.StateChangedCallbacks[StateName], Callback)
+	self.CallbackIdCounter += 1
+	local CallbackId = self.CallbackIdCounter
+	StateCallbacks[CallbackId] = Callback
+
+	local Connection = {
+		Connected = true,
+		Disconnect = nil :: any,
+	}
+
+	function Connection.Disconnect()
+		if not Connection.Connected then
+			return
+		end
+
+		Connection.Connected = false
+
+		local CallbacksForState = self.CallbacksByState[StateName]
+		if CallbacksForState then
+			CallbacksForState[CallbackId] = nil
+		end
+	end
+
+	return Connection :: CallbackConnection
 end
 
 function StateManager:FireEvent(EventName: string, EventData: any?)
@@ -79,9 +116,11 @@ end
 
 function StateManager:OnEvent(EventName: string, Callback: (EventData: any?) -> ())
 	local Event = self.Events[EventName]
-	if Event then
-		return Event:Connect(Callback)
+	if not Event then
+		return nil
 	end
+
+	return Event:Connect(Callback)
 end
 
 function StateManager:Destroy()
@@ -93,7 +132,7 @@ function StateManager:Destroy()
 
 	table.clear(self.States)
 	table.clear(self.Events)
-	table.clear(self.StateChangedCallbacks)
+	table.clear(self.CallbacksByState)
 end
 
 return StateManager

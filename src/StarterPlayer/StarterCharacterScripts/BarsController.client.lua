@@ -1,10 +1,11 @@
 --!strict
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local General = Shared:WaitForChild("General")
-local Formulas = require(General:WaitForChild("Formulas"))
+local Formulas = require(Shared.General.Formulas)
+local UpdateService = require(Shared.Networking.UpdateService)
+local Maid = require(Shared.General.Maid)
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -13,8 +14,8 @@ local Frames = Hud:WaitForChild("Frames")
 local BarsFrame = Frames:WaitForChild("Bars")
 local BarsFolder = BarsFrame:WaitForChild("BarFrames")
 
-local BAR_UPDATE_RATE = 0.05
-local LERP_SPEED = 10
+local LERP_SPEED = 12
+local UPDATE_INTERVAL = 1 / 30
 
 type BarData = {
 	Frame: Frame,
@@ -26,54 +27,39 @@ type BarData = {
 	TargetValue: number,
 }
 
-local Bars: {[string]: BarData} = {}
+local Bars: { [string]: BarData } = {}
+local CharacterMaid = Maid.new()
 
 local function SetupBar(BarFrame: Frame)
 	local BarName = BarFrame.Name
-	local Fill = BarFrame:FindFirstChild("Fill")
-	local Quantity = BarFrame:FindFirstChild("Quantity")
+	local Fill = BarFrame:FindFirstChild("Fill") :: Frame?
+	local Quantity = BarFrame:FindFirstChild("Quantity") :: TextLabel?
 
-	if not Fill or not Fill:IsA("Frame") then
+	if not Fill or not Quantity then
 		return
 	end
-
-	if not Quantity or not Quantity:IsA("TextLabel") then
-		return
-	end
-
-	local StatName = BarName
-	local MaxStatName = "Max" .. BarName
 
 	Bars[BarName] = {
 		Frame = BarFrame,
 		Fill = Fill,
 		Quantity = Quantity,
-		StatName = StatName,
-		MaxStatName = MaxStatName,
+		StatName = BarName,
+		MaxStatName = "Max" .. BarName,
 		CurrentValue = 0,
 		TargetValue = 0,
 	}
 end
 
-local function UpdateBar(BarData: BarData, Humanoid: Humanoid, Character: Model)
-	if not Character or not Humanoid then
-		return
-	end
-
-	local Current = Humanoid:GetAttribute(BarData.StatName) or Character:GetAttribute(BarData.StatName)
-	local Max = Humanoid:GetAttribute(BarData.MaxStatName) or Character:GetAttribute(BarData.MaxStatName)
+local function UpdateBarTarget(BarData: BarData, Humanoid: Humanoid, Character: Model)
+	local Current: number?
+	local Max: number?
 
 	if BarData.StatName == "Health" then
 		Current = Humanoid.Health
 		Max = Humanoid.MaxHealth
-	end
-
-	if BarData.StatName == "Hunger" then
-		local HungerThreshold = Character:GetAttribute("HungerThreshold") or 0
-		local ThresholdBar = BarData.Frame:FindFirstChild("Threshold")
-		if ThresholdBar and ThresholdBar:IsA("Frame") then
-			ThresholdBar.Size = UDim2.fromScale(HungerThreshold, 1)
-		end
+	else
+		Current = Humanoid:GetAttribute(BarData.StatName) or Character:GetAttribute(BarData.StatName)
+		Max = Humanoid:GetAttribute(BarData.MaxStatName) or Character:GetAttribute(BarData.MaxStatName)
 	end
 
 	if not Current or not Max or Max == 0 then
@@ -81,63 +67,62 @@ local function UpdateBar(BarData: BarData, Humanoid: Humanoid, Character: Model)
 	end
 
 	BarData.TargetValue = Current / Max
+
+	if BarData.StatName == "Hunger" then
+		local HungerThreshold = Character:GetAttribute("HungerThreshold") or 0
+		local ThresholdBar = BarData.Frame:FindFirstChild("Threshold") :: Frame?
+		if ThresholdBar then
+			ThresholdBar.Size = UDim2.fromScale(HungerThreshold, 1)
+		end
+	end
 end
 
 local function LerpBar(BarData: BarData, DeltaTime: number)
-	BarData.CurrentValue = BarData.CurrentValue + (BarData.TargetValue - BarData.CurrentValue) * math.min(LERP_SPEED * DeltaTime, 1)
-
+	local Alpha = math.min(LERP_SPEED * DeltaTime, 1)
+	BarData.CurrentValue += (BarData.TargetValue - BarData.CurrentValue) * Alpha
 	BarData.Fill.Size = UDim2.fromScale(BarData.CurrentValue, 1)
+	BarData.Quantity.Text = tostring(math.floor(BarData.CurrentValue * 100)) .. "%"
+end
+
+local function UpdateBodyFatigue(Character: Model)
+	local BodyFatigueLabel = BarsFrame:FindFirstChild("BodyFatiguePercentage", true) :: TextLabel?
+	if not BodyFatigueLabel then
+		return
+	end
+
+	local BodyFatigue = Character:GetAttribute("BodyFatigue") or 0
+	local MaxBodyFatigue = Character:GetAttribute("MaxBodyFatigue") or 100
+	local Percentage = (BodyFatigue / MaxBodyFatigue) * 100
+	local Rounded = Formulas.Round(Percentage, 1)
+
+	BodyFatigueLabel.Text = tostring(Rounded) .. "%"
+	BodyFatigueLabel.TextScaled = not BodyFatigueLabel.TextFits
 end
 
 local function SetupCharacter(Character: Model)
-	local Humanoid = Character:WaitForChild("Humanoid", 5)
+	CharacterMaid:DoCleaning()
+
+	local Humanoid = Character:WaitForChild("Humanoid", 5) :: Humanoid?
 	if not Humanoid then
 		return
 	end
 
 	for _, BarData in Bars do
-		UpdateBar(BarData, Humanoid, Character)
+		UpdateBarTarget(BarData, Humanoid, Character)
 		BarData.CurrentValue = BarData.TargetValue
 		LerpBar(BarData, 0)
 	end
 
-	local LastUpdate = tick()
-
-	local HeartbeatConnection = RunService.Heartbeat:Connect(function()
-		local CurrentTime = tick()
-
-		if CurrentTime - LastUpdate >= BAR_UPDATE_RATE then
-			for _, BarData in Bars do
-				UpdateBar(BarData, Humanoid, Character)
-				BarData.Quantity.Text = tostring(math.floor(BarData.TargetValue * 100)) .. "%"
-			end
-			LastUpdate = CurrentTime
-		end
-
-		local DeltaTime = CurrentTime - LastUpdate + BAR_UPDATE_RATE
+	local UpdateConnection = UpdateService.Register(function(DeltaTime: number)
 		for _, BarData in Bars do
+			UpdateBarTarget(BarData, Humanoid, Character)
 			LerpBar(BarData, DeltaTime)
-			BarData.Quantity.Text = tostring(math.floor(BarData.TargetValue * 100)) .. "%"
 		end
 
-		local BodyFatigueTextLabel = BarsFrame:FindFirstChild("BodyFatiguePercentage", true)
-		if BodyFatigueTextLabel then
-			local BodyFatigue = Character:GetAttribute("BodyFatigue") or Character:GetAttribute("BodyFatigue") or 0
-			local MaxBodyFatigue = Character:GetAttribute("MaxBodyFatigue") or Character:GetAttribute("MaxBodyFatigue") or 100
-			local Percentage = (BodyFatigue / MaxBodyFatigue) * 100
-			local Rounded = Formulas.Round(Percentage, 1)
-			if Rounded % 0.15 == 0 then
-				BodyFatigueTextLabel.Text = tostring(Rounded) .. "%"
-				if not BodyFatigueTextLabel.TextFits then
-					BodyFatigueTextLabel.TextScaled = true
-				end
-			end
-		end
-	end)
+		UpdateBodyFatigue(Character)
+	end, UPDATE_INTERVAL)
 
-	Character.Destroying:Connect(function()
-		HeartbeatConnection:Disconnect()
-	end)
+	CharacterMaid:GiveTask(UpdateConnection)
 end
 
 for _, Child in BarsFolder:GetChildren() do
@@ -147,19 +132,20 @@ for _, Child in BarsFolder:GetChildren() do
 end
 
 BarsFolder.ChildAdded:Connect(function(Child)
-	if Child:IsA("Frame") then
-		task.wait()
-		SetupBar(Child)
+	if not Child:IsA("Frame") then
+		return
+	end
 
-		if Player.Character then
-			local Humanoid = Player.Character:FindFirstChild("Humanoid")
-			if Humanoid then
-				local BarData = Bars[Child.Name]
-				if BarData then
-					UpdateBar(BarData, Humanoid, Player.Character)
-					BarData.CurrentValue = BarData.TargetValue
-					LerpBar(BarData, 0)
-				end
+	SetupBar(Child)
+
+	if Player.Character then
+		local Humanoid = Player.Character:FindFirstChild("Humanoid") :: Humanoid?
+		if Humanoid then
+			local BarData = Bars[Child.Name]
+			if BarData then
+				UpdateBarTarget(BarData, Humanoid, Player.Character)
+				BarData.CurrentValue = BarData.TargetValue
+				LerpBar(BarData, 0)
 			end
 		end
 	end

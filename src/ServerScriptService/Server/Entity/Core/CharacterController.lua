@@ -2,7 +2,6 @@
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
@@ -29,35 +28,48 @@ local ModifierConfigs = require(Shared.Configurations.Modifiers.BodyCompositionM
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
+local Formulas = require(Shared.General.Formulas)
 local Maid = require(Shared.General.Maid)
+local DebugLogger = require(Shared.Debug.DebugLogger)
+local UpdateService = require(Shared.Networking.UpdateService)
 
 local CharacterController = {}
 CharacterController.__index = CharacterController
 
-export type DamageModifier = (Damage: number, Data: {[string]: any}) -> number
-export type HealingModifier = (HealAmount: number, Data: {[string]: any}) -> number
-export type StaminaCostModifier = (Cost: number, Data: {[string]: any}) -> number
-export type SpeedModifier = (Speed: number, Data: {[string]: any}) -> number
+export type DamageModifier = (Damage: number, Data: { [string]: any }) -> number
+export type HealingModifier = (HealAmount: number, Data: { [string]: any }) -> number
+export type StaminaCostModifier = (Cost: number, Data: { [string]: any }) -> number
+export type SpeedModifier = (Speed: number, Data: { [string]: any }) -> number
 
-export type ControllerType = typeof(setmetatable({} :: {
-	Character: Model,
-	Humanoid: Humanoid,
-	IsPlayer: boolean,
-	Player: Player?,
-	Maid: Maid.MaidSelf,
-	StateManager: StateManager.StateManager,
-	StatManager: StatManager.StatManager,
-	HookController: HookController.HookController,
-	StaminaController: StaminaController.StaminaController?,
-	HungerController: HungerController.HungerController?,
-	BodyFatigueController: BodyFatigueController.BodyFatigueController?,
-	TrainingController: TrainingController.TrainingController?,
-	BodyScalingController: BodyScalingController.BodyScalingController?,
-	SweatController: SweatController.SweatController?,
-	ModifierRegistry: ModifierRegistry.ModifierRegistry,
-}, CharacterController))
+export type ControllerType = typeof(setmetatable(
+	{} :: {
+		Character: Model,
+		Humanoid: Humanoid,
+		IsPlayer: boolean,
+		Player: Player?,
+		Maid: Maid.MaidSelf,
+		StateManager: StateManager.StateManager,
+		StatManager: StatManager.StatManager,
+		HookController: HookController.HookController,
+		StaminaController: StaminaController.StaminaController?,
+		HungerController: HungerController.HungerController?,
+		BodyFatigueController: BodyFatigueController.BodyFatigueController?,
+		TrainingController: TrainingController.TrainingController?,
+		BodyScalingController: BodyScalingController.BodyScalingController?,
+		SweatController: SweatController.SweatController?,
+		ModifierRegistry: ModifierRegistry.ModifierRegistry,
+		LastWalkSpeedUpdate: number,
+		CachedWalkSpeed: number,
+		MovementTickAccumulator: number,
+		MovementTickRateSeconds: number,
+	},
+	CharacterController
+))
 
-local Controllers: {[Model]: ControllerType} = {}
+local Controllers: { [Model]: ControllerType } = {}
+
+local WALKSPEED_UPDATE_THROTTLE = 0.05
+local HEARTBEAT_UPDATE_THROTTLE = 1 / 20
 
 function CharacterController.new(Character: Model, Player: Player?, PlayerData: any?): ControllerType
 	local self = setmetatable({
@@ -76,6 +88,10 @@ function CharacterController.new(Character: Model, Player: Player?, PlayerData: 
 		BodyScalingController = nil,
 		SweatController = nil,
 		ModifierRegistry = ModifierRegistry.new(),
+		LastWalkSpeedUpdate = 0,
+		CachedWalkSpeed = 8,
+		MovementTickAccumulator = 0,
+		MovementTickRateSeconds = 0.10,
 	}, CharacterController) :: ControllerType
 
 	self.StateManager = StateManager.new(Character)
@@ -111,6 +127,11 @@ function CharacterController.new(Character: Model, Player: Player?, PlayerData: 
 
 		self:SetupMovementTracking()
 		self:SetupStatChangeListeners()
+		self:StartConsolidatedUpdateLoop()
+
+		DebugLogger.Info("CharacterController", "Created player controller for: %s", Player.Name)
+	else
+		DebugLogger.Info("CharacterController", "Created NPC controller for: %s", Character.Name)
 	end
 
 	self.Maid:GiveTask(self.Humanoid.Died:Connect(function()
@@ -120,8 +141,31 @@ function CharacterController.new(Character: Model, Player: Player?, PlayerData: 
 	return self
 end
 
+function CharacterController:StartConsolidatedUpdateLoop()
+	self.Maid:Set(
+		"ConsolidatedUpdate",
+		UpdateService.RegisterWithCleanup(function(DeltaTime: number)
+			if self.BodyFatigueController then
+				self.BodyFatigueController:Update(DeltaTime)
+			end
+
+			if self.HungerController then
+				self.HungerController:Update()
+			end
+
+			if self.TrainingController then
+				self.TrainingController:ProcessTraining(DeltaTime)
+			end
+
+			self:UpdateStaminaAndMovement(DeltaTime)
+			self:EnforceWalkSpeed()
+		end, HEARTBEAT_UPDATE_THROTTLE)
+	)
+end
+
 function CharacterController:SetupStatChangeListeners()
 	self.Maid:GiveTask(self.StatManager:OnStatChanged(StatTypes.FAT, function()
+		self:UpdateMaxHealth()
 		self:UpdateModifiedRunSpeed()
 		if self.BodyScalingController then
 			self.BodyScalingController:UpdateBodyScale()
@@ -142,21 +186,6 @@ end
 
 function CharacterController:SetupHumanoidStateTracking()
 	local Humanoid = self.Humanoid
-
-	self.Maid:GiveTask(RunService.Heartbeat:Connect(function(DeltaTime)
-		if self.BodyFatigueController then
-			self.BodyFatigueController:Update(DeltaTime)
-		end
-
-		if self.HungerController then
-			self.HungerController:Update()
-		end
-
-		if self.TrainingController then
-			self.TrainingController:ProcessTraining(DeltaTime)
-		end
-	end))
-
 	local IsInAir = false
 
 	self.Maid:GiveTask(Humanoid.StateChanged:Connect(function(_, NewState)
@@ -184,12 +213,31 @@ function CharacterController:GetExpectedWalkSpeed(MovementMode: string?): number
 
 	if MovementMode == "run" then
 		return self.ModifierRegistry:Apply("Speed", RunSpeedStat)
-	elseif MovementMode == "jog" then
+	end
+
+	if MovementMode == "jog" then
 		local JogSpeed = RunSpeedStat * StatBalance.MovementSpeeds.JogSpeedPercent
 		return self.ModifierRegistry:Apply("Speed", JogSpeed)
-	else
-		return StatBalance.MovementSpeeds.WalkSpeed
 	end
+
+	return StatBalance.MovementSpeeds.WalkSpeed
+end
+
+function CharacterController:EnforceWalkSpeed()
+	local Now = os.clock()
+	if Now - self.LastWalkSpeedUpdate < WALKSPEED_UPDATE_THROTTLE then
+		return
+	end
+
+	local CurrentMode = self.Character:GetAttribute("MovementMode")
+	local ExpectedSpeed = self:GetExpectedWalkSpeed(CurrentMode)
+
+	if not Formulas.IsNearlyEqual(self.Humanoid.WalkSpeed, ExpectedSpeed, 0.1) then
+		self.Humanoid.WalkSpeed = ExpectedSpeed
+		self.CachedWalkSpeed = ExpectedSpeed
+	end
+
+	self.LastWalkSpeedUpdate = Now
 end
 
 function CharacterController:SetupMovementTracking()
@@ -197,29 +245,20 @@ function CharacterController:SetupMovementTracking()
 		return
 	end
 
-	-- Enforce WalkSpeed every frame (anti-exploit)
-	self.Maid:GiveTask(RunService.Heartbeat:Connect(function()
-		local CurrentMode = self.Character:GetAttribute("MovementMode")
-		local ExpectedSpeed = self:GetExpectedWalkSpeed(CurrentMode)
-
-		-- Only update if different to avoid unnecessary operations
-		if math.abs(self.Humanoid.WalkSpeed - ExpectedSpeed) > 0.01 then
-			self.Humanoid.WalkSpeed = ExpectedSpeed
-		end
-	end))
-
 	self.Maid:GiveTask(self.Character:GetAttributeChangedSignal("MovementMode"):Connect(function()
 		local CurrentMode = self.Character:GetAttribute("MovementMode")
 
-		self.Maid:Set("MovementTraining", nil)
-
 		if CurrentMode == "run" then
 			self:HandleSprintMode()
-		elseif CurrentMode == "jog" then
-			self:HandleJogMode()
-		else
-			self:HandleWalkMode()
+			return
 		end
+
+		if CurrentMode == "jog" then
+			self:HandleJogMode()
+			return
+		end
+
+		self:HandleWalkMode()
 	end))
 end
 
@@ -232,31 +271,7 @@ function CharacterController:HandleSprintMode()
 		self.StaminaController:OnSprintStart()
 	end
 
-	-- Speed is enforced by Heartbeat loop, just set it once
-	self.Humanoid.WalkSpeed = self:GetExpectedWalkSpeed("run")
-
-	local SprintConnection = RunService.Heartbeat:Connect(function(DeltaTime)
-		local IsMoving = self.Character.PrimaryPart.AssemblyLinearVelocity.Magnitude > 1
-
-		if IsMoving and self.StaminaController then
-			local Success = self.StaminaController:HandleSprint(DeltaTime)
-
-			if not Success then
-				self.Character:SetAttribute("MovementMode", "walk")
-				self.StateManager:SetState(StateTypes.SPRINTING, false)
-				self.StateManager:FireEvent("SprintStopped", {})
-				self.StateManager:FireEvent("StaminaDepleted", {})
-			else
-				if self.TrainingController and self.TrainingController:CanTrain() then
-					local RunSpeedXP = (TrainingBalance.TrainingTypes.RunSpeed.BaseXPPerSecond * TrainingBalance.TrainingTypes.RunSpeed.NonmachineMultiplier) * DeltaTime
-					local FatigueGain = 0.5 * 0.7
-					self.TrainingController:GrantStatGain(StatTypes.RUN_SPEED, RunSpeedXP, FatigueGain)
-				end
-			end
-		end
-	end)
-
-	self.Maid:Set("MovementTraining", SprintConnection)
+	self.MovementTickAccumulator = 0
 end
 
 function CharacterController:HandleJogMode()
@@ -268,31 +283,7 @@ function CharacterController:HandleJogMode()
 		self.StaminaController:OnJogStart()
 	end
 
-	-- Speed is enforced by Heartbeat loop, just set it once
-	self.Humanoid.WalkSpeed = self:GetExpectedWalkSpeed("jog")
-
-	local JogConnection = RunService.Heartbeat:Connect(function(DeltaTime)
-		local IsMoving = self.Character.PrimaryPart.AssemblyLinearVelocity.Magnitude > 1
-
-		if IsMoving and self.StaminaController then
-			local Success = self.StaminaController:HandleJog(DeltaTime)
-
-			if not Success then
-				self.Character:SetAttribute("MovementMode", "walk")
-				self.StateManager:SetState(StateTypes.JOGGING, false)
-				self.StateManager:FireEvent("JogStopped", {})
-				self.StateManager:FireEvent("StaminaDepleted", {})
-			else
-				if self.TrainingController and self.TrainingController:CanTrain() then
-					local StaminaXP = (TrainingBalance.TrainingTypes.Stamina.BaseXPPerSecond * TrainingBalance.TrainingTypes.Stamina.NonmachineMultiplier) * DeltaTime
-					local FatigueGain = 0.5 * 0.8
-					self.TrainingController:GrantStatGain(StatTypes.MAX_STAMINA, StaminaXP, FatigueGain)
-				end
-			end
-		end
-	end)
-
-	self.Maid:Set("MovementTraining", JogConnection)
+	self.MovementTickAccumulator = 0
 end
 
 function CharacterController:HandleWalkMode()
@@ -319,8 +310,72 @@ function CharacterController:HandleWalkMode()
 	self.StateManager:SetState(StateTypes.SPRINTING, false)
 	self.StateManager:SetState(StateTypes.JOGGING, false)
 
-	-- Speed is enforced by Heartbeat loop, just set it once
-	self.Humanoid.WalkSpeed = 8
+	self.MovementTickAccumulator = 0
+end
+
+function CharacterController:UpdateStaminaAndMovement(DeltaTime: number)
+	if not self.StaminaController then
+		return
+	end
+
+	local CurrentMode = self.Character:GetAttribute("MovementMode")
+	local PrimaryPart = self.Character.PrimaryPart
+
+	local IsMoving = false
+	if PrimaryPart then
+		IsMoving = PrimaryPart.AssemblyLinearVelocity.Magnitude > 1
+	end
+
+	self.MovementTickAccumulator += DeltaTime
+	if self.MovementTickAccumulator < self.MovementTickRateSeconds then
+		return
+	end
+
+	local AppliedDeltaTime = self.MovementTickAccumulator
+	self.MovementTickAccumulator = 0
+
+	local CanContinue = self.StaminaController:Update(AppliedDeltaTime, CurrentMode, IsMoving)
+
+	if CanContinue then
+		if IsMoving then
+			self:GrantMovementTraining(CurrentMode, AppliedDeltaTime)
+		end
+		return
+	end
+
+	if CurrentMode ~= "walk" then
+		self.Character:SetAttribute("MovementMode", "walk")
+		self.StateManager:FireEvent("StaminaDepleted", {})
+	end
+end
+
+function CharacterController:GrantMovementTraining(CurrentMode: string?, DeltaTime: number)
+	if not self.TrainingController then
+		return
+	end
+
+	if not self.TrainingController:CanTrain() then
+		return
+	end
+
+	if CurrentMode == "run" then
+		local RunSpeedXP = (
+			TrainingBalance.TrainingTypes.RunSpeed.BaseXPPerSecond
+			* TrainingBalance.TrainingTypes.RunSpeed.NonmachineMultiplier
+		) * DeltaTime
+		local FatigueGain = 0.35
+		self.TrainingController:GrantStatGain(StatTypes.RUN_SPEED, RunSpeedXP, FatigueGain)
+		return
+	end
+
+	if CurrentMode == "jog" then
+		local StaminaXP = (
+			TrainingBalance.TrainingTypes.Stamina.BaseXPPerSecond
+			* TrainingBalance.TrainingTypes.Stamina.NonmachineMultiplier
+		) * DeltaTime
+		local FatigueGain = 0.4
+		self.TrainingController:GrantStatGain(StatTypes.MAX_STAMINA, StaminaXP, FatigueGain)
+	end
 end
 
 function CharacterController:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
@@ -345,7 +400,7 @@ function CharacterController:TakeDamage(Damage: number, Source: Player?, Directi
 		Source = Source,
 		Direction = Direction,
 		WasBlocked = self.StateManager:GetState(StateTypes.BLOCKING),
-		HealthPercent = self.Humanoid.Health / self.Humanoid.MaxHealth,
+		HealthPercent = Formulas.Percentage(self.Humanoid.Health, self.Humanoid.MaxHealth),
 	})
 end
 
@@ -360,7 +415,7 @@ function CharacterController:DealDamage(Target: Model, BaseDamage: number)
 	end
 end
 
-function CharacterController:SetStates(StatesToSet: {[string]: boolean})
+function CharacterController:SetStates(StatesToSet: { [string]: boolean })
 	for StateName, Value in StatesToSet do
 		self.StateManager:SetState(StateName, Value)
 	end
@@ -370,51 +425,52 @@ function CharacterController:UpdateMaxHealth()
 	local BaseMaxHealth = StatBalance.Defaults.MaxHealth
 	local FinalMaxHealth = self.ModifierRegistry:Apply("MaxHealth", BaseMaxHealth)
 
+	local OldMaxHealth = self.StatManager:GetStat(StatTypes.MAX_HEALTH)
+	local CurrentHealth = self.StatManager:GetStat(StatTypes.HEALTH)
+
+	local WasAtFullHealth = OldMaxHealth > 0 and Formulas.IsNearlyEqual(CurrentHealth, OldMaxHealth, 0.1)
+
 	self.StatManager:SetStat(StatTypes.MAX_HEALTH, FinalMaxHealth)
 
-	local CurrentHealth = self.StatManager:GetStat(StatTypes.HEALTH)
-	if CurrentHealth > FinalMaxHealth then
+	if WasAtFullHealth or (CurrentHealth > FinalMaxHealth) then
 		self.StatManager:SetStat(StatTypes.HEALTH, FinalMaxHealth)
 	end
 
-	if self.Humanoid then
-		self.Humanoid.MaxHealth = self.StatManager:GetStat(StatTypes.MAX_HEALTH)
-		self.Humanoid.Health = self.StatManager:GetStat(StatTypes.HEALTH)
-	end
+	self.Humanoid.MaxHealth = FinalMaxHealth
+	self.Humanoid.Health = self.StatManager:GetStat(StatTypes.HEALTH)
 end
 
 function CharacterController:UpdateModifiedRunSpeed()
 	local RunSpeedStat = self.StatManager:GetStat(StatTypes.RUN_SPEED)
-
 	local ModifiedRunSpeed = self.ModifierRegistry:Apply("Speed", RunSpeedStat)
 
-	self.Character:SetAttribute("ModifiedRunSpeed", ModifiedRunSpeed)
+	local CurrentModified = self.Character:GetAttribute("ModifiedRunSpeed") or 0
+	if not Formulas.IsNearlyEqual(ModifiedRunSpeed, CurrentModified, 0.1) then
+		self.Character:SetAttribute("ModifiedRunSpeed", ModifiedRunSpeed)
+	end
 end
 
 function CharacterController:SetupBodyCompositionModifiers()
-    for _, Config in ModifierConfigs do
-        self.ModifierRegistry:Register(Config.Type, Config.Priority, function(BaseValue, Data)
-            return Config.Calculate(BaseValue, self.StatManager, Data)
-        end)
-    end
-
-    -- Event listeners
-	self.Maid:GiveTask(self.StatManager:OnStatChanged(StatTypes.FAT, function(_, _)
-		self:UpdateMaxHealth()
-	end))
+	for _, Config in ModifierConfigs do
+		self.ModifierRegistry:Register(Config.Type, Config.Priority, function(BaseValue, Data)
+			return Config.Calculate(BaseValue, self.StatManager, Data)
+		end)
+	end
 end
 
 function CharacterController:Destroy()
+	DebugLogger.Info("CharacterController", "Destroying controller for: %s", self.Character.Name)
 	self.Maid:DoCleaning()
 	Controllers[self.Character] = nil
+	self.Character = nil
+	self.Humanoid = nil
 end
 
 function CharacterController.Get(Character: Model): ControllerType?
 	return Controllers[Character]
 end
 
-
-function CharacterController:GetDebugInfo(): {[string]: any}
+function CharacterController:GetDebugInfo(): { [string]: any }
 	local ActiveStates = {}
 	for StateName, _ in StateTypes do
 		if self.StateManager:GetState(StateName) then
@@ -428,7 +484,8 @@ function CharacterController:GetDebugInfo(): {[string]: any}
 		CharacterName = self.Character.Name,
 		IsPlayer = self.IsPlayer,
 		Health = string.format("%.1f/%.1f", self.Humanoid.Health, self.Humanoid.MaxHealth),
-		Stamina = string.format("%.1f/%.1f",
+		Stamina = string.format(
+			"%.1f/%.1f",
 			self.StatManager:GetStat(StatTypes.STAMINA),
 			self.StatManager:GetStat(StatTypes.MAX_STAMINA)
 		),

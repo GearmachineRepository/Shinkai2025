@@ -6,6 +6,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
 local Maid = require(Shared.General.Maid)
 local FootstepEngine = require(Shared.Footsteps.FootstepEngine)
+local FootstepMaterialMap = require(Shared.Footsteps.FootstepMaterialMap)
 
 local Player = Players.LocalPlayer
 
@@ -24,23 +25,21 @@ end
 
 function FootstepController:OnFootplant(Character: Model)
 	local MaterialName = self:GetMaterialName(Character)
-
 	if not MaterialName then
 		return
 	end
 
-	FootstepEngine.PlayFootstep(Character, MaterialName)
-
-	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not HumanoidRootPart then
+	local MaterialId = FootstepMaterialMap.GetId(MaterialName)
+	if not MaterialId then
 		return
 	end
 
-	Packets.Footplanted:Fire(MaterialName, HumanoidRootPart.Position, Player.UserId)
+	FootstepEngine.PlayFootstep(Character, MaterialId)
+	Packets.Footplanted:Fire(MaterialId)
 end
 
 function FootstepController:SetupAnimationTracking(Animator: Animator, Character: Model)
-	local ActiveTrackMaids: {[AnimationTrack]: Maid.MaidSelf} = {}
+	local ActiveTrackMaids: { [AnimationTrack]: Maid.MaidSelf } = {}
 
 	local AnimationPlayedConnection = Animator.AnimationPlayed:Connect(function(Track: AnimationTrack)
 		local TrackMaid = Maid.new()
@@ -90,7 +89,7 @@ function FootstepController:SetupCharacter(Character: Model)
 	self:SetupAnimationTracking(Animator, Character)
 end
 
-function FootstepController:OnReplicatedFootplant(MaterialName: string, _: Vector3, PlayerId: number)
+function FootstepController:OnReplicatedFootplant(MaterialId: number, PlayerId: number)
 	if PlayerId == Player.UserId then
 		return
 	end
@@ -106,11 +105,11 @@ function FootstepController:OnReplicatedFootplant(MaterialName: string, _: Vecto
 	end
 
 	FootstepEngine.InitializeCharacter(Character)
-	FootstepEngine.PlayFootstep(Character, MaterialName)
+	FootstepEngine.PlayFootstep(Character, MaterialId)
 end
 
-Packets.Footplanted.OnClientEvent:Connect(function(MaterialName: string, Position: Vector3, PlayerId: number)
-	FootstepController:OnReplicatedFootplant(MaterialName, Position, PlayerId)
+Packets.Footplanted.OnClientEvent:Connect(function(PlayerId: number, MaterialId: number)
+	FootstepController:OnReplicatedFootplant(MaterialId, PlayerId)
 end)
 
 if Player.Character then
