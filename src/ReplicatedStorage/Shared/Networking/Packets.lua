@@ -46,7 +46,7 @@ return {
 	AllocateStatPoint = Packet("AllocateStatPoint", Packet.String),
 
 	-- Treadmill
-	TreadmillModeSelected = Packet("TreadmillModeSelected"),
+	TreadmillModeSelected = Packet("TreadmillModeSelected", Packet.Boolean8),
 	SelectTreadmillMode = Packet("SelectTreadmillMode", Packet.String),
 
 	-- Interactions

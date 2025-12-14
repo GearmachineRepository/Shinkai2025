@@ -69,7 +69,7 @@ export type ControllerType = typeof(setmetatable(
 local Controllers: { [Model]: ControllerType } = {}
 
 local WALKSPEED_UPDATE_THROTTLE = 0.05
-local HEARTBEAT_UPDATE_THROTTLE = 1 / 20
+local HEARTBEAT_UPDATE_THROTTLE = 1 / 10
 
 function CharacterController.new(Character: Model, Player: Player?, PlayerData: any?): ControllerType
 	local self = setmetatable({

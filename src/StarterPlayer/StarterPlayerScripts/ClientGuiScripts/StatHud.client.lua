@@ -10,13 +10,6 @@ local Packets = require(Shared.Networking.Packets)
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
-local Hud = PlayerGui:WaitForChild("Hud")
-local Frames = Hud:WaitForChild("Frames")
-local StatsFrame = Frames:WaitForChild("Stats")
-local StatsList = StatsFrame:WaitForChild("StatList")
-local StatTemplate = StatsList:WaitForChild("StatTemplate")
-
-local Character = script.Parent
 
 local POINT_TEXT = "Points: "
 local BUFF_TEXT = "+"
@@ -24,71 +17,101 @@ local MAX_STARS_PER_ROW = 5
 local DIM_COLOR = Color3.fromRGB(50, 50, 50)
 
 local StatFrames = {}
+local CurrentCharacter: Model? = nil
 
-if Player then
-	local IsPremium = Player.MembershipType == Enum.MembershipType.Premium
-	if IsPremium or Player.Name == "Odawg566" or Player.Name == "SkiMag80" then
-		StatsFrame.Premium.Visible = true
-		local PremiumButton = Frames:FindFirstChild("PremiumButton")
-		if PremiumButton then
-			PremiumButton.Visible = true
+local Hud: ScreenGui? = nil
+local Frames: Instance? = nil
+local StatsFrame: Frame? = nil
+local StatsList: ScrollingFrame? = nil
+local StatTemplate: Frame? = nil
+
+local function WaitForHud(): ScreenGui
+	while true do
+		local ExistingHud = PlayerGui:FindFirstChild("Hud")
+		if ExistingHud then
+			return ExistingHud :: ScreenGui
 		end
+
+		PlayerGui.ChildAdded:Wait()
 	end
 end
 
-for _, Stat in StatUtils.TRAINABLE_STATS do
-	local NewTemplate = StatTemplate:Clone()
-	NewTemplate.Name = Stat
-	NewTemplate.StatName.Text = Stat
-	NewTemplate.Visible = true
-	NewTemplate.Parent = StatTemplate.Parent
-
-	if not NewTemplate.StatName.TextFits then
-		NewTemplate.StatName.TextScaled = true
+local function RebuildStatFrames()
+	for _, Frame in StatFrames do
+		if Frame and Frame.Parent then
+			Frame:Destroy()
+		end
 	end
+	table.clear(StatFrames)
 
-	local AllocateButton = NewTemplate:FindFirstChild("Allocate")
-	local PointsLabel = NewTemplate:FindFirstChild("Points")
-	local TotalStatBuffLabel = NewTemplate:FindFirstChild("TotalBuff")
-	local ProgressLabel = NewTemplate:FindFirstChild("Progress")
+	Hud = WaitForHud()
+	Frames = Hud:WaitForChild("Frames")
+	StatsFrame = Frames:WaitForChild("Stats") :: Frame
+	StatsList = StatsFrame:WaitForChild("StatList") :: ScrollingFrame
+	StatTemplate = StatsList:WaitForChild("StatTemplate") :: Frame
 
-	if PointsLabel then
-		PointsLabel.Text = POINT_TEXT .. "0"
+	for _, Stat in StatUtils.TRAINABLE_STATS do
+		local NewTemplate = StatTemplate:Clone()
+		NewTemplate.Name = Stat
+		NewTemplate.StatName.Text = Stat
+		NewTemplate.Visible = true
+		NewTemplate.Parent = StatTemplate.Parent
+
+		if not NewTemplate.StatName.TextFits then
+			NewTemplate.StatName.TextScaled = true
+		end
+
+		local AllocateButton = NewTemplate:FindFirstChild("Allocate")
+		local PointsLabel = NewTemplate:FindFirstChild("Points")
+		local TotalStatBuffLabel = NewTemplate:FindFirstChild("TotalBuff")
+		local ProgressLabel = NewTemplate:FindFirstChild("Progress")
+
+		if PointsLabel then
+			PointsLabel.Text = POINT_TEXT .. "0"
+		end
+
+		if TotalStatBuffLabel then
+			TotalStatBuffLabel.Text = BUFF_TEXT .. "0"
+		end
+
+		if ProgressLabel then
+			ProgressLabel.Text = "(0/0)"
+		end
+
+		if AllocateButton then
+			AllocateButton.Visible = false
+
+			AllocateButton.MouseButton1Click:Connect(function()
+				if not CurrentCharacter then
+					return
+				end
+
+				local AllocatablePoints = CurrentCharacter:GetAttribute(Stat .. "_AvailablePoints") or 0
+				if AllocatablePoints <= 0 then
+					return
+				end
+
+				local CurrentStars = CurrentCharacter:GetAttribute(Stat .. "_Stars") or 0
+
+				if CurrentStars >= StatUtils.HARD_CAP_TOTAL_STARS then
+					warn("This stat is maxed at", StatUtils.HARD_CAP_TOTAL_STARS, "stars!")
+					return
+				end
+
+				Packets.AllocateStatPoint:Fire(Stat)
+			end)
+		end
+
+		table.insert(StatFrames, NewTemplate)
 	end
-
-	if TotalStatBuffLabel then
-		TotalStatBuffLabel.Text = BUFF_TEXT .. "0"
-	end
-
-	if ProgressLabel then
-		ProgressLabel.Text = "(0/0)"
-	end
-
-	if AllocateButton then
-		AllocateButton.Visible = false
-
-		AllocateButton.MouseButton1Click:Connect(function()
-			local AllocatablePoints = Character:GetAttribute(Stat .. "_AvailablePoints") or 0
-			if AllocatablePoints <= 0 then
-				return
-			end
-
-			local CurrentStars = Character:GetAttribute(Stat .. "_Stars") or 0
-
-			if CurrentStars >= StatUtils.HARD_CAP_TOTAL_STARS then
-				warn("This stat is maxed at", StatUtils.HARD_CAP, "stars!")
-				return
-			end
-
-			Packets.AllocateStatPoint:Fire(Stat)
-		end)
-	end
-
-	table.insert(StatFrames, NewTemplate)
 end
 
 local function UpdateStatStars(BaseStatName: string)
-	local AllocatedStars = Character:GetAttribute(BaseStatName .. "_Stars") or 0
+	if not CurrentCharacter then
+		return
+	end
+
+	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
 
 	local StatFrame: Frame? = nil
 	for _, Frame in StatFrames do
@@ -129,7 +152,11 @@ local function UpdateStatStars(BaseStatName: string)
 end
 
 local function UpdateStatValue(BaseStatName: string)
-	local AllocatedStars = Character:GetAttribute(BaseStatName .. "_Stars") or 0
+	if not CurrentCharacter then
+		return
+	end
+
+	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
 
 	local StatFrame: Frame? = nil
 	for _, Frame in StatFrames do
@@ -157,7 +184,11 @@ local function UpdateStatValue(BaseStatName: string)
 end
 
 local function UpdateAvailablePoints(BaseStatName: string)
-	local AvailablePoints = Character:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
+	if not CurrentCharacter then
+		return
+	end
+
+	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
 
 	local StatFrame: Frame? = nil
 	for _, Frame in StatFrames do
@@ -183,9 +214,13 @@ local function UpdateAvailablePoints(BaseStatName: string)
 end
 
 local function UpdateXPProgress(BaseStatName: string)
-	local CurrentXP = Character:GetAttribute(BaseStatName .. "_XP") or 0
-	local AvailablePoints = Character:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
-	local AllocatedStars = Character:GetAttribute(BaseStatName .. "_Stars") or 0
+	if not CurrentCharacter then
+		return
+	end
+
+	local CurrentXP = CurrentCharacter:GetAttribute(BaseStatName .. "_XP") or 0
+	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
+	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
 
 	local StatFrame: Frame? = nil
 	for _, Frame in StatFrames do
@@ -232,6 +267,10 @@ local function UpdateXPProgress(BaseStatName: string)
 end
 
 local function UpdateAllStats()
+	if not CurrentCharacter then
+		return
+	end
+
 	for _, Stat in StatUtils.TRAINABLE_STATS do
 		UpdateStatStars(Stat)
 		UpdateStatValue(Stat)
@@ -240,19 +279,51 @@ local function UpdateAllStats()
 	end
 end
 
-for _, Stat in StatUtils.TRAINABLE_STATS do
-	Character:GetAttributeChangedSignal(Stat .. "_Stars"):Connect(function()
-		UpdateStatStars(Stat)
-		UpdateStatValue(Stat)
-	end)
+local function SetupCharacterListeners(Character: Model)
+	for _, Stat in StatUtils.TRAINABLE_STATS do
+		Character:GetAttributeChangedSignal(Stat .. "_Stars"):Connect(function()
+			UpdateStatStars(Stat)
+			UpdateStatValue(Stat)
+		end)
 
-	Character:GetAttributeChangedSignal(Stat .. "_AvailablePoints"):Connect(function()
-		UpdateAvailablePoints(Stat)
-	end)
+		Character:GetAttributeChangedSignal(Stat .. "_AvailablePoints"):Connect(function()
+			UpdateAvailablePoints(Stat)
+		end)
 
-	Character:GetAttributeChangedSignal(Stat .. "_XP"):Connect(function()
-		UpdateXPProgress(Stat)
-	end)
+		Character:GetAttributeChangedSignal(Stat .. "_XP"):Connect(function()
+			UpdateXPProgress(Stat)
+		end)
+	end
+
+	UpdateAllStats()
 end
 
-UpdateAllStats()
+local function OnCharacterAdded(Character: Model)
+	CurrentCharacter = Character
+
+	RebuildStatFrames()
+
+	if Player then
+		local IsPremium = Player.MembershipType == Enum.MembershipType.Premium
+		if IsPremium or Player.Name == "Odawg566" or Player.Name == "SkiMag80" then
+			if StatsFrame then
+				StatsFrame.Premium.Visible = true
+			end
+
+			if Frames then
+				local PremiumButton = Frames:FindFirstChild("PremiumButton")
+				if PremiumButton then
+					PremiumButton.Visible = true
+				end
+			end
+		end
+	end
+
+	SetupCharacterListeners(Character)
+end
+
+Player.CharacterAdded:Connect(OnCharacterAdded)
+
+if Player.Character then
+	OnCharacterAdded(Player.Character)
+end

@@ -12,6 +12,7 @@ local Player = Players.LocalPlayer
 
 local FootstepController = {}
 FootstepController.CharacterMaid = Maid.new()
+FootstepController.CurrentCharacter = nil :: Model?
 
 function FootstepController:GetMaterialName(Character: Model): string?
 	local Material = FootstepEngine.GetFloorMaterial(Character)
@@ -71,6 +72,7 @@ end
 
 function FootstepController:SetupCharacter(Character: Model)
 	self.CharacterMaid:DoCleaning()
+	self.CurrentCharacter = Character
 
 	FootstepEngine.InitializeCharacter(Character)
 
@@ -112,10 +114,10 @@ Packets.Footplanted.OnClientEvent:Connect(function(PlayerId: number, MaterialId:
 	FootstepController:OnReplicatedFootplant(MaterialId, PlayerId)
 end)
 
-if Player.Character then
-	FootstepController:SetupCharacter(Player.Character)
-end
-
 Player.CharacterAdded:Connect(function(Character: Model)
 	FootstepController:SetupCharacter(Character)
 end)
+
+if Player.Character then
+	FootstepController:SetupCharacter(Player.Character)
+end

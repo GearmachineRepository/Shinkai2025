@@ -11,20 +11,15 @@ local TreadmillUI = Frames:WaitForChild("TreadmillModeSelection")
 local MaxStaminaButton = TreadmillUI:WaitForChild("MaxStaminaButton")
 local RunSpeedButton = TreadmillUI:WaitForChild("RunSpeedButton")
 
-
--- Listen for server telling you to show UI
-Packets.TreadmillModeSelected.OnClientEvent:Connect(function()
-	-- Show your treadmill mode selection UI here
-	TreadmillUI.Visible = true
+Packets.TreadmillModeSelected.OnClientEvent:Connect(function(Toggle: boolean)
+	TreadmillUI.Visible = Toggle
 end)
 
--- When player clicks "Max Stamina" button
 MaxStaminaButton.MouseButton1Click:Connect(function()
 	Packets.SelectTreadmillMode:Fire("MaxStamina")
 	TreadmillUI.Visible = false
 end)
 
--- When player clicks "Run Speed" button
 RunSpeedButton.MouseButton1Click:Connect(function()
 	Packets.SelectTreadmillMode:Fire("RunSpeed")
 	TreadmillUI.Visible = false

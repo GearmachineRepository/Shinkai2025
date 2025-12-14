@@ -44,7 +44,11 @@ function StatManager.new(Character: Model, PlayerData: any?): StatManager
 
 	for StatName, DefaultValue in StatBalance.Defaults do
 		if PlayerData and PlayerData.Stats and PlayerData.Stats[StatName] ~= nil then
-			self.Stats[StatName] = PlayerData.Stats[StatName]
+			if StatName == StatTypes.STAMINA then
+				self.Stats[StatName] = PlayerData.Stats[StatTypes.MAX_STAMINA] or DefaultValue
+			else
+				self.Stats[StatName] = PlayerData.Stats[StatName]
+			end
 		else
 			self.Stats[StatName] = DefaultValue
 		end

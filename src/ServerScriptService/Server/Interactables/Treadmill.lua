@@ -245,13 +245,15 @@ function TreadmillInteractable.OnInteract(Player: Player, TreadmillModel: Model)
 		ActivityConnection = nil,
 	}
 
-	Packets.TreadmillModeSelected:FireClient(Player)
+	Packets.TreadmillModeSelected:FireClient(Player, true)
 end
 
 function TreadmillInteractable.OnStopInteract(Player: Player, TreadmillModel: Model)
 	local CurrentTrainer = TreadmillModel:GetAttribute("ActiveFor")
 	if CurrentTrainer == Player.UserId then
 		ExitTreadmill(Player, TreadmillModel)
+
+		Packets.TreadmillModeSelected:FireClient(Player, false)
 	end
 end
 

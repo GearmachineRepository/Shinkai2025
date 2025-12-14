@@ -99,9 +99,6 @@ function AnimationController:OnCharacterAdded(NewCharacter: Model)
 	self:Initialize(NewCharacter)
 end
 
-local InitialCharacter = Player.Character or Player.CharacterAdded:Wait()
-AnimationController:Initialize(InitialCharacter)
-
 Packets.PlayAnimation.OnClientEvent:Connect(function(AnimationName: string)
 	AnimationController:Play(AnimationName)
 end)
@@ -113,3 +110,7 @@ end)
 Player.CharacterAdded:Connect(function(NewCharacter: Model)
 	AnimationController:OnCharacterAdded(NewCharacter)
 end)
+
+if Player.Character then
+	AnimationController:Initialize(Player.Character)
+end

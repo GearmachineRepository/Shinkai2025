@@ -154,5 +154,3 @@ end)
 if Player.Character then
 	SetupCharacter(Player.Character)
 end
-
-Player.CharacterAdded:Connect(SetupCharacter)
