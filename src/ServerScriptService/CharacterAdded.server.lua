@@ -7,7 +7,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CharacterLoader = require(Server.Entity.CharacterLoader)
+local CharacterLoader = require(Server.Entity.Core.CharacterLoader)
 local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
 local DataModule = require(Server.DataModule)
 

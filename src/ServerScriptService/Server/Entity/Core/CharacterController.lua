@@ -145,6 +145,10 @@ function CharacterController:StartConsolidatedUpdateLoop()
 	self.Maid:Set(
 		"ConsolidatedUpdate",
 		UpdateService.RegisterWithCleanup(function(DeltaTime: number)
+			if not self.Character then
+				return
+			end
+
 			if self.BodyFatigueController then
 				self.BodyFatigueController:Update(DeltaTime)
 			end

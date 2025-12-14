@@ -155,6 +155,10 @@ function StaminaController:RestoreStaminaExternal(Amount: number)
 end
 
 function StaminaController:ApplyStamina(TargetStamina: number, ForceSync: boolean)
+	if not self.Controller.Character then
+		return
+	end
+
 	local MaxStamina = self:GetMaxStamina()
 	local Clamped = math.clamp(TargetStamina, 0, MaxStamina)
 
@@ -175,11 +179,11 @@ function StaminaController:ApplyStamina(TargetStamina: number, ForceSync: boolea
 
 	if Quantized <= 0 and not self.IsExhausted then
 		self.IsExhausted = true
-		self.Controller.Character:SetAttribute("Exhausted", true)
+		self.Controller.StateManager:SetState("Exhausted", true)
 		DebugLogger.Info("StaminaController", "Player exhausted: %s", self.Controller.Character.Name)
 	elseif self.IsExhausted and Quantized >= StaminaBalance.Exhaustion.THRESHOLD then
 		self.IsExhausted = false
-		self.Controller.Character:SetAttribute("Exhausted", false)
+		self.Controller.StateManager:SetState("Exhausted", false)
 		DebugLogger.Info("StaminaController", "Player recovered: %s", self.Controller.Character.Name)
 	end
 end
