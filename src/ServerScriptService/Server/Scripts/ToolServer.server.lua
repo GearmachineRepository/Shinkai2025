@@ -9,7 +9,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Entity = require(Server.Framework.Core.Entity)
 local Packets = require(Shared.Networking.Packets)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local function ValidateSlotIndex(SlotIndex: number): boolean
 	return SlotIndex >= 1 and SlotIndex <= 10
@@ -17,19 +16,16 @@ end
 
 local function HandleEquipTool(Player: Player, SlotIndex: number)
 	if not ValidateSlotIndex(SlotIndex) then
-		DebugLogger.Warning("ToolServer", "Invalid slot index from %s: %d", Player.Name, SlotIndex)
 		return
 	end
 
 	local Character = Player.Character
 	if not Character then
-		DebugLogger.Warning("ToolServer", "%s has no character", Player.Name)
 		return
 	end
 
 	local EntityInstance = Entity.GetEntity(Character)
 	if not EntityInstance or not EntityInstance.Components.Tool then
-		DebugLogger.Warning("ToolServer", "No ToolComponent for %s", Player.Name)
 		return
 	end
 
@@ -38,7 +34,6 @@ end
 
 local function HandleUnequipTool(Player: Player, SlotIndex: number)
 	if not ValidateSlotIndex(SlotIndex) then
-		DebugLogger.Warning("ToolServer", "Invalid slot index from %s: %d", Player.Name, SlotIndex)
 		return
 	end
 
@@ -83,7 +78,6 @@ local function SendHotbarToClient(Player: Player)
 	end
 
 	Packets.HotbarUpdate:FireClient(Player, HotbarData)
-	DebugLogger.Info("HotbarSync", "Sent hotbar data to %s", Player.Name)
 end
 
 local function SendEquippedToolToClient(Player: Player)
@@ -118,5 +112,3 @@ Players.PlayerAdded:Connect(function(Player: Player)
 		SendHotbarToClient(Player)
 	end)
 end)
-
-DebugLogger.Info("ToolServer", "Tool system initialized")

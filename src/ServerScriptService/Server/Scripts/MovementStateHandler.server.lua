@@ -8,7 +8,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Entity = require(Server.Framework.Core.Entity)
 local Packets = require(Shared.Networking.Packets)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local VALID_MOVEMENT_MODES = {
 	walk = true,
@@ -22,7 +21,6 @@ end
 
 Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, MovementMode: string)
 	if not ValidateMovementMode(MovementMode) then
-		DebugLogger.Warning("MovementStateHandler", "Invalid movement mode from %s: %s", Player.Name, MovementMode)
 		return
 	end
 
@@ -33,7 +31,6 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 
 	local EntityInstance = Entity.GetEntity(Character)
 	if not EntityInstance or not EntityInstance.Components.Stamina then
-		DebugLogger.Warning("MovementStateHandler", "No entity for %s", Player.Name)
 		return
 	end
 
@@ -47,14 +44,12 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 			Character:SetAttribute("MovementMode", "jog")
 		else
 			Character:SetAttribute("MovementMode", "walk")
-			DebugLogger.Info("MovementStateHandler", "%s cannot jog - exhausted", Player.Name)
 		end
 	elseif MovementMode == "run" then
 		if EntityInstance.Components.Stamina:CanSprint() then
 			Character:SetAttribute("MovementMode", "run")
 		else
 			Character:SetAttribute("MovementMode", "walk")
-			DebugLogger.Info("MovementStateHandler", "%s cannot run - exhausted", Player.Name)
 		end
 	elseif MovementMode == "walk" then
 		Character:SetAttribute("MovementMode", "walk")

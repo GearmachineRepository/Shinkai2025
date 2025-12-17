@@ -4,7 +4,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local TraitData = require(Shared.Configurations.Data.TraitData)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local TraitSystem = {}
 
@@ -42,7 +41,6 @@ end
 
 function TraitSystem.RollSingleTrait(PlayerData: any, SlotIndex: number): string
 	if SlotIndex < 1 or SlotIndex > MAX_TRAITS then
-		DebugLogger.Warning(script.Name, "Invalid trait slot:", SlotIndex)
 		return ""
 	end
 

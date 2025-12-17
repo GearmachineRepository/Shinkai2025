@@ -8,7 +8,6 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local Berserker = {
 	Name = "Berserker",
@@ -34,7 +33,6 @@ function Berserker.OnActivate(Entity: any)
 		local MaxHealth = Entity.Stats:GetStat(StatTypes.MAX_HEALTH)
 
 		if MaxHealth > 0 and (Health / MaxHealth) < 0.3 then
-			DebugLogger.Info(script.Name, "Boosting damage (", 1.5, "x) for:", Entity.Player)
 			return Damage * 1.5
 		end
 
@@ -44,7 +42,6 @@ function Berserker.OnActivate(Entity: any)
 	table.insert(Cleanups, AttackModifier)
 
 	return function()
-		DebugLogger.Info(script.Name, "Cleaning for:", Entity.Player)
 		for _, CleanupFn in Cleanups do
 			if CleanupFn then
 				CleanupFn()

@@ -20,13 +20,11 @@ local function LoadInteractableModule(InteractableType: string): any?
 	local InteractableModule = INTERACTABLES_FOLDER:FindFirstChild(InteractableType)
 
 	if not InteractableModule or not InteractableModule:IsA("ModuleScript") then
-		DebugLogger.Warning("InteractionServer", "No module found for type: %s", InteractableType)
 		return nil
 	end
 
 	local Success, Result = pcall(require, InteractableModule)
 	if not Success then
-		DebugLogger.Error("InteractionServer", "Failed to load module %s: %s", InteractableType, Result)
 		return nil
 	end
 
@@ -78,21 +76,18 @@ local function CheckDistance(Player: Player, InteractableObject: Model): (boolea
 end
 
 local function HandleInteraction(Player: Player, InteractableObject: Instance, IsStopAction: boolean)
-	local IsValidInteractable, InteractableError = ValidateInteractable(InteractableObject)
+	local IsValidInteractable, _InteractableError = ValidateInteractable(InteractableObject)
 	if not IsValidInteractable then
-		DebugLogger.Warning("InteractionServer", "Invalid interactable from %s: %s", Player.Name, InteractableError)
 		return
 	end
 
-	local IsValidPlayer, PlayerError = ValidatePlayer(Player)
+	local IsValidPlayer, _PlayerError = ValidatePlayer(Player)
 	if not IsValidPlayer then
-		DebugLogger.Warning("InteractionServer", "Invalid player state %s: %s", Player.Name, PlayerError)
 		return
 	end
 
-	local IsInRange, DistanceError = CheckDistance(Player, InteractableObject :: Model)
+	local IsInRange, _DistanceError = CheckDistance(Player, InteractableObject :: Model)
 	if not IsInRange then
-		DebugLogger.Info("InteractionServer", "%s out of range: %s", Player.Name, DistanceError)
 		return
 	end
 

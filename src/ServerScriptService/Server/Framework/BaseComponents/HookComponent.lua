@@ -48,19 +48,16 @@ local function LoadHook(HookName: string): any?
 
 	local HooksFolder = Server:FindFirstChild("Hooks")
 	if not HooksFolder then
-		DebugLogger.Warning("HookComponent", "Hooks folder not found")
 		return nil
 	end
 
 	local HookModule = HooksFolder:FindFirstChild(HookName)
 	if not HookModule then
-		DebugLogger.Warning("HookComponent", "Hook module not found: %s", HookName)
 		return nil
 	end
 
 	local Success, Hook = pcall(require, HookModule)
 	if not Success then
-		DebugLogger.Error("HookComponent", "Failed to load hook %s: %s", HookName, Hook)
 		return nil
 	end
 
@@ -70,7 +67,6 @@ end
 
 function HookComponent:RegisterHook(HookName: string)
 	if self.ActiveHooks[HookName] then
-		DebugLogger.Warning("HookComponent", "Hook already registered: %s", HookName)
 		return
 	end
 
@@ -85,7 +81,6 @@ function HookComponent:RegisterHook(HookName: string)
 		local Success, CleanupOrError = pcall(Hook.OnActivate, self.Entity)
 
 		if not Success then
-			DebugLogger.Error("HookComponent", "Hook activation failed for %s: %s", HookName, CleanupOrError)
 			self.ActiveHooks[HookName] = nil
 			return
 		end
@@ -94,8 +89,6 @@ function HookComponent:RegisterHook(HookName: string)
 			self.CleanupFunctions[HookName] = CleanupOrError
 		end
 	end
-
-	DebugLogger.Info("HookComponent", "Registered hook: %s", HookName)
 end
 
 function HookComponent:UnregisterHook(HookName: string)
@@ -121,7 +114,6 @@ function HookComponent:UnregisterHook(HookName: string)
 	end
 
 	self.ActiveHooks[HookName] = nil
-	DebugLogger.Info("HookComponent", "Unregistered hook: %s", HookName)
 end
 
 function HookComponent:GetActiveHooks(): { string }
@@ -137,10 +129,7 @@ function HookComponent:HasHook(HookName: string): boolean
 end
 
 function HookComponent:Destroy()
-	DebugLogger.Info("HookComponent", "Destroying HookComponent with %d active hooks", #self:GetActiveHooks())
-
 	for HookName in pairs(self.ActiveHooks) do
-		DebugLogger.Info("HookComponent", "Unregistering hook during destroy: %s", HookName)
 		self:UnregisterHook(HookName)
 	end
 

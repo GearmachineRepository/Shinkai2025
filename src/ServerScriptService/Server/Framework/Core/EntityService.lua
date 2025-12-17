@@ -9,7 +9,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 local Entity = require(Server.Framework.Core.Entity)
 local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
-local DebugLogger = require(Shared.Debug.DebugLogger)
+-- local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local EntityService = {}
 
@@ -17,13 +17,13 @@ local Entities: { [Model]: any } = {}
 
 function EntityService.CreateEntity(Character: Model, Player: Player?, PlayerData: any?): any?
 	if Entities[Character] then
-		DebugLogger.Warning("EntityService", "Entity already exists for: %s", Character.Name)
+		-- DebugLogger.Warning("EntityService", "Entity already exists for: %s", Character.Name)
 		return Entities[Character]
 	end
 
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid then
-		DebugLogger.Error("EntityService", "No Humanoid found in: %s", Character.Name)
+		-- DebugLogger.Error("EntityService", "No Humanoid found in: %s", Character.Name)
 		return nil
 	end
 
@@ -37,7 +37,7 @@ function EntityService.CreateEntity(Character: Model, Player: Player?, PlayerDat
 
 	Entities[Character] = NewEntity
 
-	DebugLogger.Info("EntityService", "Created entity for: %s", Character.Name)
+	-- DebugLogger.Info("EntityService", "Created entity for: %s", Character.Name)
 	return NewEntity
 end
 
@@ -54,7 +54,7 @@ function EntityService.DestroyEntity(Character: Model)
 	EntityToDestroy:Destroy()
 	Entities[Character] = nil
 
-	DebugLogger.Info("EntityService", "Destroyed entity for: %s", Character.Name)
+	-- DebugLogger.Info("EntityService", "Destroyed entity for: %s", Character.Name)
 end
 
 function EntityService.GetAllEntities(): { any }

@@ -13,7 +13,7 @@ local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local DebugLogger = require(Shared.Debug.DebugLogger)
+-- local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local StateComponent = require(BaseComponents.StateComponent)
 local StatComponent = require(BaseComponents.StatComponent)
@@ -138,7 +138,7 @@ function Entity:DealDamage(Target: Model, BaseDamage: number)
 end
 
 function Entity:Destroy()
-	DebugLogger.Info("Entity", "Destroying entity for: %s", self.Character.Name)
+	-- DebugLogger.Info("Entity", "Destroying entity for: %s", self.Character.Name)
 
 	EventBus.Publish(EntityEvents.ENTITY_DESTROYED, {
 		Entity = self,
@@ -149,7 +149,7 @@ function Entity:Destroy()
 	self.Maid:DoCleaning()
 	table.clear(self.Components)
 
-	DebugLogger.Info("Entity", "Entity destroyed for: %s", self.Character.Name)
+	-- DebugLogger.Info("Entity", "Entity destroyed for: %s", self.Character.Name)
 end
 
 return Entity

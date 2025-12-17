@@ -8,7 +8,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Entity = require(Server.Framework.Core.Entity)
 local StatSystem = require(Server.Game.Systems.StatSystem)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
 local Packets = require(Shared.Networking.Packets)
@@ -48,34 +47,29 @@ end
 
 local function HandleAllocateStatPoint(Player: Player, StatName: string)
 	if IsRateLimited(Player.UserId) then
-		DebugLogger.Warning("StatAllocationHandler", "Rate limited: %s", Player.Name)
 		return
 	end
 
 	if not IsTrainableStat(StatName) then
-		DebugLogger.Warning("StatAllocationHandler", "Invalid stat from %s: %s", Player.Name, StatName)
 		return
 	end
 
 	local Character = Player.Character
 	if not Character then
-		DebugLogger.Warning("StatAllocationHandler", "No character: %s", Player.Name)
 		return
 	end
 
 	local EntityInstance = Entity.GetEntity(Character)
 	if not EntityInstance or not EntityInstance.Components.Training then
-		DebugLogger.Warning("StatAllocationHandler", "No entity for %s", Player.Name)
 		return
 	end
 
 	local TrainingComponent = EntityInstance.Components.Training
 	local PlayerData = TrainingComponent.PlayerData
 
-	local Success, ErrorMessage = StatSystem.AllocateStar(PlayerData, StatName)
+	local Success, _ErrorMessage = StatSystem.AllocateStar(PlayerData, StatName)
 
 	if not Success then
-		DebugLogger.Warning("StatAllocationHandler", "Failed for %s: %s", Player.Name, ErrorMessage)
 		return
 	end
 
@@ -91,7 +85,7 @@ local function HandleAllocateStatPoint(Player: Player, StatName: string)
 	local AvailablePoints = PlayerData.Stats[StatName .. "_AvailablePoints"]
 	Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
 
-	DebugLogger.Info("StatAllocationHandler", "%s allocated point to %s", Player.Name, StatName)
+	-- DebugLogger.Info("StatAllocationHandler", "%s allocated point to %s", Player.Name, StatName)
 end
 
 Packets.AllocateStatPoint.OnServerEvent:Connect(HandleAllocateStatPoint)

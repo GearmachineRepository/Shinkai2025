@@ -17,6 +17,24 @@ local CallbackRegistry = {}
 local Callbacks: { [string]: { CallbackEntry } } = {}
 local CallbackCounts: { [string]: number } = {}
 
+local IMMEDIATE_FIRE_PATTERNS = {
+	"^Event:",
+	"^StateChanged:",
+	"Attack",
+	"Damage",
+	"Speed",
+	"StaminaCost",
+}
+
+local function ShouldFireImmediately(CallbackKey: string): boolean
+	for _, Pattern in IMMEDIATE_FIRE_PATTERNS do
+		if string.find(CallbackKey, Pattern) then
+			return true
+		end
+	end
+	return false
+end
+
 function CallbackRegistry.Register(CallbackKey: string, Callback: Callback, ScopeKey: any?): CallbackConnection
 	if not Callbacks[CallbackKey] then
 		Callbacks[CallbackKey] = {}
@@ -64,8 +82,14 @@ function CallbackRegistry.Fire(CallbackKey: string, ...: any)
 		return
 	end
 
-	for _, Entry in CallbackList do
-		task.defer(Entry.Callback, ...)
+	if ShouldFireImmediately(CallbackKey) then
+		for _, Entry in CallbackList do
+			Entry.Callback(...)
+		end
+	else
+		for _, Entry in CallbackList do
+			task.defer(Entry.Callback, ...)
+		end
 	end
 end
 

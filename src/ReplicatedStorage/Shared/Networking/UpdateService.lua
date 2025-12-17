@@ -60,7 +60,7 @@ function UpdateService.Register(Callback: Callback, RateSeconds: number?): Handl
 	Entries[Handle] = {
 		Callback = Callback,
 		RateSeconds = RateSeconds or 0,
-		Accumulator = 0,
+		Accumulator = (RateSeconds and RateSeconds > 0) and 0 or nil,
 	}
 
 	EnsureRunning()

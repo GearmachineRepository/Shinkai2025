@@ -11,7 +11,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local EntityService = require(Server.Framework.Core.EntityService)
 local EntityUpdateSystem = require(Server.Framework.Systems.EntityUpdateSystem)
 local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
-local DebugLogger = require(Shared.Debug.DebugLogger)
+-- local DebugLogger = require(Shared.Debug.DebugLogger)
 local DataModule = require(Server.Game.Data.DataModule)
 local Maid = require(Shared.General.Maid)
 
@@ -70,7 +70,7 @@ end
 local function CleanupOldCharacter(Player: Player)
 	local OldCharacter = Player.Character
 	if OldCharacter then
-		DebugLogger.Info(script.Name, "Cleaning up old character for: %s", Player.Name)
+		-- DebugLogger.Info(script.Name, "Cleaning up old character for: %s", Player.Name)
 		EntityService.DestroyEntity(OldCharacter)
 	end
 end
@@ -111,7 +111,7 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 
 	PlayerCharacterConnections[Player] = Character.AncestryChanged:Connect(function(_, NewParent)
 		if not NewParent then
-			DebugLogger.Info(script.Name, "Character removed from workspace for: %s", Player.Name)
+			-- DebugLogger.Info(script.Name, "Character removed from workspace for: %s", Player.Name)
 			EntityService.DestroyEntity(Character)
 			if PlayerCharacterConnections[Player] then
 				PlayerCharacterConnections[Player]:Disconnect()
@@ -120,7 +120,7 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 		end
 	end)
 
-	DebugLogger.Info(script.Name, "Loaded character for: %s", Player.Name)
+	-- DebugLogger.Info(script.Name, "Loaded character for: %s", Player.Name)
 end
 
 Players.PlayerAdded:Connect(function(Player: Player)
@@ -136,7 +136,7 @@ Players.PlayerAdded:Connect(function(Player: Player)
 end)
 
 Players.PlayerRemoving:Connect(function(Player: Player)
-	DebugLogger.Info(script.Name, "Player leaving: %s", Player.Name)
+	-- DebugLogger.Info(script.Name, "Player leaving: %s", Player.Name)
 
 	if PlayerCharacterConnections[Player] then
 		PlayerCharacterConnections[Player]:Disconnect()
@@ -153,5 +153,5 @@ Players.PlayerRemoving:Connect(function(Player: Player)
 		EntityService.DestroyEntity(Player.Character)
 	end
 
-	DebugLogger.Info(script.Name, "Removed character for: %s", Player.Name)
+	-- DebugLogger.Info(script.Name, "Removed character for: %s", Player.Name)
 end)

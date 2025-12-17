@@ -10,7 +10,6 @@ local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 
 export type CallbackConnection = {
 	Disconnect: () -> (),
@@ -72,15 +71,11 @@ function StateComponent:SetState(StateName: string, Value: boolean)
 end
 
 function StateComponent:Destroy()
-	DebugLogger.Info("StateComponent", "Destroying StateComponent for: %s", self.Entity.Character.Name)
-
 	if self.Entity.Character then
 		CallbackRegistry.ClearScope(self.Entity.Character)
 	end
 
 	table.clear(self.States)
-
-	DebugLogger.Info("StateComponent", "StateComponent destroyed for: %s", self.Entity.Character.Name)
 end
 
 return StateComponent
