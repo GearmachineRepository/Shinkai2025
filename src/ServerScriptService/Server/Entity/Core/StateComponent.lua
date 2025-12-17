@@ -67,11 +67,7 @@ function StateComponent:SetState(StateName: string, Value: boolean)
 		Value = Value,
 	})
 
-	CallbackRegistry.Fire("StateChanged:" .. StateName, Value)
-end
-
-function StateComponent:OnStateChanged(StateName: string, Callback: (Value: boolean) -> ()): CallbackConnection
-	return CallbackRegistry.Register("StateChanged:" .. StateName, Callback, self.Entity.Character)
+	CallbackRegistry.Fire(StateName, Value)
 end
 
 function StateComponent:Destroy()

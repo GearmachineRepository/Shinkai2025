@@ -114,14 +114,7 @@ function StatComponent:SetStat(StatName: string, Value: number)
 		OldValue = OldValue,
 	})
 
-	CallbackRegistry.Fire("StatChanged:" .. StatName, Value, OldValue)
-end
-
-function StatComponent:OnStatChanged(
-	StatName: string,
-	Callback: (NewValue: number, OldValue: number) -> ()
-): CallbackConnection
-	return CallbackRegistry.Register("StatChanged:" .. StatName, Callback, self.Entity.Character)
+	CallbackRegistry.Fire(StatName, Value, OldValue)
 end
 
 function StatComponent:GetAllStats(): { [string]: number }

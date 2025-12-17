@@ -1,8 +1,12 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Shared = ReplicatedStorage:WaitForChild("Shared")
+local ServerScriptService = game:GetService("ServerScriptService")
 
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
+
+local CallbackRegistry = require(Server.Core.CallbackRegistry)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 
@@ -13,6 +17,7 @@ local Berserker = {
 
 function Berserker.OnActivate(Entity: any)
 	local Cleanup = {}
+
 	-- local Aura = {}
 
 	-- local function CreateAura()
@@ -41,7 +46,7 @@ function Berserker.OnActivate(Entity: any)
 	-- 	end
 	-- end
 
-	local HealthCallback = Entity.Stats:OnStatChanged(StatTypes.HEALTH, function(_NewHealth: number, _OldHealth: number)
+	local HealthCallback = CallbackRegistry.Register(StatTypes.HEALTH, function()
 		local MaxHealth = Entity.Stats:GetStat(StatTypes.MAX_HEALTH)
 		if MaxHealth <= 0 then
 			return
@@ -54,7 +59,7 @@ function Berserker.OnActivate(Entity: any)
 		-- elseif HealthPercent >= 0.3 then
 		-- 	RemoveAura()
 		-- end
-	end)
+	end, Entity.Character)
 
 	table.insert(Cleanup, HealthCallback)
 

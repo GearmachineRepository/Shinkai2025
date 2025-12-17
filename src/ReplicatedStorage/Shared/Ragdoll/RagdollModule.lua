@@ -7,7 +7,7 @@ type MotorData = {
 	C0: CFrame,
 	C1: CFrame,
 	Part0: BasePart,
-	Part1: BasePart
+	Part1: BasePart,
 }
 
 type RagdollModule = {
@@ -18,14 +18,14 @@ type RagdollModule = {
 	CreateColliderPart: (self: RagdollModule, Part: BasePart) -> (),
 	ReplaceJoints: (self: RagdollModule, Character: Model) -> (),
 	ResetJoints: (self: RagdollModule, Character: Model) -> (),
-	GetMotorData: (self: RagdollModule, Character: Model) -> {[Motor6D]: MotorData}
+	GetMotorData: (self: RagdollModule, Character: Model) -> { [Motor6D]: MotorData },
 }
 
 local RagdollModule: RagdollModule = {} :: any
 RagdollModule.PlayersCollisionGroup = "Characters"
 RagdollModule.CanCollide = false
 
-local StoredMotorData: {[Model]: {[Motor6D]: MotorData}} = {}
+local StoredMotorData: { [Model]: { [Motor6D]: MotorData } } = {}
 
 if not PhysicsService:IsCollisionGroupRegistered("Uncollidable") then
 	PhysicsService:RegisterCollisionGroup("Uncollidable")
@@ -43,12 +43,16 @@ function RagdollModule:Ragdoll(Character: Model): ()
 		local IsNpc: boolean = Players:GetPlayerFromCharacter(Character) == nil
 		local Humanoid: Humanoid? = Character:FindFirstChildWhichIsA("Humanoid")
 
-		if not Humanoid then return end
-		
+		if not Humanoid then
+			return
+		end
+
 		local Animator = Humanoid:FindFirstChild("Animator") :: Animator
-		
-		if not Animator then return end
-	
+
+		if not Animator then
+			return
+		end
+
 		for _, Animation: AnimationTrack in Animator:GetPlayingAnimationTracks() do
 			Animation:Stop()
 		end
@@ -84,14 +88,18 @@ function RagdollModule:unRagdoll(Character: Model): ()
 		local IsNpc: boolean = Players:GetPlayerFromCharacter(Character) == nil
 		local Humanoid: Humanoid? = Character:FindFirstChildWhichIsA("Humanoid")
 
-		if not Humanoid then return end
-		if Humanoid.Health <= 0.1 then return end
+		if not Humanoid then
+			return
+		end
+		if Humanoid.Health <= 0.1 then
+			return
+		end
 
 		Character:SetAttribute("Ragdoll", false)
 
 		Humanoid.AutoRotate = true
 		Humanoid.RequiresNeck = false
-		
+
 		Humanoid.WalkSpeed = 16
 		Humanoid.JumpPower = 50
 
@@ -112,27 +120,26 @@ function RagdollModule:unRagdoll(Character: Model): ()
 	end
 end
 
-local FallbackAttachmentCFrames: {[string]: {CFrame}} = {
-	["Neck"] = {CFrame.new(0, 1, 0, 0, -1, 0, 1, 0, -0, 0, 0, 1), CFrame.new(0, -0.5, 0, 0, -1, 0, 1, 0, -0, 0, 0, 1)},
-	["Left Shoulder"] = {CFrame.new(-1.3, 0.75, 0, -1, 0, 0, 0, -1, 0, 0, 0, 1), CFrame.new(0.2, 0.75, 0, -1, 0, 0, 0, -1, 0, 0, 0, 1)},
-	["Right Shoulder"] = {CFrame.new(1.3, 0.75, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-0.2, 0.75, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)},
-	["Left Hip"] = {CFrame.new(-0.5, -1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1), CFrame.new(0, 1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1)},
-	["Right Hip"] = {CFrame.new(0.5, -1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1), CFrame.new(0, 1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1)},
-}
+-- local FallbackAttachmentCFrames: {[string]: {CFrame}} = {
+-- 	["Neck"] = {CFrame.new(0, 1, 0, 0, -1, 0, 1, 0, -0, 0, 0, 1), CFrame.new(0, -0.5, 0, 0, -1, 0, 1, 0, -0, 0, 0, 1)},
+-- 	["Left Shoulder"] = {CFrame.new(-1.3, 0.75, 0, -1, 0, 0, 0, -1, 0, 0, 0, 1), CFrame.new(0.2, 0.75, 0, -1, 0, 0, 0, -1, 0, 0, 0, 1)},
+-- 	["Right Shoulder"] = {CFrame.new(1.3, 0.75, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1), CFrame.new(-0.2, 0.75, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1)},
+-- 	["Left Hip"] = {CFrame.new(-0.5, -1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1), CFrame.new(0, 1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1)},
+-- 	["Right Hip"] = {CFrame.new(0.5, -1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1), CFrame.new(0, 1, 0, 0, 1, -0, -1, 0, 0, 0, 0, 1)},
+-- }
 
-local RagdollInstanceNames: {[string]: boolean} = {
+local RagdollInstanceNames: { [string]: boolean } = {
 	["RagdollAttachment"] = true,
 	["RagdollConstraint"] = true,
 	["ColliderPart"] = true,
 }
 
-
-function RagdollModule:GetMotorData(Character: Model): {[Motor6D]: MotorData}
+function RagdollModule:GetMotorData(Character: Model): { [Motor6D]: MotorData }
 	if StoredMotorData[Character] then
 		return StoredMotorData[Character]
 	end
 
-	local MotorDataMap: {[Motor6D]: MotorData} = {}
+	local MotorDataMap: { [Motor6D]: MotorData } = {}
 
 	for _, Descendant: Instance in Character:GetDescendants() do
 		if Descendant:IsA("Motor6D") then
@@ -142,7 +149,7 @@ function RagdollModule:GetMotorData(Character: Model): {[Motor6D]: MotorData}
 					C0 = Motor.C0,
 					C1 = Motor.C1,
 					Part0 = Motor.Part0,
-					Part1 = Motor.Part1
+					Part1 = Motor.Part1,
 				}
 			end
 		end
@@ -153,11 +160,13 @@ function RagdollModule:GetMotorData(Character: Model): {[Motor6D]: MotorData}
 end
 
 function RagdollModule:CreateColliderPart(Part: BasePart): ()
-	if not Part then return end
+	if not Part then
+		return
+	end
 	local RagdollColliderPart: Part = Instance.new("Part")
 	RagdollColliderPart.Name = "ColliderPart"
 	RagdollColliderPart.Size = Part.Size / 1.7
-	RagdollColliderPart.Massless = true			
+	RagdollColliderPart.Massless = true
 	RagdollColliderPart.CFrame = Part.CFrame
 	RagdollColliderPart.Transparency = 1
 
@@ -171,13 +180,16 @@ function RagdollModule:CreateColliderPart(Part: BasePart): ()
 	RagdollColliderPart.Parent = Part
 end
 
-
 function RagdollModule:ReplaceJoints(Character: Model): ()
-	local MotorDataMap: {[Motor6D]: MotorData} = self:GetMotorData(Character)
+	local MotorDataMap: { [Motor6D]: MotorData } = self:GetMotorData(Character)
 
 	for Motor: Motor6D, Data: MotorData in MotorDataMap do
-		if not Motor.Parent then continue end
-		if not Data.Part0 or not Data.Part1 then continue end
+		if not Motor.Parent then
+			continue
+		end
+		if not Data.Part0 or not Data.Part1 then
+			continue
+		end
 
 		Motor.Enabled = false
 
@@ -214,8 +226,10 @@ end
 function RagdollModule:ResetJoints(Character: Model): ()
 	local Humanoid: Humanoid? = Character:FindFirstChildWhichIsA("Humanoid")
 
-	if Humanoid then	
-		if Humanoid.Health < 0.1 then return end
+	if Humanoid then
+		if Humanoid.Health < 0.1 then
+			return
+		end
 		for _, Descendant: Instance in Character:GetDescendants() do
 			if RagdollInstanceNames[Descendant.Name] then
 				Descendant:Destroy()
