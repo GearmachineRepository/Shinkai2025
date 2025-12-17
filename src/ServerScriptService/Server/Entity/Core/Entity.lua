@@ -11,6 +11,7 @@ local EventBus = require(Server.Core.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
+local DebugLogger = require(Shared.Debug.DebugLogger)
 
 local StateComponent = require(Server.Entity.Core.StateComponent)
 local StatComponent = require(Server.Entity.Core.StatComponent)
@@ -84,10 +85,6 @@ function Entity.new(Data: EntityData): Entity
 	self.Character:SetAttribute("HasEntity", true)
 	EntityRegistry[self.Character] = self
 
-	self.Maid:GiveTask(self.Humanoid.Died:Connect(function()
-		self:Destroy()
-	end))
-
 	self.Maid:GiveTask(self.Humanoid.HealthChanged:Connect(function()
 		self.Stats:SetStat("Health", self.Humanoid.Health)
 	end))
@@ -139,6 +136,8 @@ function Entity:DealDamage(Target: Model, BaseDamage: number)
 end
 
 function Entity:Destroy()
+	DebugLogger.Info("Entity", "Destroying entity for: %s", self.Character.Name)
+
 	EventBus.Publish(EntityEvents.ENTITY_DESTROYED, {
 		Entity = self,
 		Character = self.Character,
@@ -147,6 +146,8 @@ function Entity:Destroy()
 	EntityRegistry[self.Character] = nil
 	self.Maid:DoCleaning()
 	table.clear(self.Components)
+
+	DebugLogger.Info("Entity", "Entity destroyed for: %s", self.Character.Name)
 end
 
 return Entity

@@ -16,52 +16,18 @@ local Berserker = {
 }
 
 function Berserker.OnActivate(Entity: any)
-	local Cleanup = {}
-
-	-- local Aura = {}
-
-	-- local function CreateAura()
-	-- 	if #Aura > 0 then
-	-- 		return
-	-- 	end
-
-	-- 	local Emitter1 = script.Emitter:Clone()
-	-- 	Emitter1.Parent = Entity.Character.Head
-	-- 	Emitter1.Enabled = true
-	-- 	table.insert(Aura, Emitter1)
-
-	-- 	local Emitter2 = script.Sparks:Clone()
-	-- 	Emitter2.Parent = Entity.Character.UpperTorso
-	-- 	Emitter2.Enabled = true
-	-- 	table.insert(Aura, Emitter2)
-	-- end
-
-	-- local function RemoveAura()
-	-- 	if #Aura > 0 then
-	-- 		for _, Emitter in Aura do
-	-- 			Emitter.Enabled = false
-	-- 			game.Debris:AddItem(Emitter, 5)
-	-- 		end
-	-- 		table.clear(Aura)
-	-- 	end
-	-- end
+	local Cleanups = {}
 
 	local HealthCallback = CallbackRegistry.Register(StatTypes.HEALTH, function()
 		local MaxHealth = Entity.Stats:GetStat(StatTypes.MAX_HEALTH)
 		if MaxHealth <= 0 then
 			return
 		end
-
-		--local HealthPercent = NewHealth / MaxHealth
-
-		-- if HealthPercent < 0.3 and HealthPercent > 0 then
-		-- 	CreateAura()
-		-- elseif HealthPercent >= 0.3 then
-		-- 	RemoveAura()
-		-- end
 	end, Entity.Character)
 
-	table.insert(Cleanup, HealthCallback)
+	table.insert(Cleanups, function()
+		HealthCallback:Disconnect()
+	end)
 
 	local AttackModifier = Entity.Modifiers:Register("Attack", 100, function(Damage: number, _Data: any)
 		local Health = Entity.Stats:GetStat(StatTypes.HEALTH)
@@ -75,12 +41,11 @@ function Berserker.OnActivate(Entity: any)
 		return Damage
 	end)
 
-	table.insert(Cleanup, AttackModifier)
+	table.insert(Cleanups, AttackModifier)
 
 	return function()
 		DebugLogger.Info(script.Name, "Cleaning for:", Entity.Player)
-		-- RemoveAura()
-		for _, CleanupFn in Cleanup do
+		for _, CleanupFn in Cleanups do
 			if CleanupFn then
 				CleanupFn()
 			end
