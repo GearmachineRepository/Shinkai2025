@@ -7,7 +7,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local StatSystem = require(Server.Systems.StatSystem)
+local StatSystem = require(Server.Game.Systems.StatSystem)
 local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
 
 local ProgressionSystem = {}

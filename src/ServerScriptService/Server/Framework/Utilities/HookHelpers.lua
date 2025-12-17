@@ -10,7 +10,11 @@
     - etc.
 ]]
 
-local CallbackRegistry = require(game.ServerScriptService.Server.Core.CallbackRegistry)
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local Server = ServerScriptService:WaitForChild("Server")
+
+local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
 
 local HookHelpers = {}
 

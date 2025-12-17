@@ -6,8 +6,8 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
-local Entity = require(Server.Entity.Core.Entity)
-local EventBus = require(Server.Core.EventBus)
+local Entity = require(Server.Framework.Core.Entity)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 

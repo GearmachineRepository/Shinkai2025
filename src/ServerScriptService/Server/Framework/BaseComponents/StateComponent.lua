@@ -7,9 +7,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local EventBus = require(Server.Core.EventBus)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
-local CallbackRegistry = require(Server.Core.CallbackRegistry)
+local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 
 export type CallbackConnection = {

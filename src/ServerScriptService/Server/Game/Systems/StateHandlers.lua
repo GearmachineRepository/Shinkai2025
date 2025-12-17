@@ -7,7 +7,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local EventBus = require(Server.Core.EventBus)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
 

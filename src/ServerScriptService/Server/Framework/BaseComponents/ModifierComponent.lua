@@ -4,7 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Server = ServerScriptService:WaitForChild("Server")
-local EventBus = require(Server.Core.EventBus)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(ReplicatedStorage.Shared.Events.EntityEvents)
 
 export type ModifierFunction = (BaseValue: number, Data: { [string]: any }?) -> number
@@ -18,7 +18,7 @@ export type Modifier = {
 export type ModifierComponent = {
 	Entity: any,
 
-	Register: (self: ModifierComponent, Type: string, Priority: number, ModifyFunction: ModifierFunction) -> (),
+	Register: (self: ModifierComponent, Type: string, Priority: number, ModifyFunction: ModifierFunction) -> () -> (),
 	Unregister: (self: ModifierComponent, Type: string, ModifyFunction: ModifierFunction) -> (),
 	Apply: (self: ModifierComponent, Type: string, BaseValue: number, Data: { [string]: any }?) -> number,
 	GetCount: (self: ModifierComponent, Type: string) -> number,
@@ -42,7 +42,7 @@ function ModifierComponent.new(Entity: any): ModifierComponent
 	return self
 end
 
-function ModifierComponent:Register(Type: string, Priority: number, ModifyFunction: ModifierFunction)
+function ModifierComponent:Register(Type: string, Priority: number, ModifyFunction: ModifierFunction): () -> ()
 	local Modifiers = self.ModifiersByType[Type]
 	if not Modifiers then
 		Modifiers = {}
@@ -65,6 +65,10 @@ function ModifierComponent:Register(Type: string, Priority: number, ModifyFuncti
 		Type = Type,
 		Priority = Priority,
 	})
+
+	return function()
+		self:Unregister(Type, ModifyFunction)
+	end
 end
 
 function ModifierComponent:Unregister(Type: string, ModifyFunction: ModifierFunction)

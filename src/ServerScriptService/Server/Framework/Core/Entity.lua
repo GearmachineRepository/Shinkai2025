@@ -6,16 +6,18 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
+local BaseComponents = Server.Framework.BaseComponents
+
 local Maid = require(Shared.General.Maid)
-local EventBus = require(Server.Core.EventBus)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 
-local StateComponent = require(Server.Entity.Core.StateComponent)
-local StatComponent = require(Server.Entity.Core.StatComponent)
-local ModifierComponent = require(Server.Entity.Core.ModifierComponent)
+local StateComponent = require(BaseComponents.StateComponent)
+local StatComponent = require(BaseComponents.StatComponent)
+local ModifierComponent = require(BaseComponents.ModifierComponent)
 
 export type EntityData = {
 	Character: Model,

@@ -6,7 +6,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
-local CallbackRegistry = require(Server.Core.CallbackRegistry)
+local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 

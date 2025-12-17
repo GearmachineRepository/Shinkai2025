@@ -6,8 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local StatSystem = require(Server.Systems.StatSystem)
-local ProgressionSystem = require(Server.Systems.ProgressionSystem)
+local StatSystem = require(Server.Game.Systems.StatSystem)
+local ProgressionSystem = require(Server.Game.Systems.ProgressionSystem)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
 local Maid = require(Shared.General.Maid)
 

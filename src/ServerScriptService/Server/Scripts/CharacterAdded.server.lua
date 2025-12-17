@@ -8,11 +8,11 @@ local CollectionService = game:GetService("CollectionService")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local EntityService = require(Server.Core.EntityService)
-local EntityUpdateSystem = require(Server.Core.EntityUpdateSystem)
+local EntityService = require(Server.Framework.Core.EntityService)
+local EntityUpdateSystem = require(Server.Framework.Systems.EntityUpdateSystem)
 local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
 local DebugLogger = require(Shared.Debug.DebugLogger)
-local DataModule = require(Server.DataModule)
+local DataModule = require(Server.Game.Data.DataModule)
 local Maid = require(Shared.General.Maid)
 
 local Assets = ReplicatedStorage:WaitForChild("Assets")
@@ -23,7 +23,7 @@ local PlayerMaids: { [Player]: Maid.MaidSelf } = {}
 local PlayerCharacterConnections: { [Player]: RBXScriptConnection } = {}
 
 task.defer(function()
-	require(Server.Entity.ComponentInitializer)
+	require(Server.Game.Systems.ComponentInitializer)
 end)
 
 print("EntityUpdateSystem loaded:", EntityUpdateSystem)

@@ -9,9 +9,9 @@ local Server = ServerScriptService:WaitForChild("Server")
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local Formulas = require(Shared.General.Formulas)
-local EventBus = require(Server.Core.EventBus)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
-local CallbackRegistry = require(Server.Core.CallbackRegistry)
+local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
 
 export type CallbackConnection = {
 	Disconnect: () -> (),

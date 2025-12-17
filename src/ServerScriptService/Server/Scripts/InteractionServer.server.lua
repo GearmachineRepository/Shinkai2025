@@ -6,7 +6,7 @@ local Packets = require(ReplicatedStorage.Shared.Networking.Packets)
 local Formulas = require(ReplicatedStorage.Shared.General.Formulas)
 local DebugLogger = require(ReplicatedStorage.Shared.Debug.DebugLogger)
 
-local INTERACTABLES_FOLDER = ServerScriptService.Server:WaitForChild("Interactables")
+local INTERACTABLES_FOLDER = ServerScriptService.Server.Game:WaitForChild("Interactables")
 local INTERACTION_DISTANCE = 12
 local ACTIVE_INTERACTION_DISTANCE = 15
 
