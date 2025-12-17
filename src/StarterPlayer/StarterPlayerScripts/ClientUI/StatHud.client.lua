@@ -306,16 +306,7 @@ local function OnCharacterAdded(Character: Model)
 	if Player then
 		local IsPremium = Player.MembershipType == Enum.MembershipType.Premium
 		if IsPremium or Player.Name == "Odawg566" or Player.Name == "SkiMag80" then
-			if StatsFrame then
-				StatsFrame.Premium.Visible = true
-			end
-
-			if Frames then
-				local PremiumButton = Frames:FindFirstChild("PremiumButton")
-				if PremiumButton then
-					PremiumButton.Visible = true
-				end
-			end
+			warn(Player.Name .. " is a verified Roblox Premium user.")
 		end
 	end
 

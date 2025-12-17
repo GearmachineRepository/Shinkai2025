@@ -3,6 +3,10 @@
 local Players = game:GetService("Players")
 local StarterGui = game:GetService("StarterGui")
 local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Packets = require(Shared.Networking.Packets)
 
 local LOCAL_PLAYER: Player = Players.LocalPlayer
 local PlayerGui: PlayerGui = LOCAL_PLAYER:WaitForChild("PlayerGui")
@@ -43,68 +47,24 @@ type SlotUi = {
 	CooldownOverlay: Frame,
 }
 
+type HotbarItem = {
+	ToolId: string,
+	ToolName: string,
+	Icon: string,
+}
+
 local HotbarGui: ScreenGui? = nil
 local RootFrame: Frame? = nil
 local SlotsFrame: Frame? = nil
 local SlotUis: { SlotUi } = {}
 
-local Character: Model? = nil
-local Humanoid: Humanoid? = nil
-
-local SlotIndexToTool: { [number]: Tool } = {}
-local ToolToSlotIndex: { [Tool]: number } = {}
-
-local EquippedTool: Tool? = nil
-
-local function IsTool(InstanceValue: Instance): boolean
-	return InstanceValue:IsA("Tool")
-end
-
-local function GetBackpack(): Backpack
-	return LOCAL_PLAYER.Backpack
-end
-
-local function GetToolIcon(ToolInstance: Tool): string
-	if ToolInstance.TextureId ~= "" then
-		return ToolInstance.TextureId
-	end
-
-	local IconAttribute: any = ToolInstance:GetAttribute("Icon")
-	if typeof(IconAttribute) == "string" then
-		return IconAttribute
-	end
-
-	return ""
-end
-
-local function IsToolOwnedByPlayer(ToolInstance: Tool): boolean
-	local CurrentCharacter: Model? = LOCAL_PLAYER.Character
-	local CurrentBackpack: Backpack = GetBackpack()
-
-	if ToolInstance.Parent == CurrentBackpack then
-		return true
-	end
-
-	if CurrentCharacter ~= nil and ToolInstance.Parent == CurrentCharacter then
-		return true
-	end
-
-	return false
-end
-
-local function FindFirstEmptySlot(): number?
-	for SlotIndex: number = 1, MAX_SLOTS do
-		if SlotIndexToTool[SlotIndex] == nil then
-			return SlotIndex
-		end
-	end
-	return nil
-end
+local HotbarItems: { [number]: HotbarItem } = {}
+local EquippedSlot: number? = nil
 
 local function GetVisibleSlotCount(): number
 	local Count: number = 0
 	for SlotIndex: number = 1, MAX_SLOTS do
-		if SlotIndexToTool[SlotIndex] ~= nil then
+		if HotbarItems[SlotIndex] ~= nil then
 			Count += 1
 		end
 	end
@@ -132,13 +92,13 @@ local function ApplyLayoutVisibility(): ()
 	CurrentRootFrame.Size = UDim2.fromOffset(TotalWidth, TotalHeight)
 end
 
-local function SetSlotVisual(SlotIndex: number, ToolInstance: Tool?): ()
+local function SetSlotVisual(SlotIndex: number, Item: HotbarItem?): ()
 	local SlotUiValue: SlotUi? = SlotUis[SlotIndex]
 	if SlotUiValue == nil then
 		return
 	end
 
-	if ToolInstance == nil then
+	if Item == nil then
 		SlotUiValue.IconImage.Image = ""
 		SlotUiValue.NameLabel.Text = ""
 		SlotUiValue.CooldownOverlay.Visible = false
@@ -148,11 +108,11 @@ local function SetSlotVisual(SlotIndex: number, ToolInstance: Tool?): ()
 	end
 
 	SlotUiValue.SlotFrame.Visible = true
-	SlotUiValue.IconImage.Image = GetToolIcon(ToolInstance)
-	SlotUiValue.NameLabel.Text = ToolInstance.Name
+	SlotUiValue.IconImage.Image = Item.Icon
+	SlotUiValue.NameLabel.Text = Item.ToolName
 	SlotUiValue.CooldownOverlay.Visible = false
 
-	if EquippedTool == ToolInstance then
+	if EquippedSlot == SlotIndex then
 		SlotUiValue.SlotFrame.BackgroundTransparency = EQUIPPED_BACKGROUND_TRANSPARENCY
 		SlotUiValue.SlotFrame.BackgroundColor3 = EQUIPPED_BACKGROUND_COLOR
 		SlotUiValue.SlotFrame.UIStroke.Thickness = 1
@@ -164,104 +124,46 @@ end
 
 local function RefreshAllSlots(): ()
 	for SlotIndex: number = 1, MAX_SLOTS do
-		SetSlotVisual(SlotIndex, SlotIndexToTool[SlotIndex])
+		SetSlotVisual(SlotIndex, HotbarItems[SlotIndex])
 	end
 	ApplyLayoutVisibility()
 end
 
-local function RegisterTool(ToolInstance: Tool): ()
-	if ToolToSlotIndex[ToolInstance] ~= nil then
-		return
-	end
-
-	if not IsToolOwnedByPlayer(ToolInstance) then
-		return
-	end
-
-	local SlotIndex: number? = FindFirstEmptySlot()
-	if SlotIndex == nil then
-		return
-	end
-
-	SlotIndexToTool[SlotIndex] = ToolInstance
-	ToolToSlotIndex[ToolInstance] = SlotIndex
-
-	RefreshAllSlots()
-end
-
-local function UnregisterTool(ToolInstance: Tool): ()
-	local SlotIndex: number? = ToolToSlotIndex[ToolInstance]
-	if SlotIndex == nil then
-		return
-	end
-
-	if EquippedTool == ToolInstance then
-		EquippedTool = nil
-	end
-
-	ToolToSlotIndex[ToolInstance] = nil
-	SlotIndexToTool[SlotIndex] = nil
-
-	RefreshAllSlots()
-end
-
-local function SafeUnregisterIfTrulyGone(ToolInstance: Tool): ()
-	task.defer(function()
-		if not IsToolOwnedByPlayer(ToolInstance) then
-			UnregisterTool(ToolInstance)
-		else
-			RefreshAllSlots()
-		end
-	end)
-end
-
 local function EquipToolAtSlot(SlotIndex: number): ()
-	local ToolInstance: Tool? = SlotIndexToTool[SlotIndex]
-	if ToolInstance == nil then
+	local Item: HotbarItem? = HotbarItems[SlotIndex]
+	if Item == nil then
 		return
 	end
 
-	local CurrentHumanoid: Humanoid? = Humanoid
-	if CurrentHumanoid == nil then
-		return
+	if EquippedSlot == SlotIndex then
+		Packets.UnequippedTool:Fire(SlotIndex)
+		EquippedSlot = nil
+	else
+		Packets.EquippedTool:Fire(SlotIndex)
+		EquippedSlot = SlotIndex
 	end
 
-	if EquippedTool == ToolInstance then
-		CurrentHumanoid:UnequipTools()
-		EquippedTool = nil
-		RefreshAllSlots()
-		return
-	end
-
-	CurrentHumanoid:EquipTool(ToolInstance)
-	EquippedTool = ToolInstance
 	RefreshAllSlots()
 end
 
-local function ScanForTools(Container: Instance): ()
-	for _, Descendant: Instance in Container:GetDescendants() do
-		if IsTool(Descendant) then
-			RegisterTool(Descendant :: Tool)
+local function HandleHotbarUpdate(HotbarData: { [number]: any })
+	table.clear(HotbarItems)
+
+	for SlotIndex, ItemData in HotbarData do
+		if typeof(ItemData) == "table" and ItemData.ToolId then
+			HotbarItems[SlotIndex] = {
+				ToolId = ItemData.ToolId,
+				ToolName = ItemData.ToolName or "Unknown",
+				Icon = ItemData.Icon or "",
+			}
 		end
 	end
 
-	for _, Child: Instance in Container:GetChildren() do
-		if IsTool(Child) then
-			RegisterTool(Child :: Tool)
-		end
-	end
+	RefreshAllSlots()
 end
 
-local function ClearAllTools(): ()
-	for SlotIndex: number = 1, MAX_SLOTS do
-		SlotIndexToTool[SlotIndex] = nil
-	end
-
-	for ToolInstance: Tool, _ in pairs(ToolToSlotIndex) do
-		ToolToSlotIndex[ToolInstance] = nil
-	end
-
-	EquippedTool = nil
+local function HandleEquippedToolUpdate(SlotIndex: number?)
+	EquippedSlot = SlotIndex
 	RefreshAllSlots()
 end
 
@@ -280,47 +182,13 @@ local function ConnectInput(): ()
 	end)
 end
 
-local function BindBackpackSignals(BackpackInstance: Backpack): ()
-	BackpackInstance.DescendantAdded:Connect(function(Descendant: Instance)
-		if IsTool(Descendant) then
-			RegisterTool(Descendant :: Tool)
-		end
-	end)
-
-	BackpackInstance.DescendantRemoving:Connect(function(Descendant: Instance)
-		if IsTool(Descendant) then
-			SafeUnregisterIfTrulyGone(Descendant :: Tool)
-		end
-	end)
-end
-
-local function BindCharacterSignals(CharacterModel: Model): ()
-	CharacterModel.DescendantAdded:Connect(function(Descendant: Instance)
-		if IsTool(Descendant) then
-			RegisterTool(Descendant :: Tool)
-		end
-	end)
-
-	CharacterModel.DescendantRemoving:Connect(function(Descendant: Instance)
-		if IsTool(Descendant) then
-			SafeUnregisterIfTrulyGone(Descendant :: Tool)
-		end
-	end)
-end
-
-local function OnCharacterAdded(NewCharacter: Model): ()
-	Character = NewCharacter
-	Humanoid = NewCharacter:WaitForChild("Humanoid") :: Humanoid
-
-	ClearAllTools()
-
-	BindCharacterSignals(Character)
-
-	local CurrentBackpack: Backpack = GetBackpack()
-	ScanForTools(CurrentBackpack)
-	ScanForTools(Character)
+local function OnCharacterAdded(_NewCharacter: Model): ()
+	table.clear(HotbarItems)
+	EquippedSlot = nil
 
 	RefreshAllSlots()
+
+	Packets.RequestHotbarSync:Fire()
 end
 
 local function BuildGui(): ()
@@ -389,7 +257,7 @@ local function BuildGui(): ()
 		KeyLabel.BorderSizePixel = 0
 		KeyLabel.Position = UDim2.fromOffset(6, 4)
 		KeyLabel.Size = UDim2.fromOffset(14, 14)
-		KeyLabel.Text = tostring(SlotIndex)
+		KeyLabel.Text = tostring(SlotIndex % 10)
 		KeyLabel.TextColor3 = SLOT_TEXT_COLOR
 		KeyLabel.TextScaled = true
 		KeyLabel.Font = Enum.Font.GothamBold
@@ -452,18 +320,14 @@ local function Initialize(): ()
 	BuildGui()
 	ConnectInput()
 
-	local CurrentBackpack: Backpack = GetBackpack()
-	BindBackpackSignals(CurrentBackpack)
+	Packets.HotbarUpdate.OnClientEvent:Connect(HandleHotbarUpdate)
+	Packets.EquippedToolUpdate.OnClientEvent:Connect(HandleEquippedToolUpdate)
 
 	LOCAL_PLAYER.CharacterAdded:Connect(OnCharacterAdded)
 
 	local ExistingCharacter: Model? = LOCAL_PLAYER.Character
 	if ExistingCharacter ~= nil then
 		OnCharacterAdded(ExistingCharacter)
-	else
-		ClearAllTools()
-		ScanForTools(CurrentBackpack)
-		RefreshAllSlots()
 	end
 end
 

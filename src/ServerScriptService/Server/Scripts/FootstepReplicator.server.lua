@@ -76,9 +76,7 @@ Packets.Footplanted.OnServerEvent:Connect(function(Player: Player, MaterialId: n
 		return
 	end
 
-	for _, OtherPlayer in NearbyPlayers do
-		Packets.Footplanted:FireClient(OtherPlayer, Player.UserId, MaterialId)
-	end
+	Packets.Footplanted:Fire(Player.UserId, MaterialId)
 end)
 
 Players.PlayerRemoving:Connect(function(Player: Player)

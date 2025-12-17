@@ -9,7 +9,7 @@ local Entity = Server:WaitForChild("Entity")
 
 local StateManager = require(Entity.Core.StateManager)
 local StatManager = require(Entity.Core.StatManager)
-local HookController = require(Entity.Specialized.HookController)
+local HookController = require(Entity.PlayerControllers.HookController)
 local StateHandlers = require(Entity.Handlers.StateHandlers)
 
 local StaminaController = require(Entity.PlayerControllers.StaminaController)
@@ -18,6 +18,8 @@ local BodyFatigueController = require(Entity.PlayerControllers.BodyFatigueContro
 local TrainingController = require(Entity.PlayerControllers.TrainingController)
 local BodyScalingController = require(Entity.PlayerControllers.BodyScalingController)
 local SweatController = require(Entity.PlayerControllers.SweatController)
+local InventoryController = require(Entity.PlayerControllers.InventoryController)
+local ToolController = require(Entity.PlayerControllers.ToolController)
 
 local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
@@ -32,6 +34,7 @@ local Formulas = require(Shared.General.Formulas)
 local Maid = require(Shared.General.Maid)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 local UpdateService = require(Shared.Networking.UpdateService)
+local CooldownSystem = require(Server.Systems.CooldownSystem)
 
 local CharacterController = {}
 CharacterController.__index = CharacterController
@@ -56,6 +59,8 @@ export type ControllerType = typeof(setmetatable(
 		BodyFatigueController: BodyFatigueController.BodyFatigueController?,
 		TrainingController: TrainingController.TrainingController?,
 		BodyScalingController: BodyScalingController.BodyScalingController?,
+		InventoryController: InventoryController.InventoryController?,
+		ToolController: ToolController.ToolController?,
 		SweatController: SweatController.SweatController?,
 		ModifierRegistry: ModifierRegistry.ModifierRegistry,
 		LastWalkSpeedUpdate: number,
@@ -87,7 +92,10 @@ function CharacterController.new(Character: Model, Player: Player?, PlayerData: 
 		TrainingController = nil,
 		BodyScalingController = nil,
 		SweatController = nil,
+		InventoryController = nil,
+		ToolController = nil,
 		ModifierRegistry = ModifierRegistry.new(),
+		CooldownController = CooldownSystem.new(),
 		LastWalkSpeedUpdate = 0,
 		CachedWalkSpeed = 8,
 		MovementTickAccumulator = 0,
@@ -117,6 +125,8 @@ function CharacterController.new(Character: Model, Player: Player?, PlayerData: 
 		self.TrainingController = TrainingController.new(self, PlayerData)
 		self.BodyScalingController = BodyScalingController.new(self)
 		self.SweatController = SweatController.new(self)
+		self.InventoryController = InventoryController.new(self, PlayerData)
+		self.ToolController = ToolController.new(self)
 
 		self.Maid:GiveTask(self.BodyFatigueController)
 		self.Maid:GiveTask(self.StaminaController)
@@ -124,6 +134,8 @@ function CharacterController.new(Character: Model, Player: Player?, PlayerData: 
 		self.Maid:GiveTask(self.TrainingController)
 		self.Maid:GiveTask(self.BodyScalingController)
 		self.Maid:GiveTask(self.SweatController)
+		self.Maid:GiveTask(self.InventoryController)
+		self.Maid:GiveTask(self.ToolController)
 
 		self:SetupMovementTracking()
 		self:SetupStatChangeListeners()
@@ -464,6 +476,7 @@ end
 
 function CharacterController:Destroy()
 	DebugLogger.Info("CharacterController", "Destroying controller for: %s", self.Character.Name)
+	self.CooldownController:Destroy()
 	self.Maid:DoCleaning()
 	Controllers[self.Character] = nil
 	self.Character = nil

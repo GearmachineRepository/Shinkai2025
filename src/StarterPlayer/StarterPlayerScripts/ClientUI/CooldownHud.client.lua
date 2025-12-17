@@ -1,0 +1,125 @@
+--!strict
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local UpdateService = require(Shared.Networking.UpdateService)
+local Packets = require(Shared.Networking.Packets)
+
+local Player = Players.LocalPlayer
+local PlayerGui = Player:WaitForChild("PlayerGui")
+
+type CooldownInfo = {
+	StartTime: number,
+	Duration: number,
+	Frame: Frame,
+	Bar: Frame,
+	Timer: TextLabel,
+}
+
+local ActiveCooldowns: { [string]: CooldownInfo } = {}
+
+local LOOP_ITERATION = 1 / 30
+
+local function GetCooldownRemaining(StartTime: number, Duration: number): number
+	local Elapsed = workspace:GetServerTimeNow() - StartTime
+	return math.max(0, Duration - Elapsed)
+end
+
+local function GetOrCreateCooldownFrame(CooldownId: string): Frame?
+	local Hud = PlayerGui:FindFirstChild("Hud")
+	if not Hud then
+		return nil
+	end
+
+	local Frames = Hud:FindFirstChild("Frames")
+	if not Frames then
+		return nil
+	end
+
+	local Cooldowns = Frames:FindFirstChild("Cooldowns")
+	if not Cooldowns then
+		return nil
+	end
+
+	local ExistingFrame = Cooldowns:FindFirstChild(CooldownId)
+	if ExistingFrame and ExistingFrame:IsA("Frame") then
+		return ExistingFrame
+	end
+
+	local Template = Cooldowns:FindFirstChild("CooldownTemplate")
+	if not Template or not Template:IsA("Frame") then
+		return nil
+	end
+
+	local NewFrame = Template:Clone()
+	NewFrame.Name = CooldownId
+	NewFrame.Visible = true
+	NewFrame.Parent = Cooldowns
+
+	return NewFrame
+end
+
+local function CleanupCooldown(CooldownId: string)
+	local CooldownInfo = ActiveCooldowns[CooldownId]
+	if CooldownInfo and CooldownInfo.Frame then
+		CooldownInfo.Frame:Destroy()
+	end
+	ActiveCooldowns[CooldownId] = nil
+end
+
+Packets.StartCooldown.OnClientEvent:Connect(function(CooldownId: string, StartTime: number, Duration: number)
+	local Frame = GetOrCreateCooldownFrame(CooldownId)
+
+	if not Frame then
+		return
+	end
+
+	local Bar = Frame:FindFirstChild("Bar")
+	local Timer = Frame:FindFirstChild("Timer")
+
+	if not Bar or not Bar:IsA("Frame") or not Timer or not Timer:IsA("TextLabel") then
+		return
+	end
+
+	ActiveCooldowns[CooldownId] = {
+		StartTime = StartTime,
+		Duration = Duration,
+		Frame = Frame,
+		Bar = Bar,
+		Timer = Timer,
+	}
+
+	local Remaining = GetCooldownRemaining(StartTime, Duration)
+	Timer.Text = string.format("%s: %.1fs", CooldownId, Remaining)
+end)
+
+Packets.ClearCooldown.OnClientEvent:Connect(function(CooldownId: string)
+	CleanupCooldown(CooldownId)
+end)
+
+UpdateService.Register(function()
+	if #ActiveCooldowns <= 0 then
+		return
+	end
+	for CooldownId, CooldownInfo in ActiveCooldowns do
+		local Remaining = GetCooldownRemaining(CooldownInfo.StartTime, CooldownInfo.Duration)
+
+		if Remaining <= 0 then
+			CleanupCooldown(CooldownId)
+			continue
+		end
+
+		local Progress = 1 - (Remaining / CooldownInfo.Duration)
+		CooldownInfo.Bar.Size = UDim2.fromScale(Progress, 1)
+		CooldownInfo.Timer.Text = string.format("%s: %.1fs", CooldownId, Remaining)
+	end
+end, LOOP_ITERATION)
+
+PlayerGui.DescendantRemoving:Connect(function(Descendant)
+	for CooldownId, CooldownInfo in ActiveCooldowns do
+		if Descendant == CooldownInfo.Frame or Descendant:IsAncestorOf(CooldownInfo.Frame) then
+			ActiveCooldowns[CooldownId] = nil
+		end
+	end
+end)

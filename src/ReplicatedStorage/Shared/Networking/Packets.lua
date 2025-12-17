@@ -2,22 +2,6 @@
 local Packet = require(script.Parent.Parent:WaitForChild("Packages"):WaitForChild("Packet"))
 
 return {
-	-- Combat
-	RequestAttack = Packet("RequestAttack"),
-	CancelAttack = Packet("CancelAttack"),
-	CombatHit = Packet("CombatHit", Packet.Instance, Packet.String, Packet.Vector3F32, Packet.NumberF64),
-	CombatHitConfirmed = Packet(
-		"CombatHitConfirmed",
-		Packet.Instance,
-		Packet.NumberF32,
-		Packet.Boolean8,
-		Packet.String
-	),
-	RequestCombatAction = Packet("RequestCombatAction", Packet.String, Packet.NumberU8),
-	CombatHitRegistered = Packet("CombatHitRegistered", Packet.Instance, Packet.String, Packet.Vector3F32),
-	ValidateHit = Packet("ValidateHit", Packet.Instance, Packet.Instance, Packet.NumberU16, Packet.String),
-	RollbackAction = Packet("RollbackAction"),
-
 	-- Animations
 	PlayAnimation = Packet("PlayAnimation", Packet.String),
 	StopAnimation = Packet("StopAnimation"),
@@ -51,4 +35,17 @@ return {
 
 	-- Interactions
 	InteractRequest = Packet("InteractRequest", Packet.Instance, Packet.Boolean8),
+
+	-- Tools
+	EquippedTool = Packet("EquippedTool", Packet.NumberU8),
+	UnequippedTool = Packet("UnequippedTool", Packet.NumberU8),
+
+	-- Hotbar Sync
+	RequestHotbarSync = Packet("RequestHotbarSync"),
+	HotbarUpdate = Packet("HotbarUpdate", Packet.Any),
+	EquippedToolUpdate = Packet("EquippedToolUpdate", Packet.Any),
+
+	-- Cooldown
+	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberU16),
+	ClearCooldown = Packet("ClearCooldown", Packet.String),
 }
