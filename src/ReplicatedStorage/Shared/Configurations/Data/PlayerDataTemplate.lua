@@ -47,7 +47,7 @@ return {
 	Backpack = {},
 	Hotbar = {},
 	Traits = {},
-	Hooks = {"IronSkin"},
+	Hooks = { "Berserker" },
 
 	Clan = {
 		ClanName = "None",

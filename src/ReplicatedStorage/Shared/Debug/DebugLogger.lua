@@ -11,7 +11,7 @@ local Logger = {}
 local CurrentLogLevel: LogLevel = LOG_LEVEL_INFO
 local EnableTimestamps: boolean = true
 
-local DebuggingEnabled: boolean = false
+local DebuggingEnabled: boolean = true
 
 local LogPrefix: string = "[Game]"
 

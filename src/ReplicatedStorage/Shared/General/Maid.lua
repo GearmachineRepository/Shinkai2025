@@ -1,12 +1,5 @@
 --!strict
 
---[[
-  ____  ___  ___ _      _______
- / __ \/ _ \/ _ | | /| / / ___/
-/ /_/ / // / __ | |/ |/ / (_ /
-\____/____/_/ |_|__/|__/\___/
-]]
-
 export type Destroyable = { Destroy: (self: any) -> () }
 export type Disconnectable = { Disconnect: (self: any) -> () }
 export type PromiseLike = { cancel: (self: any) -> (), getStatus: (self: any) -> string }

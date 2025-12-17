@@ -1,9 +1,9 @@
 --!strict
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local InputBuffer = require(ReplicatedStorage.Shared.General.InputBuffer)
+-- local InputBuffer = require(ReplicatedStorage.Shared.General.InputBuffer)
 
-InputBuffer.OnAction(function(ActionName)
-	print("Action fired:", ActionName)
-end)
+-- InputBuffer.OnAction(function(ActionName)
+
+-- end)

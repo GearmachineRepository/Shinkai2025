@@ -2,14 +2,21 @@
 local CommandUtil = require(script.Parent.Parent.CommandUtil)
 
 return {
-	Description = "Deal damage to yourself",
+	Description = "Damage yourself by amount (tests damage system)",
 	Usage = "!damage <amount>",
-	Execute = function(Player: Player, Amount: string)
-		local Controller = CommandUtil.GetController(Player)
-		if not Controller then return end
+	Execute = function(Player: Player, AmountStr: string)
+		local Amount = tonumber(AmountStr)
+		if not Amount or Amount <= 0 then
+			warn("Usage: !damage <amount>")
+			return
+		end
 
-		local DamageAmount = tonumber(Amount) or 10
-		Controller:TakeDamage(DamageAmount)
-		print("Dealt", DamageAmount, "damage to", Player.Name)
-	end
+		local Entity = CommandUtil.GetEntity(Player)
+		if not Entity then
+			return
+		end
+
+		Entity:TakeDamage(Amount, Player)
+		print(string.format("Dealt %d damage to %s", Amount, Player.Name))
+	end,
 }

@@ -1,11 +1,13 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local StatSystem = require(script.Parent.StatSystem)
-
+local StatSystem = require(Server.Systems.StatSystem)
 local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
 
 local ProgressionSystem = {}
@@ -43,21 +45,13 @@ function ProgressionSystem.GetFatiguePenalty(PlayerData: any): number
 	return 1.0 - PenaltyRatio
 end
 
-function ProgressionSystem.AwardTrainingXP(
-	PlayerData: any,
-	StatType: string,
-	BaseXP: number,
-	CharacterController: any?
-): number
+function ProgressionSystem.AwardTrainingXP(PlayerData: any, StatType: string, BaseXP: number, Entity: any?): number
 	local XPMultiplier = TrainingBalance.XPRates.BASE_RATE
 
-	if CharacterController and CharacterController.IsPlayer then
-		local Player = CharacterController.IsPlayer
-		if Player and Player:IsA("Player") then
-			local IsPremium = Player.MembershipType == Enum.MembershipType.Premium
-			if IsPremium then
-				XPMultiplier *= TrainingBalance.XPRates.PREMIUM_MULTIPLIER
-			end
+	if Entity and Entity.IsPlayer and Entity.Player then
+		local IsPremium = Entity.Player.MembershipType == Enum.MembershipType.Premium
+		if IsPremium then
+			XPMultiplier *= TrainingBalance.XPRates.PREMIUM_MULTIPLIER
 		end
 	end
 
@@ -73,11 +67,11 @@ function ProgressionSystem.AwardTrainingXP(
 	if FinalXP > 0 then
 		PlayerData.Stats[StatType .. "_XP"] = (PlayerData.Stats[StatType .. "_XP"] or 0) + FinalXP
 
-		if CharacterController then
+		if Entity and Entity.Stats then
 			local FatigueGain = FinalXP * TrainingBalance.FatigueSystem.XP_TO_FATIGUE_RATIO
-        	local NewFatigue = math.min(100, (CharacterController.StatManager:GetStat(StatTypes.BODY_FATIGUE) or 0) + FatigueGain)
-
-			CharacterController.StatManager:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
+			local CurrentFatigue = Entity.Stats:GetStat(StatTypes.BODY_FATIGUE) or 0
+			local NewFatigue = math.min(100, CurrentFatigue + FatigueGain)
+			Entity.Stats:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
 		end
 
 		StatSystem.UpdateAvailablePoints(PlayerData, StatType)
@@ -85,7 +79,6 @@ function ProgressionSystem.AwardTrainingXP(
 
 	return FinalXP
 end
-
 function ProgressionSystem.RestoreFatigue(PlayerData: any)
 	PlayerData.Stats[StatTypes.BODY_FATIGUE] = 0
 end
@@ -117,7 +110,11 @@ function ProgressionSystem.ConsumeFood(_: any, HungerRestoreAmount: number, Char
 	CharacterController.StatManager:SetStat(StatTypes.HUNGER, NewHunger)
 end
 
-function ProgressionSystem.ProcessMuscleTraining(_: any, MuscleXP: number, CharacterController: any?): boolean -- PlayerData is unused
+function ProgressionSystem.ProcessMuscleTraining(
+	_: any,
+	MuscleXP: number,
+	CharacterController: any?
+): boolean -- PlayerData is unused
 	if not CharacterController or not CharacterController.StatManager then
 		return false
 	end

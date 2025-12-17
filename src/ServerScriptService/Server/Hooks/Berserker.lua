@@ -1,62 +1,85 @@
---!nonstrict
+--!strict
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local DebugLogger = require(Shared.Debug.DebugLogger)
+
 local Berserker = {
 	Name = "Berserker",
 	Description = "Deal 50% more damage below 30% health",
 }
 
-function Berserker.Register(Controller)
-	local Aura = {}
+function Berserker.OnActivate(Entity: any)
+	local Cleanup = {}
+	-- local Aura = {}
 
-	local function CreateAura()
-		if #Aura > 0 then return end
+	-- local function CreateAura()
+	-- 	if #Aura > 0 then
+	-- 		return
+	-- 	end
 
-		local Emitter1 = script.Emitter:Clone()
-		Emitter1.Parent = Controller.Character.Head
-		Emitter1.Enabled = true
-		
-		table.insert(Aura, Emitter1)
-		
-		local Emitter2 = script.Sparks:Clone()
-		Emitter2.Parent = Controller.Character.UpperTorso
-		Emitter2.Enabled = true
+	-- 	local Emitter1 = script.Emitter:Clone()
+	-- 	Emitter1.Parent = Entity.Character.Head
+	-- 	Emitter1.Enabled = true
+	-- 	table.insert(Aura, Emitter1)
 
-		table.insert(Aura, Emitter2)
-	end
+	-- 	local Emitter2 = script.Sparks:Clone()
+	-- 	Emitter2.Parent = Entity.Character.UpperTorso
+	-- 	Emitter2.Enabled = true
+	-- 	table.insert(Aura, Emitter2)
+	-- end
 
-	local function RemoveAura()
-		if #Aura > 0 then
-			for _, Emitter in pairs(Aura) do
-				Emitter.Enabled = false
-				game.Debris:AddItem(Emitter, 5)
-			end
-			table.clear(Aura)
+	-- local function RemoveAura()
+	-- 	if #Aura > 0 then
+	-- 		for _, Emitter in Aura do
+	-- 			Emitter.Enabled = false
+	-- 			game.Debris:AddItem(Emitter, 5)
+	-- 		end
+	-- 		table.clear(Aura)
+	-- 	end
+	-- end
+
+	local HealthCallback = Entity.Stats:OnStatChanged(StatTypes.HEALTH, function(_NewHealth: number, _OldHealth: number)
+		local MaxHealth = Entity.Stats:GetStat(StatTypes.MAX_HEALTH)
+		if MaxHealth <= 0 then
+			return
 		end
-	end
 
-	local HealthConnection = Controller.Humanoid.HealthChanged:Connect(function()
-		local HealthPercent = Controller.Humanoid.Health / Controller.Humanoid.MaxHealth
+		--local HealthPercent = NewHealth / MaxHealth
 
-		if HealthPercent < 0.3 and #Aura <= 0 then
-			CreateAura()
-		elseif HealthPercent >= 0.3 and #Aura > 0 then
-			RemoveAura()
-		end
+		-- if HealthPercent < 0.3 and HealthPercent > 0 then
+		-- 	CreateAura()
+		-- elseif HealthPercent >= 0.3 then
+		-- 	RemoveAura()
+		-- end
 	end)
 
-	local AttackModifierCleanup = Controller:RegisterAttackModifier(100, function(Damage, _)
-		local HealthPercent = Controller.Humanoid.Health / Controller.Humanoid.MaxHealth
+	table.insert(Cleanup, HealthCallback)
 
-		if HealthPercent < 0.3 then
+	local AttackModifier = Entity.Modifiers:Register("Attack", 100, function(Damage: number, _Data: any)
+		local Health = Entity.Stats:GetStat(StatTypes.HEALTH)
+		local MaxHealth = Entity.Stats:GetStat(StatTypes.MAX_HEALTH)
+
+		if MaxHealth > 0 and (Health / MaxHealth) < 0.3 then
+			DebugLogger.Info(script.Name, "Boosting damage (", 1.5, "x) for:", Entity.Player)
 			return Damage * 1.5
 		end
 
 		return Damage
 	end)
 
+	table.insert(Cleanup, AttackModifier)
+
 	return function()
-		RemoveAura()
-		HealthConnection:Disconnect()
-		AttackModifierCleanup()
+		DebugLogger.Info(script.Name, "Cleaning for:", Entity.Player)
+		-- RemoveAura()
+		for _, CleanupFn in Cleanup do
+			if CleanupFn then
+				CleanupFn()
+			end
+		end
 	end
 end
 

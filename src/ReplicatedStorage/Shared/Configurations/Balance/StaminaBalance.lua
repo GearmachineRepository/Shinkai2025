@@ -20,6 +20,12 @@ local StaminaBalance = {
 		REDUCTION_PERCENT = 100,
 		COOLDOWN = 0.1,
 	},
+
+	Sync = {
+		QUANTUM = 0.10,
+		UPDATE_THRESHOLD = 0.01,
+		SYNC_RATE_SECONDS = 0.10,
+	},
 }
 
 return StaminaBalance

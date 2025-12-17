@@ -6,9 +6,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CharacterController = require(Server.Entity.Core.CharacterController)
+local Entity = require(Server.Entity.Core.Entity)
+local StatSystem = require(Server.Systems.StatSystem)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local StatBalance = require(Shared.Configurations.Balance.StatBalance)
 local Packets = require(Shared.Networking.Packets)
 
 local TRAINABLE_STATS = {
@@ -61,24 +63,35 @@ local function HandleAllocateStatPoint(Player: Player, StatName: string)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller then
-		DebugLogger.Warning("StatAllocationHandler", "No controller: %s", Player.Name)
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Training then
+		DebugLogger.Warning("StatAllocationHandler", "No entity for %s", Player.Name)
 		return
 	end
 
-	local TrainingController = Controller.TrainingController
-	if not TrainingController then
-		DebugLogger.Warning("StatAllocationHandler", "No TrainingController: %s", Player.Name)
+	local TrainingComponent = EntityInstance.Components.Training
+	local PlayerData = TrainingComponent.PlayerData
+
+	local Success, ErrorMessage = StatSystem.AllocateStar(PlayerData, StatName)
+
+	if not Success then
+		DebugLogger.Warning("StatAllocationHandler", "Failed for %s: %s", Player.Name, ErrorMessage)
 		return
 	end
 
-	local Success = TrainingController:AllocateStatPoint(StatName)
-	if Success then
-		DebugLogger.Info("StatAllocationHandler", "%s allocated point to %s", Player.Name, StatName)
-	else
-		DebugLogger.Info("StatAllocationHandler", "%s failed to allocate %s", Player.Name, StatName)
-	end
+	local NewStars = PlayerData.Stats[StatName .. "_Stars"]
+	local BaseValue = StatBalance.Defaults[StatName] or 0
+	local NewStatValue = StatSystem.CalculateStatValue(BaseValue, NewStars, StatName)
+
+	EntityInstance.Stats:SetStat(StatName, NewStatValue)
+
+	Character:SetAttribute(StatName .. "_Stars", NewStars)
+
+	StatSystem.UpdateAvailablePoints(PlayerData, StatName)
+	local AvailablePoints = PlayerData.Stats[StatName .. "_AvailablePoints"]
+	Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
+
+	DebugLogger.Info("StatAllocationHandler", "%s allocated point to %s", Player.Name, StatName)
 end
 
 Packets.AllocateStatPoint.OnServerEvent:Connect(HandleAllocateStatPoint)

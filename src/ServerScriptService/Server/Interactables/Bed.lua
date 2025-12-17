@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CharacterController = require(Server.Entity.Core.CharacterController)
+local Entity = require(Server.Entity.Core.Entity)
 local InteractableBase = require(Server.Interactables.InteractableBase)
 local FatigueBalance = require(Shared.Configurations.Balance.FatigueBalance)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
@@ -54,12 +54,12 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.BodyFatigueController then
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.BodyFatigue then
 		return
 	end
 
-	local ExistingFatigue = Controller.StatManager:GetStat(StatTypes.BODY_FATIGUE)
+	local ExistingFatigue = EntityInstance.Stats:GetStat(StatTypes.BODY_FATIGUE)
 	if ExistingFatigue <= 0 then
 		return
 	end
@@ -90,16 +90,18 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 		ExitBed(Player, BedModel)
 	end)
 
-	local MaxFatigue = Controller.StatManager:GetStat(StatTypes.MAX_BODY_FATIGUE)
+	local MaxFatigue = EntityInstance.Stats:GetStat(StatTypes.MAX_BODY_FATIGUE)
 	local ReductionRate = MaxFatigue / FatigueBalance.Rest.TIME_TO_FULL_REST
 
 	Packets.PlayAnimation:FireClient(Player, "sleep")
 
 	local RestConnection = UpdateService.RegisterWithCleanup(function(DeltaTime: number)
-		local CurrentFatigue = Controller.StatManager:GetStat(StatTypes.BODY_FATIGUE)
+		local CurrentFatigue = EntityInstance.Stats:GetStat(StatTypes.BODY_FATIGUE)
 
 		if CurrentFatigue <= 0 then
-			Controller.SweatController:StopSweating()
+			if EntityInstance.Components.Sweat then
+				EntityInstance.Components.Sweat:StopSweating()
+			end
 			ExitBed(Player, BedModel)
 			return
 		end
@@ -107,7 +109,7 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 		local FatigueReduction = ReductionRate * DeltaTime
 		local NewFatigue = math.max(0, CurrentFatigue - FatigueReduction)
 
-		Controller.StatManager:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
+		EntityInstance.Stats:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
 	end, 0.10)
 
 	ActiveSleepers[Player] = {

@@ -14,7 +14,7 @@ local StatBalance = {
 		PhysicalResistance = 0,
 		BodyFatigue = 0,
 		MaxBodyFatigue = 100,
-		Hunger = 45,
+		Hunger = 75,
 		MaxHunger = 75,
 		Fat = 0,
 		Muscle = 0,
@@ -66,13 +66,13 @@ local StatBalance = {
 	XPTierSize = 5,
 
 	StarTiers = {
-		{Min = 0, Max = 4, Name = "Bronze", Color = Color3.fromRGB(205, 127, 50)},
-		{Min = 5, Max = 9, Name = "Silver", Color = Color3.fromRGB(192, 192, 192)},
-		{Min = 10, Max = 14, Name = "Gold", Color = Color3.fromRGB(224, 198, 79)},
-		{Min = 15, Max = 19, Name = "Platinum", Color = Color3.fromRGB(113, 153, 172)},
-		{Min = 20, Max = 24, Name = "Emerald", Color = Color3.fromRGB(80, 200, 120)},
-		{Min = 25, Max = 29, Name = "Diamond", Color = Color3.fromRGB(116, 245, 250)},
-		{Min = 30, Max = math.huge, Name = "Champion", Color = Color3.fromRGB(207, 63, 171)},
+		{ Min = 0, Max = 4, Name = "Bronze", Color = Color3.fromRGB(205, 127, 50) },
+		{ Min = 5, Max = 9, Name = "Silver", Color = Color3.fromRGB(192, 192, 192) },
+		{ Min = 10, Max = 14, Name = "Gold", Color = Color3.fromRGB(224, 198, 79) },
+		{ Min = 15, Max = 19, Name = "Platinum", Color = Color3.fromRGB(113, 153, 172) },
+		{ Min = 20, Max = 24, Name = "Emerald", Color = Color3.fromRGB(80, 200, 120) },
+		{ Min = 25, Max = 29, Name = "Diamond", Color = Color3.fromRGB(116, 245, 250) },
+		{ Min = 30, Max = math.huge, Name = "Champion", Color = Color3.fromRGB(207, 63, 171) },
 	},
 }
 

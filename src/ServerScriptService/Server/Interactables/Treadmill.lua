@@ -7,7 +7,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 
-local CharacterController = require(Server.Entity.Core.CharacterController)
+local Entity = require(Server.Entity.Core.Entity)
 local InteractableBase = require(Server.Interactables.InteractableBase)
 local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
@@ -73,7 +73,7 @@ local function ExitTreadmill(PlayerWhoTrained: Player, TreadmillModel: Model)
 	InteractableBase.ReleaseInteractable(TreadmillModel)
 end
 
-local function UpdateTreadmillVisuals(TreadmillModel: Model, StatToTrain: string, Controller: any)
+local function UpdateTreadmillVisuals(TreadmillModel: Model, StatToTrain: string, EntityInstance: any)
 	local Tread = TreadmillModel:FindFirstChild("Tread") :: BasePart?
 	if not Tread then
 		return
@@ -82,7 +82,7 @@ local function UpdateTreadmillVisuals(TreadmillModel: Model, StatToTrain: string
 	local BaseSpeed = if StatToTrain == StatTypes.MAX_STAMINA
 		then TREADMILL_JOGGING_SPEED
 		else TREADMILL_SPRINTING_SPEED
-	local RunSpeedStat = Controller.StatManager:GetStat(StatTypes.RUN_SPEED)
+	local RunSpeedStat = EntityInstance.Stats:GetStat(StatTypes.RUN_SPEED)
 
 	local TreadSpeed = BaseSpeed * (1 + (RunSpeedStat * 0.1))
 
@@ -98,15 +98,15 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.TrainingController then
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Training then
 		return
 	end
 
-	local TrainingController = Controller.TrainingController
-	local StaminaController = Controller.StaminaController
+	local TrainingComponent = EntityInstance.Components.Training
+	local StaminaComponent = EntityInstance.Components.Stamina
 
-	if not TrainingController:CanTrain() then
+	if not TrainingComponent:CanTrain() then
 		ExitTreadmill(Player, TreadmillModel)
 		return
 	end
@@ -143,7 +143,7 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 			return
 		end
 
-		if not TrainingController:CanTrain() then
+		if not TrainingComponent:CanTrain() then
 			ExitTreadmill(Player, TreadmillModel)
 			return
 		end
@@ -157,14 +157,14 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 
 		if VisualAccumulator >= UPDATE_RATE_SECONDS then
 			VisualAccumulator = 0
-			UpdateTreadmillVisuals(TreadmillModel, StatToTrain, Controller)
+			UpdateTreadmillVisuals(TreadmillModel, StatToTrain, EntityInstance)
 		end
 
 		if StaminaAccumulator >= UPDATE_RATE_SECONDS then
 			StaminaAccumulator = 0
 
-			if StaminaController then
-				local Success = StaminaController:ConsumeStamina(PendingStaminaCost)
+			if StaminaComponent then
+				local Success = StaminaComponent:ConsumeStamina(PendingStaminaCost)
 				PendingStaminaCost = 0
 
 				if not Success then
@@ -179,7 +179,7 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 		if XpAccumulator >= UPDATE_RATE_SECONDS then
 			XpAccumulator = 0
 
-			TrainingController:GrantStatGain(StatToTrain, PendingXpGain)
+			TrainingComponent:GrantStatGain(StatToTrain, PendingXpGain)
 			PendingXpGain = 0
 		end
 	end, 0.10)
@@ -195,6 +195,7 @@ end
 
 function TreadmillInteractable.OnInteract(Player: Player, TreadmillModel: Model)
 	local IsValid, ErrorMessage = InteractableBase.ValidateBasicRequirements(Player)
+
 	if not IsValid then
 		warn(ErrorMessage)
 		return
@@ -205,12 +206,13 @@ function TreadmillInteractable.OnInteract(Player: Player, TreadmillModel: Model)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.TrainingController then
+	local EntityInstance = Entity.GetEntity(Character)
+
+	if not EntityInstance or not EntityInstance.Components.Training then
 		return
 	end
 
-	if not Controller.TrainingController:CanTrain() then
+	if not EntityInstance.Components.Training:CanTrain() then
 		return
 	end
 

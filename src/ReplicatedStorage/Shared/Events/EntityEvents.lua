@@ -1,6 +1,9 @@
 --!strict
 
 local EventTypes = {
+	ENTITY_CREATED = "EntityCreated",
+	ENTITY_DESTROYED = "EntityDestroyed",
+	HEALTH_DEPLETED = "HealthDepleted",
 	DAMAGE_TAKEN = "DamageTaken",
 	DAMAGE_DEALT = "DamageDealt",
 	ATTACK_STARTED = "AttackStarted",
@@ -12,6 +15,7 @@ local EventTypes = {
 	PERFECT_BLOCK = "PerfectBlock",
 	POSTURE_BREAK = "PostureBreak",
 	RIPOSTE_STARTED = "RiposteStarted",
+	MOVEMENT_MODE_CHANGED = "MovementModeChanged",
 	SPRINT_STARTED = "SprintStarted",
 	SPRINT_STOPPED = "SprintStopped",
 	JOG_STARTED = "JogStarted",
@@ -20,8 +24,18 @@ local EventTypes = {
 	SKILL_USED = "SkillUsed",
 	MODE_ACTIVATED = "ModeActivated",
 	MODE_DEACTIVATED = "ModeDeactivated",
+	STAMINA_DRAINED = "StaminaDrained",
+	STAMINA_RESTORED = "StaminaRestored",
 	STAMINA_DEPLETED = "StaminaDepleted",
+	HUNGER_CHANGED = "HungerChanged",
 	HUNGER_CRITICAL = "HungerCritical",
+	STAT_CHANGED = "StatChanged",
+	STATE_CHANGED = "StateChanged",
+	TRAINING_GAIN = "TrainingGain",
+	STAT_LEVEL_UP = "StatLevelUp",
+	BODY_SCALE_UPDATED = "BodyScaleUpdated",
+	MODIFIER_ADDED = "ModifierAdded",
+	MODIFIER_REMOVED = "ModifierRemoved",
 }
 
 return EventTypes

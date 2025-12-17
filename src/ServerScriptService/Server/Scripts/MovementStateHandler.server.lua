@@ -6,7 +6,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CharacterController = require(Server.Entity.Core.CharacterController)
+local Entity = require(Server.Entity.Core.Entity)
 local Packets = require(Shared.Networking.Packets)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 
@@ -31,9 +31,9 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.StaminaController then
-		DebugLogger.Warning("MovementStateHandler", "No controller for %s", Player.Name)
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Stamina then
+		DebugLogger.Warning("MovementStateHandler", "No entity for %s", Player.Name)
 		return
 	end
 
@@ -43,14 +43,14 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 	end
 
 	if MovementMode == "jog" then
-		if Controller.StaminaController:CanJog() then
+		if EntityInstance.Components.Stamina:CanJog() then
 			Character:SetAttribute("MovementMode", "jog")
 		else
 			Character:SetAttribute("MovementMode", "walk")
 			DebugLogger.Info("MovementStateHandler", "%s cannot jog - exhausted", Player.Name)
 		end
 	elseif MovementMode == "run" then
-		if Controller.StaminaController:CanSprint() then
+		if EntityInstance.Components.Stamina:CanSprint() then
 			Character:SetAttribute("MovementMode", "run")
 		else
 			Character:SetAttribute("MovementMode", "walk")

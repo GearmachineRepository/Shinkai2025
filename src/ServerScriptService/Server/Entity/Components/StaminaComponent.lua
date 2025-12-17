@@ -1,47 +1,52 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StaminaBalance = require(Shared.Configurations.Balance.StaminaBalance)
 local Formulas = require(Shared.General.Formulas)
 local Maid = require(Shared.General.Maid)
-local DebugLogger = require(Shared.Debug.DebugLogger)
 
-local StaminaController = {}
-StaminaController.__index = StaminaController
+export type StaminaComponent = {
+	Entity: any,
+	CanSprint: (self: StaminaComponent) -> boolean,
+	CanJog: (self: StaminaComponent) -> boolean,
+	ConsumeStamina: (self: StaminaComponent, Amount: number) -> boolean,
+	RestoreStaminaExternal: (self: StaminaComponent, Amount: number) -> (),
+	Update: (self: StaminaComponent, DeltaTime: number, MovementMode: string?, IsMoving: boolean) -> boolean,
+	OnSprintStart: (self: StaminaComponent) -> (),
+	OnSprintEnd: (self: StaminaComponent) -> (),
+	OnJogStart: (self: StaminaComponent) -> (),
+	OnJogEnd: (self: StaminaComponent) -> (),
+	GetStutterStepMultiplier: (self: StaminaComponent, MovementType: string) -> number,
+	Destroy: (self: StaminaComponent) -> (),
+}
 
-export type StaminaController = typeof(setmetatable(
-	{} :: {
-		Controller: any,
-		LastStaminaUse: number,
-		IsExhausted: boolean,
-		SprintStartTime: number?,
-		JogStartTime: number?,
-		LastSprintEndTime: number,
-		LastJogEndTime: number,
-		Maid: Maid.MaidSelf,
-		CachedMaxStamina: number,
-		LastStaminaValue: number,
+type StaminaComponentInternal = StaminaComponent & {
+	LastStaminaUse: number,
+	IsExhausted: boolean,
+	SprintStartTime: number?,
+	JogStartTime: number?,
+	LastSprintEndTime: number,
+	LastJogEndTime: number,
+	Maid: Maid.MaidSelf,
+	CachedMaxStamina: number,
+	LastStaminaValue: number,
+	SyncAccumulator: number,
+	PendingDelta: number,
+}
 
-		SyncAccumulator: number,
-		PendingDelta: number,
-	},
-	StaminaController
-))
-
-local STAMINA_UPDATE_THRESHOLD = 0.01
-local STAMINA_SYNC_RATE_SECONDS = 0.10
-local STAMINA_QUANTUM = 0.10
+local StaminaComponent = {}
+StaminaComponent.__index = StaminaComponent
 
 local function QuantizeStamina(Value: number): number
-	return math.floor((Value / STAMINA_QUANTUM) + 0.5) * STAMINA_QUANTUM
+	return math.floor((Value / StaminaBalance.Sync.QUANTUM) + 0.5) * StaminaBalance.Sync.QUANTUM
 end
 
-function StaminaController.new(CharacterController: any): StaminaController
-	local self = setmetatable({
-		Controller = CharacterController,
+function StaminaComponent.new(Entity: any): StaminaComponent
+	local self: StaminaComponentInternal = setmetatable({
+		Entity = Entity,
 		LastStaminaUse = 0,
 		IsExhausted = false,
 		SprintStartTime = nil,
@@ -51,34 +56,33 @@ function StaminaController.new(CharacterController: any): StaminaController
 		Maid = Maid.new(),
 		CachedMaxStamina = 75,
 		LastStaminaValue = 75,
-
 		SyncAccumulator = 0,
 		PendingDelta = 0,
-	}, StaminaController)
+	}, StaminaComponent) :: any
 
 	self.CachedMaxStamina = self:GetMaxStamina()
-	self.LastStaminaValue = self.Controller.StatManager:GetStat(StatTypes.STAMINA)
+	self.LastStaminaValue = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 
 	return self
 end
 
-function StaminaController:GetMaxStamina(): number
-	local NewMax = self.Controller.StatManager:GetStat(StatTypes.MAX_STAMINA)
+function StaminaComponent:GetMaxStamina(): number
+	local NewMax = self.Entity.Stats:GetStat(StatTypes.MAX_STAMINA)
 	if not Formulas.IsNearlyEqual(NewMax, self.CachedMaxStamina, 0.1) then
 		self.CachedMaxStamina = NewMax
 	end
 	return self.CachedMaxStamina
 end
 
-function StaminaController:CanSprint(): boolean
+function StaminaComponent:CanSprint(): boolean
 	return not self.IsExhausted
 end
 
-function StaminaController:CanJog(): boolean
+function StaminaComponent:CanJog(): boolean
 	return not self.IsExhausted
 end
 
-function StaminaController:GetStutterStepMultiplier(MovementType: string): number
+function StaminaComponent:GetStutterStepMultiplier(MovementType: string): number
 	local CurrentTime = os.clock()
 	local StartTime = if MovementType == "run" then self.SprintStartTime else self.JogStartTime
 	local LastEndTime = if MovementType == "run" then self.LastSprintEndTime else self.LastJogEndTime
@@ -101,30 +105,30 @@ function StaminaController:GetStutterStepMultiplier(MovementType: string): numbe
 	return 1 - Formulas.FromPercentage(StaminaBalance.StutterStep.REDUCTION_PERCENT, 1)
 end
 
-function StaminaController:OnSprintStart()
+function StaminaComponent:OnSprintStart()
 	self.SprintStartTime = os.clock()
 end
 
-function StaminaController:OnSprintEnd()
+function StaminaComponent:OnSprintEnd()
 	self.LastSprintEndTime = os.clock()
 	self.SprintStartTime = nil
 end
 
-function StaminaController:OnJogStart()
+function StaminaComponent:OnJogStart()
 	self.JogStartTime = os.clock()
 end
 
-function StaminaController:OnJogEnd()
+function StaminaComponent:OnJogEnd()
 	self.LastJogEndTime = os.clock()
 	self.JogStartTime = nil
 end
 
-function StaminaController:ConsumeStamina(Amount: number): boolean
+function StaminaComponent:ConsumeStamina(Amount: number): boolean
 	if Amount <= 0 then
 		return true
 	end
 
-	local CurrentStamina = self.Controller.StatManager:GetStat(StatTypes.STAMINA)
+	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	local TargetStamina = CurrentStamina + self.PendingDelta - Amount
 
 	if TargetStamina <= 0 then
@@ -143,58 +147,57 @@ function StaminaController:ConsumeStamina(Amount: number): boolean
 	return true
 end
 
-function StaminaController:RestoreStaminaExternal(Amount: number)
+function StaminaComponent:RestoreStaminaExternal(Amount: number)
 	if Amount <= 0 then
 		return
 	end
 
-	local CurrentStamina = self.Controller.StatManager:GetStat(StatTypes.STAMINA)
+	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	self.PendingDelta += Amount
 	self.SyncAccumulator = 0
 	self:ApplyStamina(CurrentStamina + self.PendingDelta, true)
 end
 
-function StaminaController:ApplyStamina(TargetStamina: number, ForceSync: boolean)
-	if not self.Controller.Character then
+function StaminaComponent:ApplyStamina(TargetStamina: number, ForceSync: boolean)
+	if not self.Entity.Character then
 		return
 	end
 
 	local MaxStamina = self:GetMaxStamina()
 	local Clamped = math.clamp(TargetStamina, 0, MaxStamina)
-
 	local Quantized = QuantizeStamina(Clamped)
 
-	if (MaxStamina - Clamped) <= (STAMINA_QUANTUM * 0.5) then
+	if (MaxStamina - Clamped) <= (StaminaBalance.Sync.QUANTUM * 0.5) then
 		Quantized = MaxStamina
 	end
 
-	local CurrentStamina = self.Controller.StatManager:GetStat(StatTypes.STAMINA)
+	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	local DeltaApplied = Quantized - CurrentStamina
 	self.PendingDelta -= DeltaApplied
 
-	if ForceSync or not Formulas.IsNearlyEqual(Quantized, self.LastStaminaValue, STAMINA_UPDATE_THRESHOLD) then
-		self.Controller.StatManager:SetStat(StatTypes.STAMINA, Quantized)
+	if
+		ForceSync or not Formulas.IsNearlyEqual(Quantized, self.LastStaminaValue, StaminaBalance.Sync.UPDATE_THRESHOLD)
+	then
+		self.Entity.Stats:SetStat(StatTypes.STAMINA, Quantized)
 		self.LastStaminaValue = Quantized
 	end
 
 	if Quantized <= 0 and not self.IsExhausted then
 		self.IsExhausted = true
-		self.Controller.StateManager:SetState("Exhausted", true)
-		DebugLogger.Info("StaminaController", "Player exhausted: %s", self.Controller.Character.Name)
+		self.Entity.States:SetState("Exhausted", true)
 	elseif self.IsExhausted and Quantized >= StaminaBalance.Exhaustion.THRESHOLD then
 		self.IsExhausted = false
-		self.Controller.StateManager:SetState("Exhausted", false)
-		DebugLogger.Info("StaminaController", "Player recovered: %s", self.Controller.Character.Name)
+		self.Entity.States:SetState("Exhausted", false)
 	end
 end
 
-function StaminaController:Update(DeltaTime: number, MovementMode: string?, IsMoving: boolean): boolean
-	local CurrentStamina = self.Controller.StatManager:GetStat(StatTypes.STAMINA)
+function StaminaComponent:Update(DeltaTime: number, MovementMode: string?, IsMoving: boolean): boolean
+	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	local MaxStamina = self:GetMaxStamina()
 
 	local DrainMultiplier = 1
-	if self.Controller.BodyFatigueController then
-		DrainMultiplier = self.Controller.BodyFatigueController:GetStaminaDrainMultiplier()
+	if self.Entity.Components.BodyFatigue then
+		DrainMultiplier = 1.0
 	end
 
 	local ForceSync = false
@@ -234,14 +237,14 @@ function StaminaController:Update(DeltaTime: number, MovementMode: string?, IsMo
 		else
 			self.PendingDelta += Regen
 
-			if self.Controller.HungerController then
-				self.Controller.HungerController:ConsumeHungerForStamina(Regen)
+			if self.Entity.Components.Hunger then
+				self.Entity.Components.Hunger:ConsumeHungerForStamina(Regen)
 			end
 		end
 	end
 
 	self.SyncAccumulator += DeltaTime
-	if ForceSync or self.SyncAccumulator >= STAMINA_SYNC_RATE_SECONDS then
+	if ForceSync or self.SyncAccumulator >= StaminaBalance.Sync.SYNC_RATE_SECONDS then
 		self.SyncAccumulator = 0
 		local TargetStamina = CurrentStamina + self.PendingDelta
 		self:ApplyStamina(TargetStamina, ForceSync)
@@ -250,9 +253,8 @@ function StaminaController:Update(DeltaTime: number, MovementMode: string?, IsMo
 	return AllowMovement
 end
 
-function StaminaController:Destroy()
-	DebugLogger.Info("StaminaController", "Destroying StaminaController for: %s", self.Controller.Character.Name)
+function StaminaComponent:Destroy()
 	self.Maid:DoCleaning()
 end
 
-return StaminaController
+return StaminaComponent

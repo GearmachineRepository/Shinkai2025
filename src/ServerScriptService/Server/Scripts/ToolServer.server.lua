@@ -7,7 +7,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CharacterController = require(Server.Entity.Core.CharacterController)
+local Entity = require(Server.Entity.Core.Entity)
 local Packets = require(Shared.Networking.Packets)
 local DebugLogger = require(Shared.Debug.DebugLogger)
 
@@ -27,13 +27,13 @@ local function HandleEquipTool(Player: Player, SlotIndex: number)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.ToolController then
-		DebugLogger.Warning("ToolServer", "No ToolController for %s", Player.Name)
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Tool then
+		DebugLogger.Warning("ToolServer", "No ToolComponent for %s", Player.Name)
 		return
 	end
 
-	Controller.ToolController:EquipTool(SlotIndex)
+	EntityInstance.Components.Tool:EquipTool(SlotIndex)
 end
 
 local function HandleUnequipTool(Player: Player, SlotIndex: number)
@@ -47,13 +47,13 @@ local function HandleUnequipTool(Player: Player, SlotIndex: number)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.ToolController then
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Tool then
 		return
 	end
 
-	if Controller.ToolController:IsToolEquipped(SlotIndex) then
-		Controller.ToolController:UnequipTool()
+	if EntityInstance.Components.Tool:IsToolEquipped(SlotIndex) then
+		EntityInstance.Components.Tool:UnequipTool()
 	end
 end
 
@@ -63,16 +63,16 @@ local function SendHotbarToClient(Player: Player)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.InventoryController then
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Inventory then
 		return
 	end
 
-	local InventoryController = Controller.InventoryController
+	local InventoryComponent = EntityInstance.Components.Inventory
 	local HotbarData: { [number]: any } = {}
 
 	for SlotIndex = 1, 10 do
-		local Item = InventoryController:GetItemInSlot(SlotIndex)
+		local Item = InventoryComponent:GetItemInSlot(SlotIndex)
 		if Item then
 			HotbarData[SlotIndex] = {
 				ToolId = Item.ToolId,
@@ -92,12 +92,12 @@ local function SendEquippedToolToClient(Player: Player)
 		return
 	end
 
-	local Controller = CharacterController.Get(Character)
-	if not Controller or not Controller.ToolController then
+	local EntityInstance = Entity.GetEntity(Character)
+	if not EntityInstance or not EntityInstance.Components.Tool then
 		return
 	end
 
-	local EquippedTool = Controller.ToolController:GetEquippedTool()
+	local EquippedTool = EntityInstance.Components.Tool:GetEquippedTool()
 	local SlotIndex = EquippedTool and EquippedTool.SlotIndex or nil
 
 	Packets.EquippedToolUpdate:FireClient(Player, SlotIndex)

@@ -104,7 +104,7 @@ function StatSystem.UpdateAvailablePoints(PlayerData: any, StatType: string)
 	PlayerData.Stats[StatType .. "_AvailablePoints"] = TotalPointsEarned - PointsSpent
 end
 
-function StatSystem.GetStarTier(TotalStars: number): {Min: number, Max: number, Name: string, Color: Color3}
+function StatSystem.GetStarTier(TotalStars: number): { Min: number, Max: number, Name: string, Color: Color3 }
 	for _, Tier in StatBalance.StarTiers do
 		if TotalStars >= Tier.Min and TotalStars <= Tier.Max then
 			return Tier

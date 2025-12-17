@@ -10,8 +10,10 @@ return {
 			return
 		end
 
-		local Controller = CommandUtil.GetController(Player)
-		if not Controller then return end
+		local Entity = CommandUtil.GetEntity(Player)
+		if not Entity then
+			return
+		end
 
 		local ParsedValue
 		if Value == "true" then
@@ -22,7 +24,7 @@ return {
 			ParsedValue = tonumber(Value) or Value
 		end
 
-		Controller.StateManager:SetState(StateName, ParsedValue)
+		Entity.States:SetState(StateName, ParsedValue)
 		print("Set", StateName, "=", ParsedValue)
-	end
+	end,
 }
