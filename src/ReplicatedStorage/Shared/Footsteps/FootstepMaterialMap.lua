@@ -20,7 +20,7 @@ local MaterialNameToId: { [string]: MaterialId } = {
 	Granite = 12,
 	Foil = 13,
 	Fabric = 14,
-	Diamond = 15,
+	DiamondPlate = 15,
 	CorrodedMetal = 16,
 	Concrete = 17,
 	Cobblestone = 18,
@@ -46,6 +46,11 @@ local MaterialNameToId: { [string]: MaterialId } = {
 	Rubber = 38,
 	Leather = 39,
 	Road = 40,
+	RoofShingles = 41,
+	SmoothPlastic = 42,
+	ClayRoofTiles = 43,
+	Glacier = 44,
+	Plaster = 45,
 }
 
 local IdToMaterialName: { [MaterialId]: string } = {}
