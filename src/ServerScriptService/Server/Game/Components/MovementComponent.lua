@@ -66,6 +66,13 @@ function MovementComponent:GetBaseSpeed(Mode: string?): number
 end
 
 function MovementComponent:GetCurrentSpeed(): number
+	if
+		self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED)
+		or self.Entity.States:GetState(StateTypes.REQUIRE_MOVE_REINTENT)
+	then
+		return 0
+	end
+
 	local BaseSpeed = self:GetBaseSpeed()
 	return self.Entity.Modifiers:Apply("WalkSpeed", BaseSpeed)
 end
@@ -86,6 +93,13 @@ function MovementComponent:EnforceWalkSpeed()
 end
 
 function MovementComponent:SetMovementMode(Mode: string)
+	if
+		self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED)
+		or self.Entity.States:GetState(StateTypes.REQUIRE_MOVE_REINTENT)
+	then
+		return
+	end
+
 	if Mode == "run" then
 		self:HandleSprintMode()
 	elseif Mode == "jog" then
@@ -132,6 +146,9 @@ function MovementComponent:HandleWalkMode()
 end
 
 function MovementComponent:UpdateStaminaAndTraining(DeltaTime: number)
+	if self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED) then
+		return
+	end
 	if not self.Entity.Components.Stamina then
 		return
 	end

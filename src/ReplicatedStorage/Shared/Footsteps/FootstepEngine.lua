@@ -39,7 +39,7 @@ local FootstepSoundGroups = {
 	GeneralSoft = "rbxassetid://75216555975721",
 	GeneralPlastic = "rbxassetid://267454199",
 	GeneralFabric = "rbxassetid://151760062",
-	GeneralConcrete = "rbxassetid://70639393862430",
+	GeneralConcrete = "rbxassetid://18984787734",
 }
 
 local SoundIdByMaterialName: { [string]: string } = {

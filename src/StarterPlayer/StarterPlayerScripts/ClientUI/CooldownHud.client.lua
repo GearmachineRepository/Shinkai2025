@@ -57,6 +57,7 @@ local function GetOrCreateCooldownFrame(CooldownId: string): Frame?
 
 	local NewFrame = Template:Clone()
 	NewFrame.Name = CooldownId
+	NewFrame.Bar.Size = UDim2.fromScale(0, 1)
 	NewFrame.Visible = true
 	NewFrame.Parent = Root
 	return NewFrame
@@ -101,10 +102,11 @@ Packets.ClearCooldown.OnClientEvent:Connect(function(CooldownId: string)
 end)
 
 UpdateService.Register(function()
-	if #ActiveCooldowns <= 0 then
+	if next(ActiveCooldowns) == nil then
 		return
 	end
-	for CooldownId, CooldownInfo in ActiveCooldowns do
+
+	for CooldownId, CooldownInfo in pairs(ActiveCooldowns) do
 		local Remaining = GetCooldownRemaining(CooldownInfo.StartTime, CooldownInfo.Duration)
 
 		if Remaining <= 0 then
@@ -119,9 +121,9 @@ UpdateService.Register(function()
 end, LOOP_ITERATION)
 
 PlayerGui.DescendantRemoving:Connect(function(Descendant)
-	for CooldownId, CooldownInfo in ActiveCooldowns do
-		if Descendant == CooldownInfo.Frame or Descendant:IsAncestorOf(CooldownInfo.Frame) then
-			ActiveCooldowns[CooldownId] = nil
+	for Id, Info in pairs(ActiveCooldowns) do
+		if Info.Frame and Info.Frame:IsDescendantOf(Descendant) then
+			ActiveCooldowns[Id] = nil
 		end
 	end
 end)

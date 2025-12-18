@@ -33,7 +33,7 @@ local DEFAULT_KEYBINDS = {
 	[Enum.KeyCode.T] = { ActionName = "Skill4", CanLoop = false },
 	[Enum.KeyCode.Y] = { ActionName = "Skill5", CanLoop = false },
 	[Enum.KeyCode.B] = { ActionName = "Skill6", CanLoop = false },
-	[Enum.KeyCode.Q] = { ActionName = "Dash", CanLoop = false },
+	[Enum.KeyCode.Q] = { ActionName = "Dash", CanLoop = true },
 }
 
 function InputBuffer.OnAction(Callback: (ActionName: string) -> ())

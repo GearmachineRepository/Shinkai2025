@@ -131,11 +131,7 @@ function StaminaComponent:ConsumeStamina(Amount: number): boolean
 	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	local TargetStamina = CurrentStamina + self.PendingDelta - Amount
 
-	if TargetStamina <= 0 then
-		self.PendingDelta = -CurrentStamina
-		self.LastStaminaUse = os.clock()
-		self.SyncAccumulator = 0
-		self:ApplyStamina(0, true)
+	if TargetStamina < 0 then
 		return false
 	end
 

@@ -27,6 +27,8 @@ local StateTypes = {
 	SLUGGISH = "Sluggish",
 	FATIGUED = "Fatigued",
 	DIZZY = "Dizzy",
+	MOVEMENT_LOCKED = "MovementLocked",
+	REQUIRE_MOVE_REINTENT = "MovementReintent",
 }
 
 return StateTypes

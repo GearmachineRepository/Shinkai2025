@@ -10,6 +10,9 @@ local Maid = require(Shared.General.Maid)
 local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
 local Packets = require(Shared.Networking.Packets)
+local DashBalance = require(Shared.Configurations.Balance.DashBalance)
+local DashValidator = require(Shared.ActionValidation.DashValidator)
+local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 export type ActionComponent = {
 	Entity: any,
@@ -41,35 +44,57 @@ end
 
 function ActionComponent:RegisterDefaultActions()
 	self.ActionHandlers.Dash = function(Entity: any, _ActionData: any?): boolean
-		if not Entity.Components.StatusEffect then
+		if not Entity.Components.StatusEffect or not Entity.Components.Stamina then
 			return false
 		end
 
-		if Entity.Components.StatusEffect:Has("DashCooldown") then
+		local CurrentStamina = Entity.Stats:GetStat("Stamina")
+		local IsOnCooldown = Entity.Components.StatusEffect:Has("DashCooldown")
+
+		local ValidationResult = DashValidator.CanDash({
+			Character = Entity.Character,
+			CurrentStamina = CurrentStamina,
+			IsOnCooldown = IsOnCooldown,
+		})
+
+		if not ValidationResult.Success then
 			return false
 		end
 
-		if Entity.States:GetState("Stunned") or Entity.States:GetState("Ragdolled") then
+		if not Entity.Components.Stamina:ConsumeStamina(DashBalance.StaminaCost) then
 			return false
 		end
 
-		local StaminaCost = 15
-		if Entity.Components.Stamina and not Entity.Components.Stamina:ConsumeStamina(StaminaCost) then
-			return false
-		end
+		Entity.Character:SetAttribute("ActionLocked", true)
 
 		Entity.States:SetState("Dashing", true)
 
-		Entity.Components.StatusEffect:Apply("DashCooldown", 1, {
+		Entity.Components.StatusEffect:Apply("DashCooldown", DashBalance.CooldownSeconds, {
 			Stacks = false,
 		})
 
 		Packets.ActionApproved:FireClient(Entity.Player, "Dash")
+		Packets.StartCooldown:FireClient(
+			Entity.Player,
+			"Dash",
+			workspace:GetServerTimeNow(),
+			DashBalance.CooldownSeconds
+		)
 
-		task.delay(0.2, function()
+		task.delay(DashBalance.DashDurationSeconds, function()
 			if Entity.States then
 				Entity.States:SetState("Dashing", false)
 			end
+
+			Entity.States:SetState(StateTypes.REQUIRE_MOVE_REINTENT, true)
+
+			if Entity.Character then
+				Entity.Character:SetAttribute("ActionLocked", false)
+			end
+
+			task.wait(DashBalance.PostDashStopSeconds)
+
+			Entity.States:SetState(StateTypes.REQUIRE_MOVE_REINTENT, false)
 		end)
 
 		return true
