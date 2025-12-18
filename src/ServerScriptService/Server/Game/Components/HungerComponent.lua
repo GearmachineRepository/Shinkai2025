@@ -1,11 +1,16 @@
 --!strict
 
+local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
+local EventBus = require(Server.Framework.Utilities.EventBus)
 local Maid = require(Shared.General.Maid)
+local EntityEvents = require(Shared.Events.EntityEvents)
 
 export type HungerComponent = {
 	Entity: any,
@@ -50,7 +55,10 @@ function HungerComponent:Update(DeltaTime: number)
 	self.Entity.Stats:SetStat(StatTypes.HUNGER, NewHunger)
 
 	if NewHunger < TrainingBalance.HungerSystem.CRITICAL_THRESHOLD then
-		self.Entity.States:FireEvent("HungerCritical", { HungerPercent = self:GetHungerPercent() })
+		EventBus.Publish(EntityEvents.HUNGER_CRITICAL, {
+			Entity = self.Entity,
+			HungerPercent = self:GetHungerPercent(),
+		})
 	end
 end
 

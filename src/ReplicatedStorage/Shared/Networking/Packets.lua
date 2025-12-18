@@ -48,4 +48,8 @@ return {
 	-- Cooldown
 	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberU16),
 	ClearCooldown = Packet("ClearCooldown", Packet.String),
+
+	-- Action
+	PerformAction = Packet("PerformAction", Packet.String, Packet.Any),
+	ActionApproved = Packet("ActionApproved", Packet.String),
 }

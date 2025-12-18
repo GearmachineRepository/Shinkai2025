@@ -36,6 +36,10 @@ local EventTypes = {
 	BODY_SCALE_UPDATED = "BodyScaleUpdated",
 	MODIFIER_ADDED = "ModifierAdded",
 	MODIFIER_REMOVED = "ModifierRemoved",
+	STATUS_EFFECT_APPLIED = "StatusEffectApplied",
+	STATUS_EFFECT_REMOVED = "StatusEffectRemoved",
+	STATUS_EFFECT_STACKED = "StatusEffectStacked",
+	ACTION_PERFORMED = "ActionPerformed",
 }
 
 return EventTypes

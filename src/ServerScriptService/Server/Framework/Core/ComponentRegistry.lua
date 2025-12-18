@@ -54,6 +54,7 @@ ComponentRegistry.RegisterEntityType("Player", {
 		"Tool",
 		"Hook",
 		"Movement",
+		"StatusEffect",
 	},
 })
 

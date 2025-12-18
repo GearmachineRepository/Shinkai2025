@@ -25,6 +25,7 @@ local ComponentUpdateRates = {
 	Training = 1 / 10,
 	Movement = 1 / 10,
 	Sweat = 1 / 2,
+	StatusEffect = 1 / 10,
 }
 
 local HEARTBEAT_UPDATE_INTERVAL = 1 / 30

@@ -25,6 +25,8 @@ local InventoryComponent = require(GameComponents.InventoryComponent)
 local ToolComponent = require(GameComponents.ToolComponent)
 local HookComponent = require(BaseComponents.HookComponent)
 local MovementComponent = require(GameComponents.MovementComponent)
+local StatusEffectComponent = require(GameComponents.StatusEffectComponent)
+local ActionComponent = require(GameComponents.ActionComponent)
 
 local ComponentInitializer = {}
 
@@ -52,6 +54,8 @@ EventBus.Subscribe(EntityEvents.ENTITY_CREATED, function(EventData)
 	AddComponent(Entity, "Tool", ToolComponent.new(Entity))
 	AddComponent(Entity, "Hook", HookComponent.new(Entity))
 	AddComponent(Entity, "Movement", MovementComponent.new(Entity))
+	AddComponent(Entity, "StatusEffect", StatusEffectComponent.new(Entity))
+	AddComponent(Entity, "Action", ActionComponent.new(Entity))
 
 	if PlayerData.Hooks then
 		for _, HookName in PlayerData.Hooks do

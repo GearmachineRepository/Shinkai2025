@@ -27,12 +27,13 @@ local DEFAULT_KEYBINDS = {
 	[Enum.UserInputType.MouseButton1] = { ActionName = "M1", CanLoop = true },
 	[Enum.UserInputType.MouseButton2] = { ActionName = "M2", CanLoop = false },
 	[Enum.KeyCode.F] = { ActionName = "Block", CanLoop = true },
-	[Enum.KeyCode.Q] = { ActionName = "Skill1", CanLoop = false },
+	[Enum.KeyCode.C] = { ActionName = "Skill1", CanLoop = false },
 	[Enum.KeyCode.E] = { ActionName = "Skill2", CanLoop = false },
-	[Enum.KeyCode.R] = { ActionName = "Skill3", CanLoop = false },
+	[Enum.KeyCode.U] = { ActionName = "Skill3", CanLoop = false },
 	[Enum.KeyCode.T] = { ActionName = "Skill4", CanLoop = false },
 	[Enum.KeyCode.Y] = { ActionName = "Skill5", CanLoop = false },
-	[Enum.KeyCode.U] = { ActionName = "Skill6", CanLoop = false },
+	[Enum.KeyCode.B] = { ActionName = "Skill6", CanLoop = false },
+	[Enum.KeyCode.Q] = { ActionName = "Dash", CanLoop = false },
 }
 
 function InputBuffer.OnAction(Callback: (ActionName: string) -> ())
