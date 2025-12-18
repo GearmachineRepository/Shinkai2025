@@ -19,6 +19,7 @@ return {
 
 	-- Footsteps
 	Footplanted = Packet("Footplanted", Packet.NumberU8),
+	FootplantedReplicate = Packet("FootplantedReplicate", Packet.NumberF64, Packet.NumberU8),
 
 	-- Movement
 	MovementStateChanged = Packet("MovementStateChanged", Packet.String),

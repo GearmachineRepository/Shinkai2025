@@ -12,6 +12,7 @@ type MaterialId = number
 type CharacterFootstepData = {
 	SoundsById: { [MaterialId]: Sound },
 	Connections: { RBXScriptConnection },
+	Initializing: boolean,
 }
 
 local FootstepEngine = {}
@@ -43,8 +44,6 @@ local FootstepSoundGroups = {
 }
 
 local SoundIdByMaterialName: { [string]: string } = {
-
-	-- Soft / Organic
 	Grass = FootstepSoundGroups.GeneralGrass,
 	LeafyGrass = FootstepSoundGroups.GeneralGrass,
 	Mud = "rbxassetid://6441160246",
@@ -53,26 +52,22 @@ local SoundIdByMaterialName: { [string]: string } = {
 	Snow = FootstepSoundGroups.GeneralSoft,
 	Ground = "rbxassetid://6540746817",
 
-	-- Wood & Wood-like
 	Wood = FootstepSoundGroups.GeneralWood,
 	WoodPlanks = FootstepSoundGroups.GeneralWood,
 	Cardboard = FootstepSoundGroups.GeneralWood,
 	Plaster = FootstepSoundGroups.GeneralWood,
 	RoofShingles = FootstepSoundGroups.GeneralWood,
 
-	-- Fabric / Soft Manufactured
 	Carpet = FootstepSoundGroups.GeneralFabric,
 	Fabric = FootstepSoundGroups.GeneralFabric,
 	Leather = FootstepSoundGroups.GeneralFabric,
 
-	-- Plastic / Synthetic
 	Plastic = FootstepSoundGroups.GeneralPlastic,
 	SmoothPlastic = FootstepSoundGroups.GeneralPlastic,
 	Neon = FootstepSoundGroups.GeneralPlastic,
 	Rubber = FootstepSoundGroups.GeneralPlastic,
 	ForceField = FootstepSoundGroups.GeneralPlastic,
 
-	-- Stone / Rock
 	Basalt = FootstepSoundGroups.GeneralRock,
 	CrackedLava = FootstepSoundGroups.GeneralRock,
 	Glacier = FootstepSoundGroups.GeneralRock,
@@ -81,13 +76,11 @@ local SoundIdByMaterialName: { [string]: string } = {
 	Rock = FootstepSoundGroups.GeneralRock,
 	Sandstone = FootstepSoundGroups.GeneralRock,
 
-	-- Concrete / Pavement
 	Asphalt = FootstepSoundGroups.GeneralConcrete,
 	Concrete = FootstepSoundGroups.GeneralConcrete,
 	Pavement = FootstepSoundGroups.GeneralConcrete,
 	Road = FootstepSoundGroups.GeneralConcrete,
 
-	-- Tile / Masonry
 	CeramicTiles = FootstepSoundGroups.GeneralTile,
 	Glass = FootstepSoundGroups.GeneralTile,
 	Slate = FootstepSoundGroups.GeneralTile,
@@ -95,13 +88,11 @@ local SoundIdByMaterialName: { [string]: string } = {
 	Cobblestone = "rbxassetid://142548009",
 	ClayRoofTiles = "rbxassetid://9117382868",
 
-	-- Metal
 	Metal = FootstepSoundGroups.GeneralMetal,
 	CorrodedMetal = FootstepSoundGroups.GeneralMetal,
 	DiamondPlate = "rbxassetid://481216891",
 	Foil = "rbxassetid://142431247",
 
-	-- Special / Misc
 	Ice = "rbxassetid://19326880",
 	Marble = "rbxassetid://134464111",
 	Pebble = "rbxassetid://180239547",
@@ -164,32 +155,68 @@ local function ComputeVolumeFromSpeed(Speed: number): number
 	return MIN_VOLUME + (MAX_VOLUME - MIN_VOLUME) * Alpha
 end
 
-function FootstepEngine.InitializeCharacter(Character: Model)
-	local RootPart = Character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+local function EnsureCharacterEntry(Character: Model): CharacterFootstepData
+	local Existing = CharacterData[Character]
+	if Existing then
+		return Existing
+	end
 
-	if not RootPart or not RootPart:IsA("BasePart") then
+	local Data: CharacterFootstepData = {
+		SoundsById = {},
+		Connections = {},
+		Initializing = false,
+	}
+
+	CharacterData[Character] = Data
+	return Data
+end
+
+function FootstepEngine.InitializeCharacter(Character: Model)
+	local Data = EnsureCharacterEntry(Character)
+	if Data.Initializing then
+		return
+	end
+
+	if next(Data.SoundsById) ~= nil then
+		return
+	end
+
+	local RootPart = GetHumanoidRootPart(Character)
+	if not RootPart then
+		Data.Initializing = true
+
+		local Connection = Character.ChildAdded:Connect(function(Child: Instance)
+			if Child.Name ~= "HumanoidRootPart" then
+				return
+			end
+
+			local RootPartChild = Child
+			if not RootPartChild:IsA("BasePart") then
+				return
+			end
+
+			FootstepEngine.InitializeCharacter(Character)
+		end)
+
+		table.insert(Data.Connections, Connection)
+
+		Data.Initializing = false
 		return
 	end
 
 	FootstepEngine.CleanupCharacter(Character)
 
+	Data = EnsureCharacterEntry(Character)
+
 	local FootstepsGroup = GetFootstepsSoundGroup()
 
-	local SoundsById: { [MaterialId]: Sound } = {}
-	local Connections: { RBXScriptConnection } = {}
-
 	for MaterialName, SoundId in SoundIdByMaterialName do
-		local MaterialId = FootstepMaterialMap.GetId(MaterialName)
-		if MaterialId then
+		local MaterialIdValue = FootstepMaterialMap.GetId(MaterialName)
+		if MaterialIdValue then
 			local TemplateName = "Footstep_" .. MaterialName
-			SoundsById[MaterialId] = CreateTemplateSound(RootPart, FootstepsGroup, SoundId, TemplateName)
+			Data.SoundsById[MaterialIdValue] = CreateTemplateSound(RootPart, FootstepsGroup, SoundId, TemplateName)
 		end
 	end
-
-	CharacterData[Character] = {
-		SoundsById = SoundsById,
-		Connections = Connections,
-	}
 end
 
 function FootstepEngine.CleanupCharacter(Character: Model)
@@ -261,13 +288,25 @@ function FootstepEngine.GetMaterialIdAtPosition(Character: Model, Position: Vect
 	return FootstepEngine.GetMaterialId(Character)
 end
 
-function FootstepEngine.PlayFootstep(Character: Model, MaterialId: MaterialId?)
+function FootstepEngine.PlayFootstep(Character: Model, MaterialIdValue: MaterialId?)
 	local Data = CharacterData[Character]
 	if not Data then
-		return
+		FootstepEngine.InitializeCharacter(Character)
+		Data = CharacterData[Character]
+		if not Data then
+			return
+		end
 	end
 
-	local FinalMaterialId = MaterialId or FootstepEngine.GetMaterialId(Character)
+	if next(Data.SoundsById) == nil then
+		FootstepEngine.InitializeCharacter(Character)
+		Data = CharacterData[Character]
+		if not Data or next(Data.SoundsById) == nil then
+			return
+		end
+	end
+
+	local FinalMaterialId = MaterialIdValue or FootstepEngine.GetMaterialId(Character)
 	if not FinalMaterialId then
 		return
 	end
@@ -293,9 +332,12 @@ function FootstepEngine.GetSoundGroup(): SoundGroup
 end
 
 Players.PlayerRemoving:Connect(function(Player: Player)
-	if Player.Character then
-		FootstepEngine.CleanupCharacter(Player.Character)
+	local Character = Player.Character
+	if not Character then
+		return
 	end
+
+	FootstepEngine.CleanupCharacter(Character)
 end)
 
 return FootstepEngine

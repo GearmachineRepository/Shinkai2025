@@ -11,6 +11,7 @@ local FootstepMaterialMap = require(Shared.Footsteps.FootstepMaterialMap)
 local Player = Players.LocalPlayer
 
 local FootstepController = {}
+
 FootstepController.CharacterMaid = Maid.new()
 FootstepController.CurrentCharacter = nil :: Model?
 
@@ -50,14 +51,16 @@ function FootstepController:SetupAnimationTracking(Animator: Animator, Character
 		end)
 
 		TrackMaid:GiveTask(MarkerConnection)
-
 		ActiveTrackMaids[Track] = TrackMaid
 
 		Track.Stopped:Once(function()
-			if ActiveTrackMaids[Track] then
-				ActiveTrackMaids[Track]:DoCleaning()
-				ActiveTrackMaids[Track] = nil
+			local ExistingTrackMaid = ActiveTrackMaids[Track]
+			if not ExistingTrackMaid then
+				return
 			end
+
+			ExistingTrackMaid:DoCleaning()
+			ActiveTrackMaids[Track] = nil
 		end)
 	end)
 
@@ -91,12 +94,12 @@ function FootstepController:SetupCharacter(Character: Model)
 	self:SetupAnimationTracking(Animator, Character)
 end
 
-function FootstepController:OnReplicatedFootplant(MaterialId: number, PlayerId: number)
-	if PlayerId == Player.UserId then
+function FootstepController:OnReplicatedFootplant(SenderUserId: number, MaterialId: number)
+	if SenderUserId == Player.UserId then
 		return
 	end
 
-	local OtherPlayer = Players:GetPlayerByUserId(PlayerId)
+	local OtherPlayer = Players:GetPlayerByUserId(SenderUserId)
 	if not OtherPlayer then
 		return
 	end
@@ -110,8 +113,8 @@ function FootstepController:OnReplicatedFootplant(MaterialId: number, PlayerId: 
 	FootstepEngine.PlayFootstep(Character, MaterialId)
 end
 
-Packets.Footplanted.OnClientEvent:Connect(function(PlayerId: number, MaterialId: number)
-	FootstepController:OnReplicatedFootplant(MaterialId, PlayerId)
+Packets.FootplantedReplicate.OnClientEvent:Connect(function(SenderUserId: number, MaterialId: number)
+	FootstepController:OnReplicatedFootplant(SenderUserId, MaterialId)
 end)
 
 Player.CharacterAdded:Connect(function(Character: Model)
@@ -121,3 +124,5 @@ end)
 if Player.Character then
 	FootstepController:SetupCharacter(Player.Character)
 end
+
+return FootstepController

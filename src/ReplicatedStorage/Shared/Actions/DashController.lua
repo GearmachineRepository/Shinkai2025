@@ -132,12 +132,12 @@ function DashController.ExecuteDash(Direction: Vector3)
 
 	local LinearVel = Instance.new("LinearVelocity")
 	LinearVel.Attachment0 = Attachment
-	LinearVel.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
-	LinearVel.VectorVelocity = Vector3.new(0, 0, -DashBalance.Client.Power)
-	LinearVel.MaxForce = DashBalance.Client.MaxForce
+	LinearVel.RelativeTo = Enum.ActuatorRelativeTo.World
+	LinearVel.VelocityConstraintMode = Enum.VelocityConstraintMode.Line
+	LinearVel.LineDirection = Direction.Unit
+	LinearVel.LineVelocity = DashBalance.Client.Power
+	LinearVel.MaxForce = math.huge
 	LinearVel.Parent = HumanoidRootPart
-
-	Attachment.WorldCFrame = CFrame.lookAt(HumanoidRootPart.Position, HumanoidRootPart.Position + Direction)
 
 	ActiveDashMover = LinearVel
 	ActiveDashAttachment = Attachment
@@ -145,7 +145,7 @@ function DashController.ExecuteDash(Direction: Vector3)
 	local TweenInfo = TweenInfo.new(DashBalance.Client.TweenDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 	TweenService:Create(LinearVel, TweenInfo, {
-		VectorVelocity = Vector3.new(0, 0, 0),
+		LineVelocity = 0,
 	}):Play()
 
 	local DirectionKey = DashController.GetDashDirectionKey()
@@ -191,14 +191,13 @@ function DashController.CleanupDash(Rollbacked: boolean)
 end
 
 function DashController.UpdateDashDirection()
-	if not ActiveDashMover or not ActiveDashAttachment then
+	if not ActiveDashMover or not ActiveDashMover.Parent then
 		return
 	end
 
 	local Direction = DashController.GetDashDirection()
-	if Direction and ActiveDashAttachment.Parent then
-		ActiveDashAttachment.WorldCFrame =
-			CFrame.lookAt(HumanoidRootPart.Position, HumanoidRootPart.Position + Direction)
+	if Direction then
+		ActiveDashMover.LineDirection = Direction.Unit
 	end
 end
 

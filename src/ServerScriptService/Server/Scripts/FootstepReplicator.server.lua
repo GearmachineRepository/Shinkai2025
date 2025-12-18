@@ -8,14 +8,14 @@ local Packets = require(Shared.Networking.Packets)
 local REPLICATION_THROTTLE = 0.1
 local MAX_DISTANCE = 150
 
-local LastReplicationTimes: { [number]: number } = {}
+local LastReplicationTimesByUserId: { [number]: number } = {}
 
-local function ShouldReplicate(PlayerId: number): boolean
-	local Now = os.clock()
-	local Last = LastReplicationTimes[PlayerId] or 0
+local function ShouldReplicate(UserId: number): boolean
+	local NowTime = os.clock()
+	local LastTime = LastReplicationTimesByUserId[UserId] or 0
 
-	if Now - Last >= REPLICATION_THROTTLE then
-		LastReplicationTimes[PlayerId] = Now
+	if NowTime - LastTime >= REPLICATION_THROTTLE then
+		LastReplicationTimesByUserId[UserId] = NowTime
 		return true
 	end
 
@@ -27,11 +27,12 @@ local function GetRootPosition(Character: Model): Vector3?
 	if not RootPart then
 		return nil
 	end
+
 	return RootPart.Position
 end
 
-local function GetNearbyPlayers(SourcePlayer: Player, Position: Vector3): { Player }
-	local Nearby: { Player } = {}
+local function GetNearbyPlayers(SourcePlayer: Player, SourcePosition: Vector3): { Player }
+	local NearbyPlayers: { Player } = {}
 
 	for _, OtherPlayer in Players:GetPlayers() do
 		if OtherPlayer == SourcePlayer then
@@ -48,12 +49,12 @@ local function GetNearbyPlayers(SourcePlayer: Player, Position: Vector3): { Play
 			continue
 		end
 
-		if (OtherPosition - Position).Magnitude <= MAX_DISTANCE then
-			table.insert(Nearby, OtherPlayer)
+		if (OtherPosition - SourcePosition).Magnitude <= MAX_DISTANCE then
+			table.insert(NearbyPlayers, OtherPlayer)
 		end
 	end
 
-	return Nearby
+	return NearbyPlayers
 end
 
 Packets.Footplanted.OnServerEvent:Connect(function(Player: Player, MaterialId: number)
@@ -66,19 +67,23 @@ Packets.Footplanted.OnServerEvent:Connect(function(Player: Player, MaterialId: n
 		return
 	end
 
-	local Position = GetRootPosition(Character)
-	if not Position then
+	local SourcePosition = GetRootPosition(Character)
+	if not SourcePosition then
 		return
 	end
 
-	local NearbyPlayers = GetNearbyPlayers(Player, Position)
+	local NearbyPlayers = GetNearbyPlayers(Player, SourcePosition)
 	if #NearbyPlayers == 0 then
 		return
 	end
 
-	Packets.Footplanted:Fire(Player.UserId, MaterialId)
+	local SenderUserId = Player.UserId
+
+	for _, NearbyPlayer in NearbyPlayers do
+		Packets.FootplantedReplicate:FireClient(NearbyPlayer, SenderUserId, MaterialId)
+	end
 end)
 
 Players.PlayerRemoving:Connect(function(Player: Player)
-	LastReplicationTimes[Player.UserId] = nil
+	LastReplicationTimesByUserId[Player.UserId] = nil
 end)
