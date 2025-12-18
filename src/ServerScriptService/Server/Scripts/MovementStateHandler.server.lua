@@ -8,7 +8,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Entity = require(Server.Framework.Core.Entity)
 local Packets = require(Shared.Networking.Packets)
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 local VALID_MOVEMENT_MODES = {
 	walk = true,
@@ -38,15 +37,6 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid then
 		return
-	end
-
-	if EntityInstance.Components.States:GetState(StateTypes.REQUIRE_MOVE_REINTENT) then
-		if
-			EntityInstance.Character.PrimaryPart
-			and EntityInstance.Character.PrimaryPart.AssemblyLinearVelocity.Magnitude < 0.1
-		then
-			EntityInstance.Components.States:SetState(StateTypes.REQUIRE_MOVE_REINTENT, false)
-		end
 	end
 
 	if MovementMode == "jog" then

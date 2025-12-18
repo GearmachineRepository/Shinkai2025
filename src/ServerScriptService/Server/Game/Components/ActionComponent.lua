@@ -12,7 +12,6 @@ local EntityEvents = require(Shared.Events.EntityEvents)
 local Packets = require(Shared.Networking.Packets)
 local DashBalance = require(Shared.Configurations.Balance.DashBalance)
 local DashValidator = require(Shared.ActionValidation.DashValidator)
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 export type ActionComponent = {
 	Entity: any,
@@ -86,15 +85,11 @@ function ActionComponent:RegisterDefaultActions()
 				Entity.States:SetState("Dashing", false)
 			end
 
-			Entity.States:SetState(StateTypes.REQUIRE_MOVE_REINTENT, true)
-
 			if Entity.Character then
 				Entity.Character:SetAttribute("ActionLocked", false)
 			end
 
-			task.wait(DashBalance.PostDashStopSeconds)
-
-			Entity.States:SetState(StateTypes.REQUIRE_MOVE_REINTENT, false)
+			Entity.Character:SetAttribute("MovementMode", "walk")
 		end)
 
 		return true

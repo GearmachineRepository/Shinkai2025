@@ -66,10 +66,7 @@ function MovementComponent:GetBaseSpeed(Mode: string?): number
 end
 
 function MovementComponent:GetCurrentSpeed(): number
-	if
-		self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED)
-		or self.Entity.States:GetState(StateTypes.REQUIRE_MOVE_REINTENT)
-	then
+	if self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED) then
 		return 0
 	end
 
@@ -93,10 +90,7 @@ function MovementComponent:EnforceWalkSpeed()
 end
 
 function MovementComponent:SetMovementMode(Mode: string)
-	if
-		self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED)
-		or self.Entity.States:GetState(StateTypes.REQUIRE_MOVE_REINTENT)
-	then
+	if self.Entity.States:GetState(StateTypes.MOVEMENT_LOCKED) then
 		return
 	end
 
