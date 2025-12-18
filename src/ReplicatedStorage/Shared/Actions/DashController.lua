@@ -1,5 +1,4 @@
 --!strict
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -10,10 +9,10 @@ local Packets = require(Shared.Networking.Packets)
 local DashBalance = require(Shared.Configurations.Balance.DashBalance)
 local DashValidator = require(Shared.ActionValidation.DashValidator)
 local AnimationService = require(Shared.General.AnimationService)
+local SoundPlayer = require(Shared.General.SoundPlayer)
+local VfxPlayer = require(Shared.VFX.VfxPlayer)
 
 local Player = Players.LocalPlayer
-local Character = Player.Character or Player.CharacterAdded:Wait()
-local HumanoidRootPart = Character:WaitForChild("HumanoidRootPart") :: Part
 
 local DashController = {}
 
@@ -21,6 +20,7 @@ local ActiveDashMover: LinearVelocity? = nil
 local ActiveDashAttachment: Attachment? = nil
 local IsOnCooldown = false
 local ActiveDashAnimation: AnimationTrack? = nil
+local _ActiveDashVfx: any? = nil
 
 local DIRECTION_KEYS = {
 	[Enum.KeyCode.W] = true,
@@ -40,10 +40,34 @@ AnimationService.Preload(Players.LocalPlayer, DODGE_ANIMATIONS)
 
 local CurrentlyPressedKeys: { [Enum.KeyCode]: boolean } = {}
 
+function DashController.GetCharacter(): Model?
+	return Player.Character
+end
+
+function DashController.GetHumanoidRootPart(): Part?
+	local Character = DashController.GetCharacter()
+	if not Character then
+		return nil
+	end
+
+	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart")
+	if HumanoidRootPart and HumanoidRootPart:IsA("BasePart") then
+		return HumanoidRootPart :: Part
+	end
+
+	return nil
+end
+
 function DashController.Initialize()
 	Packets.ActionApproved.OnClientEvent:Connect(function(ActionName: string)
 		if ActionName == "Dash" then
 			DashController.OnServerApproval()
+		end
+	end)
+
+	Packets.ActionDenied.OnClientEvent:Connect(function(ActionName: string)
+		if ActionName == "Dash" then
+			DashController.OnServerDenied()
 		end
 	end)
 
@@ -97,6 +121,11 @@ function DashController.GetDashDirectionKey(): string?
 end
 
 function DashController.CanDash(): (boolean, string?)
+	local Character = DashController.GetCharacter()
+	if not Character then
+		return false, "No character"
+	end
+
 	local CurrentStamina = Character:GetAttribute("Stamina") or 0
 
 	local ValidationResult = DashValidator.CanDash({
@@ -126,6 +155,19 @@ end
 
 function DashController.ExecuteDash(Direction: Vector3)
 	DashController.CleanupDash(true)
+
+	local HumanoidRootPart = DashController.GetHumanoidRootPart()
+	if not HumanoidRootPart then
+		return
+	end
+
+	local Character = DashController.GetCharacter()
+	if Character then
+		SoundPlayer.Play(Character, "Dodge")
+		Packets.PlaySound:Fire("Dodge")
+
+		_ActiveDashVfx = VfxPlayer.PlayLocal("DodgeVfx")
+	end
 
 	local Attachment = Instance.new("Attachment")
 	Attachment.Parent = HumanoidRootPart
@@ -173,11 +215,27 @@ function DashController.OnServerApproval()
 	end
 end
 
+function DashController.OnServerDenied()
+	DashController.CleanupDash(true)
+end
+
 function DashController.CleanupDash(Rollbacked: boolean)
 	if ActiveDashAnimation and Rollbacked then
 		ActiveDashAnimation:Stop(0.05)
 		ActiveDashAnimation = nil
 	end
+
+	local Character = DashController.GetCharacter()
+
+	if Character then
+		if Rollbacked then
+			VfxPlayer.Cleanup(Character, "DodgeVfx")
+		else
+			VfxPlayer.Stop(Character, "DodgeVfx")
+		end
+	end
+
+	_ActiveDashVfx = nil
 
 	if ActiveDashMover and ActiveDashMover.Parent then
 		ActiveDashMover:Destroy()

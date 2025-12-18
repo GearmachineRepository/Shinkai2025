@@ -53,4 +53,13 @@ return {
 	-- Action
 	PerformAction = Packet("PerformAction", Packet.String, Packet.Any),
 	ActionApproved = Packet("ActionApproved", Packet.String),
+	ActionDenied = Packet("ActionDenied", Packet.String),
+
+	-- Sounds
+	PlaySound = Packet("PlaySound", Packet.String, Packet.Any),
+	PlaySoundReplicate = Packet("PlaySoundReplicate", Packet.NumberF64, Packet.String, Packet.Any),
+
+	-- VFX
+	PlayVfx = Packet("PlayVfx", Packet.String, Packet.Any),
+	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.NumberF64, Packet.String, Packet.Any),
 }
