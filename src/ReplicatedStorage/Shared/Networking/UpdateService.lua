@@ -10,7 +10,7 @@ export type Handle = number
 type Entry = {
 	Callback: Callback,
 	RateSeconds: number,
-	Accumulator: number,
+	Accumulator: number?,
 }
 
 local Entries: { [Handle]: Entry } = {}
@@ -29,13 +29,16 @@ local function EnsureRunning()
 				continue
 			end
 
-			EntryValue.Accumulator += DeltaTime
-			if EntryValue.Accumulator < EntryValue.RateSeconds then
+			local Accumulator = EntryValue.Accumulator or 0
+			Accumulator += DeltaTime
+
+			if Accumulator < EntryValue.RateSeconds then
+				EntryValue.Accumulator = Accumulator
 				continue
 			end
 
-			local Steps = math.floor(EntryValue.Accumulator / EntryValue.RateSeconds)
-			EntryValue.Accumulator -= Steps * EntryValue.RateSeconds
+			local Steps = math.floor(Accumulator / EntryValue.RateSeconds)
+			EntryValue.Accumulator = Accumulator - (Steps * EntryValue.RateSeconds)
 
 			EntryValue.Callback(EntryValue.RateSeconds * Steps)
 		end
@@ -57,10 +60,11 @@ function UpdateService.Register(Callback: Callback, RateSeconds: number?): Handl
 	local Handle = NextHandle
 	NextHandle += 1
 
+	local Rate = RateSeconds or 0
 	Entries[Handle] = {
 		Callback = Callback,
-		RateSeconds = RateSeconds or 0,
-		Accumulator = (RateSeconds and RateSeconds > 0) and 0 or nil,
+		RateSeconds = Rate,
+		Accumulator = if Rate > 0 then 0 else nil,
 	}
 
 	EnsureRunning()

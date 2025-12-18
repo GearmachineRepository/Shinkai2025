@@ -24,6 +24,7 @@ local ComponentUpdateRates = {
 	Hunger = 1,
 	Training = 1 / 10,
 	Movement = 1 / 10,
+	Sweat = 1 / 2,
 }
 
 local HEARTBEAT_UPDATE_INTERVAL = 1 / 30
@@ -50,6 +51,8 @@ local function UpdateEntity(EntityInstance: any, DeltaTime: number)
 			else
 				UpdateData.ComponentAccumulators[ComponentName] = Accumulator
 			end
+		else
+			UpdateData.ComponentAccumulators[ComponentName] = nil
 		end
 	end
 end
@@ -76,8 +79,12 @@ EventBus.Subscribe(EntityEvents.ENTITY_DESTROYED, function(EventData)
 	local EntityInstance = EventData.Entity
 	local UpdateData = EntityUpdateData[EntityInstance]
 
-	if UpdateData and UpdateData.UpdateHandle then
-		UpdateService.Disconnect(UpdateData.UpdateHandle)
+	if UpdateData then
+		if UpdateData.UpdateHandle then
+			UpdateService.Disconnect(UpdateData.UpdateHandle)
+		end
+
+		table.clear(UpdateData.ComponentAccumulators)
 	end
 
 	EntityUpdateData[EntityInstance] = nil

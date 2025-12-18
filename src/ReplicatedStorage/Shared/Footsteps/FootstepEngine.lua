@@ -1,29 +1,33 @@
 --!strict
 
+local Players = game:GetService("Players")
 local SoundService = game:GetService("SoundService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local FootstepMaterialMap = require(script.Parent.FootstepMaterialMap)
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local FootstepMaterialMap = require(Shared.Footsteps.FootstepMaterialMap)
 
-local FootstepEngine = {}
-
-export type MaterialId = FootstepMaterialMap.MaterialId
+type MaterialId = number
 
 type CharacterFootstepData = {
 	SoundsById: { [MaterialId]: Sound },
 	Connections: { RBXScriptConnection },
 }
 
-local MIN_SPEED = 0
-local MAX_SPEED = 30
-local MIN_VOLUME = 0.3
-local MAX_VOLUME = 1.0
+local FootstepEngine = {}
 
-local FOOTSTEP_ROLLOFF_MIN_DISTANCE = 5
-local FOOTSTEP_ROLLOFF_MAX_DISTANCE = 150
-local TEMPLATE_VOLUME = 0.65
-local RAY_DISTANCE_DOWN = 50
+local TEMPLATE_VOLUME = 0.2
+local MIN_VOLUME = 0.15
+local MAX_VOLUME = 0.55
+local MIN_SPEED = 0
+local MAX_SPEED = 25
+
+local RAY_DISTANCE_DOWN = 5
+local POSITION_RAY_START_OFFSET = 0.5
 local POSITION_RAY_DISTANCE_DOWN = 10
-local POSITION_RAY_START_OFFSET = 1
+
+local FOOTSTEP_ROLLOFF_MIN_DISTANCE = 10
+local FOOTSTEP_ROLLOFF_MAX_DISTANCE = 100
 
 local FootstepSoundGroups = {
 	GeneralRock = "rbxassetid://18984787734",
@@ -39,52 +43,69 @@ local FootstepSoundGroups = {
 }
 
 local SoundIdByMaterialName: { [string]: string } = {
-	WoodPlanks = FootstepSoundGroups.GeneralWood,
-	Wood = FootstepSoundGroups.GeneralWood,
-	CeramicTiles = FootstepSoundGroups.GeneralTile,
-	Splash = "rbxassetid://28604165",
-	Sand = FootstepSoundGroups.GeneralSoft,
-	Plastic = FootstepSoundGroups.GeneralPlastic,
-	SmoothPlastic = FootstepSoundGroups.GeneralPlastic,
-	Pebble = "rbxassetid://180239547",
-	Metal = FootstepSoundGroups.GeneralMetal,
-	Marble = "rbxassetid://134464111",
-	Ice = "rbxassetid://19326880",
-	Grass = FootstepSoundGroups.GeneralGrass,
-	Granite = FootstepSoundGroups.GeneralGranite,
-	Foil = "rbxassetid://142431247",
-	Fabric = FootstepSoundGroups.GeneralFabric,
-	DiamondPlate = "rbxassetid://481216891",
-	CorrodedMetal = FootstepSoundGroups.GeneralMetal,
-	Concrete = FootstepSoundGroups.GeneralConcrete,
-	Cobblestone = "rbxassetid://142548009",
-	Brick = "rbxassetid://168786259",
 
-	Asphalt = FootstepSoundGroups.GeneralConcrete,
-	Basalt = FootstepSoundGroups.GeneralRock,
-	Rock = FootstepSoundGroups.GeneralRock,
-	Limestone = FootstepSoundGroups.GeneralRock,
-	Pavement = FootstepSoundGroups.GeneralConcrete,
-	Salt = FootstepSoundGroups.GeneralSoft,
-	Sandstone = FootstepSoundGroups.GeneralRock,
-	Slate = FootstepSoundGroups.GeneralTile,
-	CrackedLava = FootstepSoundGroups.GeneralRock,
-	Neon = FootstepSoundGroups.GeneralPlastic,
-	Glass = FootstepSoundGroups.GeneralTile,
-	ForceField = FootstepSoundGroups.GeneralPlastic,
+	-- Soft / Organic
+	Grass = FootstepSoundGroups.GeneralGrass,
 	LeafyGrass = FootstepSoundGroups.GeneralGrass,
 	Mud = "rbxassetid://6441160246",
+	Salt = FootstepSoundGroups.GeneralSoft,
+	Sand = FootstepSoundGroups.GeneralSoft,
 	Snow = FootstepSoundGroups.GeneralSoft,
 	Ground = "rbxassetid://6540746817",
+
+	-- Wood & Wood-like
+	Wood = FootstepSoundGroups.GeneralWood,
+	WoodPlanks = FootstepSoundGroups.GeneralWood,
 	Cardboard = FootstepSoundGroups.GeneralWood,
-	Carpet = FootstepSoundGroups.GeneralFabric,
-	Rubber = FootstepSoundGroups.GeneralPlastic,
-	Leather = FootstepSoundGroups.GeneralFabric,
-	Road = FootstepSoundGroups.GeneralConcrete,
-	RoofShingles = FootstepSoundGroups.GeneralWood,
-	ClayRoofTiles = "rbxassetid://9117382868",
-	Glacier = FootstepSoundGroups.GeneralRock,
 	Plaster = FootstepSoundGroups.GeneralWood,
+	RoofShingles = FootstepSoundGroups.GeneralWood,
+
+	-- Fabric / Soft Manufactured
+	Carpet = FootstepSoundGroups.GeneralFabric,
+	Fabric = FootstepSoundGroups.GeneralFabric,
+	Leather = FootstepSoundGroups.GeneralFabric,
+
+	-- Plastic / Synthetic
+	Plastic = FootstepSoundGroups.GeneralPlastic,
+	SmoothPlastic = FootstepSoundGroups.GeneralPlastic,
+	Neon = FootstepSoundGroups.GeneralPlastic,
+	Rubber = FootstepSoundGroups.GeneralPlastic,
+	ForceField = FootstepSoundGroups.GeneralPlastic,
+
+	-- Stone / Rock
+	Basalt = FootstepSoundGroups.GeneralRock,
+	CrackedLava = FootstepSoundGroups.GeneralRock,
+	Glacier = FootstepSoundGroups.GeneralRock,
+	Granite = FootstepSoundGroups.GeneralGranite,
+	Limestone = FootstepSoundGroups.GeneralRock,
+	Rock = FootstepSoundGroups.GeneralRock,
+	Sandstone = FootstepSoundGroups.GeneralRock,
+
+	-- Concrete / Pavement
+	Asphalt = FootstepSoundGroups.GeneralConcrete,
+	Concrete = FootstepSoundGroups.GeneralConcrete,
+	Pavement = FootstepSoundGroups.GeneralConcrete,
+	Road = FootstepSoundGroups.GeneralConcrete,
+
+	-- Tile / Masonry
+	CeramicTiles = FootstepSoundGroups.GeneralTile,
+	Glass = FootstepSoundGroups.GeneralTile,
+	Slate = FootstepSoundGroups.GeneralTile,
+	Brick = "rbxassetid://168786259",
+	Cobblestone = "rbxassetid://142548009",
+	ClayRoofTiles = "rbxassetid://9117382868",
+
+	-- Metal
+	Metal = FootstepSoundGroups.GeneralMetal,
+	CorrodedMetal = FootstepSoundGroups.GeneralMetal,
+	DiamondPlate = "rbxassetid://481216891",
+	Foil = "rbxassetid://142431247",
+
+	-- Special / Misc
+	Ice = "rbxassetid://19326880",
+	Marble = "rbxassetid://134464111",
+	Pebble = "rbxassetid://180239547",
+	Splash = "rbxassetid://28604165",
 }
 
 local CharacterData: { [Model]: CharacterFootstepData } = {}
@@ -145,6 +166,7 @@ end
 
 function FootstepEngine.InitializeCharacter(Character: Model)
 	local RootPart = Character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+
 	if not RootPart or not RootPart:IsA("BasePart") then
 		return
 	end
@@ -269,5 +291,11 @@ end
 function FootstepEngine.GetSoundGroup(): SoundGroup
 	return GetFootstepsSoundGroup()
 end
+
+Players.PlayerRemoving:Connect(function(Player: Player)
+	if Player.Character then
+		FootstepEngine.CleanupCharacter(Player.Character)
+	end
+end)
 
 return FootstepEngine

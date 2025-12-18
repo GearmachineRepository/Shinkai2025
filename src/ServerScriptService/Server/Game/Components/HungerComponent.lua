@@ -9,7 +9,7 @@ local Maid = require(Shared.General.Maid)
 
 export type HungerComponent = {
 	Entity: any,
-	Update: (self: HungerComponent) -> (),
+	Update: (self: HungerComponent, DeltaTime: number) -> (),
 	Feed: (self: HungerComponent, Amount: number) -> (),
 	GetHungerPercent: (self: HungerComponent) -> number,
 	ConsumeHungerForStamina: (self: HungerComponent, StaminaUsed: number) -> (),
@@ -19,7 +19,6 @@ export type HungerComponent = {
 }
 
 type HungerComponentInternal = HungerComponent & {
-	LastUpdate: number,
 	Maid: Maid.MaidSelf,
 }
 
@@ -29,7 +28,6 @@ HungerComponent.__index = HungerComponent
 function HungerComponent.new(Entity: any): HungerComponent
 	local self: HungerComponentInternal = setmetatable({
 		Entity = Entity,
-		LastUpdate = tick(),
 		Maid = Maid.new(),
 	}, HungerComponent) :: any
 
@@ -39,15 +37,7 @@ function HungerComponent.new(Entity: any): HungerComponent
 	return self
 end
 
-function HungerComponent:Update()
-	local Now = tick()
-	local DeltaTime = Now - self.LastUpdate
-	self.LastUpdate = Now
-
-	if DeltaTime > 5 then
-		return
-	end
-
+function HungerComponent:Update(DeltaTime: number)
 	local DecayRate = TrainingBalance.HungerSystem.DECAY_RATE
 
 	if self.Entity.Components.Sweat then

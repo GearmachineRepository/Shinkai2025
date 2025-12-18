@@ -55,12 +55,12 @@ function SweatComponent:SetupActivityTracking()
 end
 
 function SweatComponent:CheckActivity()
-	local MovementMode = self.Character:GetAttribute("MovementMode")
+	local IsSprinting = self.Character:GetAttribute("Sprinting")
 	local IsTraining = self.Character:GetAttribute("Training")
 	local IsUsingSkill = self.Character:GetAttribute("UsingSkill")
 	local IsAttacking = self.Character:GetAttribute("Attacking")
 
-	local IsDoingActivity = MovementMode == "jog" or MovementMode == "run" or IsTraining or IsUsingSkill or IsAttacking
+	local IsDoingActivity = IsSprinting or IsTraining or IsUsingSkill or IsAttacking
 
 	if IsDoingActivity then
 		self.LastActivityTime = tick()

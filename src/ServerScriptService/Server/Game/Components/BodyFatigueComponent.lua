@@ -22,7 +22,6 @@ export type BodyFatigueComponent = {
 type BodyFatigueComponentInternal = BodyFatigueComponent & {
 	PlayerData: any,
 	Maid: Maid.MaidSelf,
-	UpdateAccumulator: number,
 }
 
 local BodyFatigueComponent = {}
@@ -33,29 +32,19 @@ function BodyFatigueComponent.new(Entity: any, PlayerData: any): BodyFatigueComp
 		Entity = Entity,
 		PlayerData = PlayerData,
 		Maid = Maid.new(),
-		UpdateAccumulator = 0,
 	}, BodyFatigueComponent) :: any
 
 	return self
 end
 
 function BodyFatigueComponent:Update(DeltaTime: number)
-	self.UpdateAccumulator += DeltaTime
-
-	if self.UpdateAccumulator < FatigueBalance.Updates.UPDATE_INTERVAL then
-		return
-	end
-
-	local AccumulatedTime = self.UpdateAccumulator
-	self.UpdateAccumulator = 0
-
 	local CompatShim = {
 		StatManager = self.Entity.Stats,
 		IsPlayer = self.Entity.Player,
 	}
 
-	ProgressionSystem.ProcessHunger(self.PlayerData, AccumulatedTime, CompatShim)
-	ProgressionSystem.ProcessFat(self.PlayerData, AccumulatedTime, CompatShim)
+	ProgressionSystem.ProcessHunger(self.PlayerData, DeltaTime, CompatShim)
+	ProgressionSystem.ProcessFat(self.PlayerData, DeltaTime, CompatShim)
 end
 
 function BodyFatigueComponent:AddFatigueFromStatGain(FatigueGain: number)

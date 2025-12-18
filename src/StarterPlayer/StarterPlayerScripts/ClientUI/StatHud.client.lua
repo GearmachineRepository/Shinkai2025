@@ -16,8 +16,9 @@ local BUFF_TEXT = "+"
 local MAX_STARS_PER_ROW = 5
 local DIM_COLOR = Color3.fromRGB(50, 50, 50)
 
-local StatFrames = {}
+local StatFrames: { [string]: Frame } = {}
 local CurrentCharacter: Model? = nil
+local IsInitialized = false
 
 local Hud: ScreenGui? = nil
 local Frames: Instance? = nil
@@ -36,13 +37,10 @@ local function WaitForHud(): ScreenGui
 	end
 end
 
-local function RebuildStatFrames()
-	for _, Frame in StatFrames do
-		if Frame and Frame.Parent then
-			Frame:Destroy()
-		end
+local function InitializeStatFrames()
+	if IsInitialized then
+		return
 	end
-	table.clear(StatFrames)
 
 	Hud = WaitForHud()
 	Frames = Hud:WaitForChild("Frames")
@@ -102,8 +100,10 @@ local function RebuildStatFrames()
 			end)
 		end
 
-		table.insert(StatFrames, NewTemplate)
+		StatFrames[Stat] = NewTemplate
 	end
+
+	IsInitialized = true
 end
 
 local function UpdateStatStars(BaseStatName: string)
@@ -112,14 +112,7 @@ local function UpdateStatStars(BaseStatName: string)
 	end
 
 	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
-
-	local StatFrame: Frame? = nil
-	for _, Frame in StatFrames do
-		if Frame.Name == BaseStatName then
-			StatFrame = Frame
-			break
-		end
-	end
+	local StatFrame = StatFrames[BaseStatName]
 
 	if not StatFrame then
 		return
@@ -157,14 +150,7 @@ local function UpdateStatValue(BaseStatName: string)
 	end
 
 	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
-
-	local StatFrame: Frame? = nil
-	for _, Frame in StatFrames do
-		if Frame.Name == BaseStatName then
-			StatFrame = Frame
-			break
-		end
-	end
+	local StatFrame = StatFrames[BaseStatName]
 
 	if not StatFrame then
 		return
@@ -189,14 +175,7 @@ local function UpdateAvailablePoints(BaseStatName: string)
 	end
 
 	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
-
-	local StatFrame: Frame? = nil
-	for _, Frame in StatFrames do
-		if Frame.Name == BaseStatName then
-			StatFrame = Frame
-			break
-		end
-	end
+	local StatFrame = StatFrames[BaseStatName]
 
 	if not StatFrame then
 		return
@@ -222,13 +201,7 @@ local function UpdateXPProgress(BaseStatName: string)
 	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
 	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
 
-	local StatFrame: Frame? = nil
-	for _, Frame in StatFrames do
-		if Frame.Name == BaseStatName then
-			StatFrame = Frame
-			break
-		end
-	end
+	local StatFrame = StatFrames[BaseStatName]
 
 	if not StatFrame then
 		return
@@ -301,7 +274,9 @@ end
 local function OnCharacterAdded(Character: Model)
 	CurrentCharacter = Character
 
-	RebuildStatFrames()
+	if not IsInitialized then
+		InitializeStatFrames()
+	end
 
 	if Player then
 		local IsPremium = Player.MembershipType == Enum.MembershipType.Premium

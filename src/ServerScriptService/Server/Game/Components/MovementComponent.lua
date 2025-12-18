@@ -22,21 +22,18 @@ export type MovementComponent = {
 type MovementComponentInternal = MovementComponent & {
 	Maid: Maid.MaidSelf,
 	LastWalkSpeedUpdate: number,
-	MovementTickAccumulator: number,
 }
 
 local MovementComponent = {}
 MovementComponent.__index = MovementComponent
 
 local WALKSPEED_UPDATE_THROTTLE = 0.05
-local MOVEMENT_TICK_RATE = 0.10
 
 function MovementComponent.new(Entity: any): MovementComponent
 	local self: MovementComponentInternal = setmetatable({
 		Entity = Entity,
 		Maid = Maid.new(),
 		LastWalkSpeedUpdate = 0,
-		MovementTickAccumulator = 0,
 	}, MovementComponent) :: any
 
 	self:SetupMovementTracking()
@@ -105,8 +102,6 @@ function MovementComponent:HandleSprintMode()
 	if self.Entity.Components.Stamina then
 		self.Entity.Components.Stamina:OnSprintStart()
 	end
-
-	self.MovementTickAccumulator = 0
 end
 
 function MovementComponent:HandleJogMode()
@@ -116,8 +111,6 @@ function MovementComponent:HandleJogMode()
 	if self.Entity.Components.Stamina then
 		self.Entity.Components.Stamina:OnJogStart()
 	end
-
-	self.MovementTickAccumulator = 0
 end
 
 function MovementComponent:HandleWalkMode()
@@ -136,8 +129,6 @@ function MovementComponent:HandleWalkMode()
 
 	self.Entity.States:SetState(StateTypes.SPRINTING, false)
 	self.Entity.States:SetState(StateTypes.JOGGING, false)
-
-	self.MovementTickAccumulator = 0
 end
 
 function MovementComponent:UpdateStaminaAndTraining(DeltaTime: number)
@@ -153,29 +144,21 @@ function MovementComponent:UpdateStaminaAndTraining(DeltaTime: number)
 		IsMoving = PrimaryPart.AssemblyLinearVelocity.Magnitude > 1
 	end
 
-	self.MovementTickAccumulator += DeltaTime
-	if self.MovementTickAccumulator < MOVEMENT_TICK_RATE then
-		return
-	end
-
-	local AppliedDeltaTime = self.MovementTickAccumulator
-	self.MovementTickAccumulator = 0
-
-	local CanContinue = self.Entity.Components.Stamina:Update(AppliedDeltaTime, CurrentMode, IsMoving)
+	local CanContinue = self.Entity.Components.Stamina:Update(DeltaTime, CurrentMode, IsMoving)
 
 	if CanContinue and IsMoving and self.Entity.Components.Training then
 		if CurrentMode == "run" then
 			local RunSpeedXP = (
 				TrainingBalance.TrainingTypes.RunSpeed.BaseXPPerSecond
 				* TrainingBalance.TrainingTypes.RunSpeed.NonmachineMultiplier
-			) * AppliedDeltaTime
+			) * DeltaTime
 			local FatigueGain = 0.35
 			self.Entity.Components.Training:GrantStatGain(StatTypes.RUN_SPEED, RunSpeedXP, FatigueGain)
 		elseif CurrentMode == "jog" then
 			local StaminaXP = (
 				TrainingBalance.TrainingTypes.Stamina.BaseXPPerSecond
 				* TrainingBalance.TrainingTypes.Stamina.NonmachineMultiplier
-			) * AppliedDeltaTime
+			) * DeltaTime
 			local FatigueGain = 0.4
 			self.Entity.Components.Training:GrantStatGain(StatTypes.MAX_STAMINA, StaminaXP, FatigueGain)
 		end

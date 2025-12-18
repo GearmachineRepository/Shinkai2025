@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local UpdateService = require(Shared.Networking.UpdateService)
 local Packets = require(Shared.Networking.Packets)
+local HudBinder = require(Shared.Utils.HudBinder)
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -19,6 +20,8 @@ type CooldownInfo = {
 
 local ActiveCooldowns: { [string]: CooldownInfo } = {}
 
+local CooldownsRoot: Frame? = nil
+
 local LOOP_ITERATION = 1 / 30
 
 local function GetCooldownRemaining(StartTime: number, Duration: number): number
@@ -26,28 +29,28 @@ local function GetCooldownRemaining(StartTime: number, Duration: number): number
 	return math.max(0, Duration - Elapsed)
 end
 
+local function BindGui()
+	local Refs = HudBinder.Get()
+	local Frames = Refs.Frames
+	local Cooldowns = Frames:WaitForChild("Cooldowns") :: Frame
+	CooldownsRoot = Cooldowns
+end
+
+BindGui()
+HudBinder.OnChanged(BindGui)
+
 local function GetOrCreateCooldownFrame(CooldownId: string): Frame?
-	local Hud = PlayerGui:FindFirstChild("Hud")
-	if not Hud then
+	local Root = CooldownsRoot
+	if Root == nil or Root.Parent == nil then
 		return nil
 	end
 
-	local Frames = Hud:FindFirstChild("Frames")
-	if not Frames then
-		return nil
-	end
-
-	local Cooldowns = Frames:FindFirstChild("Cooldowns")
-	if not Cooldowns then
-		return nil
-	end
-
-	local ExistingFrame = Cooldowns:FindFirstChild(CooldownId)
+	local ExistingFrame = Root:FindFirstChild(CooldownId)
 	if ExistingFrame and ExistingFrame:IsA("Frame") then
 		return ExistingFrame
 	end
 
-	local Template = Cooldowns:FindFirstChild("CooldownTemplate")
+	local Template = Root:FindFirstChild("CooldownTemplate")
 	if not Template or not Template:IsA("Frame") then
 		return nil
 	end
@@ -55,8 +58,7 @@ local function GetOrCreateCooldownFrame(CooldownId: string): Frame?
 	local NewFrame = Template:Clone()
 	NewFrame.Name = CooldownId
 	NewFrame.Visible = true
-	NewFrame.Parent = Cooldowns
-
+	NewFrame.Parent = Root
 	return NewFrame
 end
 

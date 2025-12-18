@@ -6,9 +6,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Formulas = require(Shared.General.Formulas)
 local UpdateService = require(Shared.Networking.UpdateService)
 local Maid = require(Shared.General.Maid)
+local HudBinder = require(Shared.Utils.HudBinder)
 
 local Player = Players.LocalPlayer
-local PlayerGui = Player:WaitForChild("PlayerGui")
 
 local LERP_SPEED = 12
 local UPDATE_INTERVAL = 1 / 30
@@ -132,23 +132,14 @@ local function UpdateBodyFatigue(Character: Model)
 	BodyFatigueLabel.TextScaled = not BodyFatigueLabel.TextFits
 end
 
-local function WaitForHud(): ScreenGui
-	while true do
-		local ExistingHud = PlayerGui:FindFirstChild("Hud")
-		if ExistingHud then
-			return ExistingHud :: ScreenGui
-		end
-
-		PlayerGui.ChildAdded:Wait()
-	end
-end
-
 local function BindGui()
 	GuiMaid:DoCleaning()
 	table.clear(BarsByName)
 
-	Hud = WaitForHud()
-	Frames = Hud:WaitForChild("Frames")
+	local Refs = HudBinder.Get()
+	Hud = Refs.Hud
+	Frames = Refs.Frames
+
 	BarsFrame = Frames:WaitForChild("Bars") :: Frame
 	BarsFolder = BarsFrame:WaitForChild("BarFrames") :: Folder
 
@@ -280,6 +271,9 @@ local function SetupCharacter(Character: Model)
 end
 
 BindGui()
+GuiMaid:GiveTask(HudBinder.OnChanged(function()
+	BindGui()
+end))
 
 Player.CharacterAdded:Connect(SetupCharacter)
 
