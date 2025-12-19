@@ -124,6 +124,17 @@ function DashAction:GetDashDirectionFromKeys(): Vector3?
 	return nil
 end
 
+function DashAction:UpdateDashDirection(ActiveDashMover: LinearVelocity?)
+	if not ActiveDashMover or not ActiveDashMover.Parent then
+		return
+	end
+
+	local Direction = self:GetDashDirectionFromKeys()
+	if Direction then
+		ActiveDashMover.LineDirection = Direction.Unit
+	end
+end
+
 function DashAction:ExecuteClient(Context: BaseAction.ActionContext): BaseAction.ActionResult
 	local Result = BaseAction.ExecuteClient(self, Context)
 
@@ -157,9 +168,11 @@ function DashAction:ExecuteClient(Context: BaseAction.ActionContext): BaseAction
 
 	local LinearVelocity = Instance.new("LinearVelocity")
 	LinearVelocity.Attachment0 = Attachment
-	LinearVelocity.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
-	LinearVelocity.VectorVelocity = Vector3.new(0, 0, -DashBalance.Client.Power)
-	LinearVelocity.MaxForce = DashBalance.Client.MaxForce
+	LinearVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
+	LinearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Line
+	LinearVelocity.LineDirection = Direction.Unit
+	LinearVelocity.LineVelocity = DashBalance.Client.Power
+	LinearVelocity.MaxForce = math.huge
 	LinearVelocity.Parent = HumanoidRootPart
 	self:AddCleanupTask(LinearVelocity)
 
@@ -181,11 +194,7 @@ function DashAction:ExecuteClient(Context: BaseAction.ActionContext): BaseAction
 			return
 		end
 
-		local CurrentDirection = self:GetDashDirectionFromKeys()
-		if CurrentDirection then
-			Attachment.WorldCFrame =
-				CFrame.lookAt(HumanoidRootPart.Position, HumanoidRootPart.Position + CurrentDirection)
-		end
+		DashAction:UpdateDashDirection(LinearVelocity)
 	end)
 
 	table.insert(ConnectionCleanup, UpdateConnection)
