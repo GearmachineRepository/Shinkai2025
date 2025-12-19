@@ -1,7 +1,9 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local BaseAction = require(Shared.Actions.ActionDefinitions.BaseAction)
@@ -15,6 +17,13 @@ local DODGE_ANIMATIONS = {
 	BackDodge = "123040873946149",
 	LeftDodge = "109465464856620",
 	RightDodge = "140455983078908",
+}
+
+local DIRECTION_KEYS = {
+	[Enum.KeyCode.W] = true,
+	[Enum.KeyCode.S] = true,
+	[Enum.KeyCode.A] = true,
+	[Enum.KeyCode.D] = true,
 }
 
 local DashAction = setmetatable({}, BaseAction)
@@ -78,6 +87,43 @@ function DashAction:Validate(Context: BaseAction.ActionContext): BaseAction.Vali
 	}
 end
 
+function DashAction:GetCurrentPressedKeys(): { [Enum.KeyCode]: boolean }
+	local PressedKeys = {}
+
+	for KeyCode in DIRECTION_KEYS do
+		if UserInputService:IsKeyDown(KeyCode) then
+			PressedKeys[KeyCode] = true
+		end
+	end
+
+	return PressedKeys
+end
+
+function DashAction:GetDashDirectionFromKeys(): Vector3?
+	local Camera = workspace.CurrentCamera
+	if not Camera then
+		return nil
+	end
+
+	local PressedKeys = self:GetCurrentPressedKeys()
+
+	local CameraLookVector = Camera.CFrame.LookVector
+	local CameraRightVector = Camera.CFrame.RightVector
+
+	local Forward = if PressedKeys[Enum.KeyCode.W] then CameraLookVector else Vector3.zero
+	local Backward = if PressedKeys[Enum.KeyCode.S] then -CameraLookVector else Vector3.zero
+	local Left = if PressedKeys[Enum.KeyCode.A] then -CameraRightVector else Vector3.zero
+	local Right = if PressedKeys[Enum.KeyCode.D] then CameraRightVector else Vector3.zero
+
+	local Direction = Forward + Backward + Left + Right
+
+	if Direction.Magnitude > 0 then
+		return Vector3.new(Direction.X, 0, Direction.Z).Unit
+	end
+
+	return nil
+end
+
 function DashAction:ExecuteClient(Context: BaseAction.ActionContext): BaseAction.ActionResult
 	local Result = BaseAction.ExecuteClient(self, Context)
 
@@ -99,30 +145,55 @@ function DashAction:ExecuteClient(Context: BaseAction.ActionContext): BaseAction
 
 	local DashVfx = VfxPlayer.PlayLocal("DodgeVfx")
 	if DashVfx then
-		self:AddCleanupTask(function()
-			VfxPlayer.Cleanup(Character, "DodgeVfx")
+		self:AddInstantCleanupTask(function()
+			VfxPlayer.Cleanup(Character, "DodgeVfx", true)
 		end)
 	end
 
 	local Attachment = Instance.new("Attachment")
 	Attachment.Parent = HumanoidRootPart
+	Attachment.WorldCFrame = CFrame.lookAt(HumanoidRootPart.Position, HumanoidRootPart.Position + Direction)
 	self:AddCleanupTask(Attachment)
 
 	local LinearVelocity = Instance.new("LinearVelocity")
 	LinearVelocity.Attachment0 = Attachment
-	LinearVelocity.RelativeTo = Enum.ActuatorRelativeTo.World
-	LinearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Line
-	LinearVelocity.LineDirection = Direction.Unit
-	LinearVelocity.LineVelocity = DashBalance.Client.Power
-	LinearVelocity.MaxForce = math.huge
+	LinearVelocity.RelativeTo = Enum.ActuatorRelativeTo.Attachment0
+	LinearVelocity.VectorVelocity = Vector3.new(0, 0, -DashBalance.Client.Power)
+	LinearVelocity.MaxForce = DashBalance.Client.MaxForce
 	LinearVelocity.Parent = HumanoidRootPart
 	self:AddCleanupTask(LinearVelocity)
 
 	local TweenInfo = TweenInfo.new(DashBalance.Client.TweenDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local VelocityTween = TweenService:Create(LinearVelocity, TweenInfo, {
+		VectorVelocity = Vector3.new(0, 0, 0),
+	})
+	VelocityTween:Play()
+	self:AddCleanupTask(VelocityTween)
 
-	TweenService:Create(LinearVelocity, TweenInfo, {
-		LineVelocity = 0,
-	}):Play()
+	local ConnectionCleanup = {}
+
+	local UpdateConnection = RunService.Heartbeat:Connect(function()
+		if self.IsRolledBack then
+			return
+		end
+
+		if not Attachment.Parent then
+			return
+		end
+
+		local CurrentDirection = self:GetDashDirectionFromKeys()
+		if CurrentDirection then
+			Attachment.WorldCFrame =
+				CFrame.lookAt(HumanoidRootPart.Position, HumanoidRootPart.Position + CurrentDirection)
+		end
+	end)
+
+	table.insert(ConnectionCleanup, UpdateConnection)
+	self:AddCleanupTask(function()
+		for _, Connection in ConnectionCleanup do
+			Connection:Disconnect()
+		end
+	end)
 
 	local DirectionKey = self:GetDirectionKey(Context)
 	local DashAnimation = nil
@@ -142,6 +213,10 @@ function DashAction:ExecuteClient(Context: BaseAction.ActionContext): BaseAction
 	end
 
 	task.delay(DashBalance.Client.AnimationDuration, function()
+		if self.IsRolledBack then
+			return
+		end
+
 		if Result.RollbackData and Result.RollbackData.Maid then
 			Result.RollbackData.Maid:DoCleaning()
 		end

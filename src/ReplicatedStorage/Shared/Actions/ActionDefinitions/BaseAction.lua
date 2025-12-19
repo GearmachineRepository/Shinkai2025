@@ -33,10 +33,13 @@ export type BaseAction = {
 	RollbackClient: (self: BaseAction, Context: ActionContext, RollbackData: any?) -> (),
 	CanExecute: (self: BaseAction, Context: ActionContext) -> ValidationResult,
 	AddCleanupTask: (self: BaseAction, Task: any) -> (),
+	AddInstantCleanupTask: (self: BaseAction, Task: any) -> (),
 }
 
 type BaseActionInternal = BaseAction & {
 	CleanupMaid: Maid.MaidSelf?,
+	InstantCleanupMaid: Maid.MaidSelf?,
+	IsRolledBack: boolean,
 }
 
 local BaseAction = {}
@@ -52,6 +55,8 @@ function BaseAction.new(Config: {
 		CooldownDuration = Config.CooldownDuration or 0,
 		StaminaCost = Config.StaminaCost or 0,
 		CleanupMaid = nil,
+		InstantCleanupMaid = nil,
+		IsRolledBack = false,
 	}, BaseAction)
 
 	return self :: any
@@ -114,14 +119,26 @@ function BaseAction:AddCleanupTask(Task: any)
 	self.CleanupMaid:GiveTask(Task)
 end
 
+function BaseAction:AddInstantCleanupTask(Task: any)
+	if not self.InstantCleanupMaid then
+		warn("[BaseAction] Attempted to add instant cleanup task without active execution")
+		return
+	end
+
+	self.InstantCleanupMaid:GiveTask(Task)
+end
+
 function BaseAction:ExecuteClient(_Context: ActionContext): ActionResult
 	self.CleanupMaid = Maid.new()
+	self.InstantCleanupMaid = Maid.new()
+	self.IsRolledBack = false
 
 	return {
 		Success = false,
 		Reason = "NotImplemented",
 		RollbackData = {
 			Maid = self.CleanupMaid,
+			InstantMaid = self.InstantCleanupMaid,
 		},
 	}
 end
@@ -134,11 +151,18 @@ function BaseAction:ExecuteServer(_Context: ActionContext): ActionResult
 end
 
 function BaseAction:RollbackClient(Context: ActionContext, RollbackData: any?)
+	self.IsRolledBack = true
+
+	if RollbackData and RollbackData.InstantMaid then
+		RollbackData.InstantMaid:DoCleaning()
+	end
+
 	if RollbackData and RollbackData.Maid then
 		RollbackData.Maid:DoCleaning()
 	end
 
 	self.CleanupMaid = nil
+	self.InstantCleanupMaid = nil
 
 	if Context.Character then
 		Context.Character:SetAttribute("ActionLocked", false)

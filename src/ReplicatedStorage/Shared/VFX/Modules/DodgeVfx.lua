@@ -19,7 +19,7 @@ RaycastParamsInstance.FilterDescendantsInstances = { workspace:WaitForChild("Cha
 RaycastParamsInstance.IgnoreWater = false
 
 type VfxInstance = {
-	Cleanup: () -> (),
+	Cleanup: (Rollback: boolean?) -> (),
 	Stop: (() -> ())?,
 }
 
@@ -85,6 +85,7 @@ local function StartGroundSmoke(Character: Model, ActiveDuration: number): VfxIn
 	SmokeEmitter.Parent = GroundAttachment
 
 	local IsStopped = false
+	local IsCleanedUp = false
 
 	local function GetSurfaceColor(RaycastResultValue: RaycastResult): Color3
 		local HitInstance = RaycastResultValue.Instance
@@ -112,7 +113,7 @@ local function StartGroundSmoke(Character: Model, ActiveDuration: number): VfxIn
 	end
 
 	local function UpdateSmokeFromGround()
-		if IsStopped then
+		if IsStopped or IsCleanedUp then
 			return
 		end
 
@@ -137,7 +138,7 @@ local function StartGroundSmoke(Character: Model, ActiveDuration: number): VfxIn
 	end
 
 	task.spawn(function()
-		while not IsStopped do
+		while not IsStopped and not IsCleanedUp do
 			UpdateSmokeFromGround()
 			task.wait(GROUND_SAMPLE_INTERVAL)
 		end
@@ -145,14 +146,25 @@ local function StartGroundSmoke(Character: Model, ActiveDuration: number): VfxIn
 
 	task.delay(ActiveDuration, Stop)
 
-	local function Cleanup()
+	local function Cleanup(Rollback: boolean?)
+		if IsCleanedUp then
+			return
+		end
+
+		IsCleanedUp = true
 		Stop()
 
-		task.delay(GROUND_SMOKE_MAX_LIFETIME + 0.2, function()
+		if Rollback then
 			if GroundAttachment.Parent then
 				GroundAttachment:Destroy()
 			end
-		end)
+		else
+			task.delay(GROUND_SMOKE_MAX_LIFETIME + 0.2, function()
+				if GroundAttachment.Parent then
+					GroundAttachment:Destroy()
+				end
+			end)
+		end
 	end
 
 	return {
@@ -177,6 +189,7 @@ function DodgeVfx.Play(Character: Model, _VfxData: any?): VfxInstance?
 
 	local CreatedTrails: { Trail } = {}
 	local MaxLifetime = 0
+	local IsCleanedUp = false
 
 	for _, Pair in AttachmentPairs do
 		local TrailClone = TrailTemplate:Clone()
@@ -193,6 +206,10 @@ function DodgeVfx.Play(Character: Model, _VfxData: any?): VfxInstance?
 	end
 
 	task.delay(TRAIL_ACTIVE_DURATION, function()
+		if IsCleanedUp then
+			return
+		end
+
 		for _, Trail in CreatedTrails do
 			if Trail and Trail.Parent then
 				Trail.Enabled = false
@@ -205,7 +222,6 @@ function DodgeVfx.Play(Character: Model, _VfxData: any?): VfxInstance?
 	local function Stop()
 		if GroundSmokeInstance and GroundSmokeInstance.Stop then
 			GroundSmokeInstance.Stop()
-			GroundSmokeInstance = nil
 		end
 
 		for _, TrailInstance in CreatedTrails do
@@ -215,22 +231,38 @@ function DodgeVfx.Play(Character: Model, _VfxData: any?): VfxInstance?
 		end
 	end
 
-	local function Cleanup()
+	local function Cleanup(Rollback: boolean?)
+		if IsCleanedUp then
+			return
+		end
+
+		IsCleanedUp = true
+
 		if GroundSmokeInstance then
-			GroundSmokeInstance.Cleanup()
+			GroundSmokeInstance.Cleanup(Rollback)
 			GroundSmokeInstance = nil
 		end
 
 		for _, TrailInstance in CreatedTrails do
 			if TrailInstance and TrailInstance.Parent then
 				TrailInstance.Enabled = false
-				game.Debris:AddItem(TrailInstance, 5)
+
+				if Rollback then
+					TrailInstance:Destroy()
+				else
+					game.Debris:AddItem(TrailInstance, MaxLifetime + 0.5)
+				end
 			end
 		end
+
 		table.clear(CreatedTrails)
 	end
 
-	task.delay(TRAIL_ACTIVE_DURATION + MaxLifetime + 0.5, Cleanup)
+	task.delay(TRAIL_ACTIVE_DURATION + MaxLifetime + 0.5, function()
+		if not IsCleanedUp then
+			Cleanup(false)
+		end
+	end)
 
 	return {
 		Cleanup = Cleanup,

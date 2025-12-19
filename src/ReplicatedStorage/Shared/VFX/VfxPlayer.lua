@@ -8,7 +8,7 @@ local Packets = require(Shared.Networking.Packets)
 local VfxModules = Shared:WaitForChild("VFX"):WaitForChild("Modules")
 
 export type VfxInstance = {
-	Cleanup: () -> (),
+	Cleanup: (Rollback: boolean?) -> (),
 	Stop: (() -> ())?,
 }
 
@@ -38,7 +38,7 @@ function VfxPlayer.Play(Character: Model, VfxName: string, VfxData: any?): VfxIn
 		return nil
 	end
 
-	VfxPlayer.Cleanup(Character, VfxName)
+	VfxPlayer.Cleanup(Character, VfxName, false)
 
 	local VfxInstance = VfxModule.Play(Character, VfxData)
 	if not VfxInstance then
@@ -86,7 +86,7 @@ function VfxPlayer.Stop(Character: Model, VfxName: string)
 	CharacterVfx[VfxName] = nil
 end
 
-function VfxPlayer.Cleanup(Character: Model, VfxName: string)
+function VfxPlayer.Cleanup(Character: Model, VfxName: string, Rollback: boolean?)
 	local CharacterVfx = ActiveVfxByCharacter[Character]
 	if not CharacterVfx then
 		return
@@ -97,7 +97,7 @@ function VfxPlayer.Cleanup(Character: Model, VfxName: string)
 		return
 	end
 
-	VfxInstance.Cleanup()
+	VfxInstance.Cleanup(Rollback)
 	CharacterVfx[VfxName] = nil
 end
 
@@ -108,7 +108,7 @@ function VfxPlayer.CleanupAll(Character: Model)
 	end
 
 	for _VfxName, VfxInstance in CharacterVfx do
-		VfxInstance.Cleanup()
+		VfxInstance.Cleanup(false)
 	end
 
 	ActiveVfxByCharacter[Character] = nil
