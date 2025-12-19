@@ -47,7 +47,7 @@ return {
 	EquippedToolUpdate = Packet("EquippedToolUpdate", Packet.Any),
 
 	-- Cooldown
-	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberU16),
+	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberF64),
 	ClearCooldown = Packet("ClearCooldown", Packet.String),
 
 	-- Action

@@ -1,6 +1,7 @@
 --!strict
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
@@ -127,7 +128,35 @@ function VfxPlayer.OnVfxReplicated(SenderUserId: number, VfxName: string, VfxDat
 	VfxPlayer.Play(SenderCharacter, VfxName, VfxData)
 end
 
-Packets.PlayVfxReplicate.OnClientEvent:Connect(VfxPlayer.OnVfxReplicated)
+if RunService:IsClient() then
+	Packets.PlayVfxReplicate.OnClientEvent:Connect(VfxPlayer.OnVfxReplicated)
+
+	Players.PlayerRemoving:Connect(function(Player: Player)
+		if Player.Character then
+			VfxPlayer.CleanupAll(Player.Character)
+		end
+	end)
+
+	local function OnCharacterRemoving(Character: Model)
+		VfxPlayer.CleanupAll(Character)
+	end
+
+	for _, Player in Players:GetPlayers() do
+		if Player.Character then
+			Player.Character.AncestryChanged:Connect(function(_, Parent)
+				if not Parent then
+					OnCharacterRemoving(Player.Character)
+				end
+			end)
+		end
+
+		Player.CharacterRemoving:Connect(OnCharacterRemoving)
+	end
+
+	Players.PlayerAdded:Connect(function(Player: Player)
+		Player.CharacterRemoving:Connect(OnCharacterRemoving)
+	end)
+end
 
 Players.PlayerRemoving:Connect(function(Player: Player)
 	if Player.Character then

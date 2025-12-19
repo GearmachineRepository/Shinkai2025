@@ -223,7 +223,8 @@ function DodgeVfx.Play(Character: Model, _VfxData: any?): VfxInstance?
 
 		for _, TrailInstance in CreatedTrails do
 			if TrailInstance and TrailInstance.Parent then
-				TrailInstance:Destroy()
+				TrailInstance.Enabled = false
+				game.Debris:AddItem(TrailInstance, 5)
 			end
 		end
 		table.clear(CreatedTrails)

@@ -25,6 +25,8 @@ function SoundPlayer.Play(Character: Model, SoundName: string)
 	SoundClone.Ended:Connect(function()
 		SoundClone:Destroy()
 	end)
+
+	return SoundClone
 end
 
 return SoundPlayer

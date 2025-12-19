@@ -9,21 +9,20 @@ local Server = ServerScriptService:WaitForChild("Server")
 local Maid = require(Shared.General.Maid)
 local EventBus = require(Server.Framework.Utilities.EventBus)
 local EntityEvents = require(Shared.Events.EntityEvents)
+local ActionRegistry = require(Shared.Actions.ActionRegistry)
 local Packets = require(Shared.Networking.Packets)
-local DashBalance = require(Shared.Configurations.Balance.DashBalance)
-local DashValidator = require(Shared.ActionValidation.DashValidator)
 
 export type ActionComponent = {
 	Entity: any,
 
-	CanPerformAction: (self: ActionComponent, ActionName: string) -> boolean,
+	CanPerformAction: (self: ActionComponent, ActionName: string, ActionData: any?) -> boolean,
 	PerformAction: (self: ActionComponent, ActionName: string, ActionData: any?) -> boolean,
 	Destroy: (self: ActionComponent) -> (),
 }
 
 type ActionComponentInternal = ActionComponent & {
 	Maid: Maid.MaidSelf,
-	ActionHandlers: { [string]: (Entity: any, ActionData: any?) -> boolean },
+	ActiveCooldowns: { [string]: boolean },
 }
 
 local ActionComponent = {}
@@ -33,72 +32,31 @@ function ActionComponent.new(Entity: any): ActionComponent
 	local self: ActionComponentInternal = setmetatable({
 		Entity = Entity,
 		Maid = Maid.new(),
-		ActionHandlers = {},
+		ActiveCooldowns = {},
 	}, ActionComponent) :: any
-
-	self:RegisterDefaultActions()
 
 	return self
 end
 
-function ActionComponent:RegisterDefaultActions()
-	self.ActionHandlers.Dash = function(Entity: any, _ActionData: any?): boolean
-		if not Entity.Components.StatusEffect or not Entity.Components.Stamina then
-			return false
-		end
-
-		local CurrentStamina = Entity.Stats:GetStat("Stamina")
-		local IsOnCooldown = Entity.Components.StatusEffect:Has("DashCooldown")
-
-		local ValidationResult = DashValidator.CanDash({
-			Character = Entity.Character,
-			CurrentStamina = CurrentStamina,
-			IsOnCooldown = IsOnCooldown,
-		})
-
-		if not ValidationResult.Success then
-			return false
-		end
-
-		if not Entity.Components.Stamina:ConsumeStamina(DashBalance.StaminaCost) then
-			return false
-		end
-
-		Entity.Character:SetAttribute("ActionLocked", true)
-
-		Entity.States:SetState("Dashing", true)
-
-		Entity.Components.StatusEffect:Apply("DashCooldown", DashBalance.CooldownSeconds, {
-			Stacks = false,
-		})
-
-		Packets.ActionApproved:FireClient(Entity.Player, "Dash")
-		Packets.StartCooldown:FireClient(
-			Entity.Player,
-			"Dash",
-			workspace:GetServerTimeNow(),
-			DashBalance.CooldownSeconds
-		)
-
-		task.delay(DashBalance.DashDurationSeconds, function()
-			if Entity.States then
-				Entity.States:SetState("Dashing", false)
-			end
-
-			if Entity.Character then
-				Entity.Character:SetAttribute("ActionLocked", false)
-			end
-
-			Entity.Character:SetAttribute("MovementMode", "walk")
-		end)
-
-		return true
-	end
+function ActionComponent:IsOnCooldown(ActionName: string): boolean
+	return self.ActiveCooldowns[ActionName] == true
 end
 
-function ActionComponent:CanPerformAction(ActionName: string): boolean
-	local Handler = self.ActionHandlers[ActionName]
-	if not Handler then
+function ActionComponent:StartCooldown(ActionName: string, Duration: number)
+	self.ActiveCooldowns[ActionName] = true
+
+	task.delay(Duration, function()
+		self.ActiveCooldowns[ActionName] = nil
+	end)
+end
+
+function ActionComponent:CanPerformAction(ActionName: string, ActionData: any?): boolean
+	local Action = ActionRegistry.Get(ActionName)
+	if not Action then
+		return false
+	end
+
+	if self:IsOnCooldown(ActionName) then
 		return false
 	end
 
@@ -106,35 +64,75 @@ function ActionComponent:CanPerformAction(ActionName: string): boolean
 		return false
 	end
 
-	return true
+	local Context = {
+		Entity = self.Entity,
+		Character = self.Entity.Character,
+		Player = self.Entity.Player,
+		ActionData = ActionData,
+	}
+
+	local ValidationResult = Action:CanExecute(Context)
+	return ValidationResult.Success
 end
 
 function ActionComponent:PerformAction(ActionName: string, ActionData: any?): boolean
-	if not self:CanPerformAction(ActionName) then
+	if not self:CanPerformAction(ActionName, ActionData) then
+		if self.Entity.Player then
+			Packets.ActionDenied:FireClient(self.Entity.Player, ActionName)
+		end
 		return false
 	end
 
-	local Handler = self.ActionHandlers[ActionName]
-	if not Handler then
+	local Action = ActionRegistry.Get(ActionName)
+	if not Action then
 		return false
 	end
 
-	local Success = Handler(self.Entity, ActionData)
+	local Context = {
+		Entity = self.Entity,
+		Character = self.Entity.Character,
+		Player = self.Entity.Player,
+		ActionData = ActionData,
+	}
 
-	if Success then
+	local Result = Action:ExecuteServer(Context)
+
+	if Result.Success then
+		if Action.CooldownDuration > 0 then
+			self:StartCooldown(ActionName, Action.CooldownDuration)
+
+			if self.Entity.Player then
+				Packets.StartCooldown:FireClient(
+					self.Entity.Player,
+					ActionName,
+					workspace:GetServerTimeNow(),
+					Action.CooldownDuration
+				)
+			end
+		end
+
+		if self.Entity.Player then
+			Packets.ActionApproved:FireClient(self.Entity.Player, ActionName)
+		end
+
 		EventBus.Publish(EntityEvents.ACTION_PERFORMED, {
 			Entity = self.Entity,
 			ActionName = ActionName,
 			ActionData = ActionData,
 		})
-	end
 
-	return Success
+		return true
+	else
+		if self.Entity.Player then
+			Packets.ActionDenied:FireClient(self.Entity.Player, ActionName)
+		end
+		return false
+	end
 end
 
 function ActionComponent:Destroy()
 	self.Maid:DoCleaning()
-	table.clear(self.ActionHandlers)
+	table.clear(self.ActiveCooldowns)
 end
 
 return ActionComponent
