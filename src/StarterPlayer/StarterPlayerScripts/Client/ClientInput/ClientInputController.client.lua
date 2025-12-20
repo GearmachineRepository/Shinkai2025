@@ -1,14 +1,10 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local InputBuffer = require(Shared.General.InputBuffer)
 local Packets = require(Shared.Networking.Packets)
-local ActionController = require(Shared.Actions.ActionController)
-
-ActionController.Initialize()
 
 InputBuffer.OnAction(function(ActionName: string)
 	if ActionName == "M1" then
@@ -30,22 +26,6 @@ InputBuffer.OnAction(function(ActionName: string)
 	elseif ActionName == "Skill6" then
 		Packets.PerformAction:Fire("Skill6")
 	elseif ActionName == "Dash" then
-		ActionController.RequestDash()
+		Packets.PerformAction:Fire("Dash")
 	end
-end)
-
-UserInputService.InputBegan:Connect(function(Input: InputObject, GameProcessed: boolean)
-	if GameProcessed then
-		return
-	end
-
-	ActionController.SetKeyPressed(Input.KeyCode, true)
-end)
-
-UserInputService.InputEnded:Connect(function(Input: InputObject, GameProcessed: boolean)
-	if GameProcessed then
-		return
-	end
-
-	ActionController.SetKeyPressed(Input.KeyCode, false)
 end)
