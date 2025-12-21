@@ -30,7 +30,7 @@ end
 
 function StatComponent.new(Entity: any, InitialData: { [string]: any }?): Types.StatComponent
 	if not ActiveConfig then
-		error(" StatComponent.SetConfig must be called before creating entities")
+		error(Types.EngineName .. "StatComponent.SetConfig must be called before creating entities")
 	end
 
 	local self: StatComponentInternal = setmetatable({
@@ -66,7 +66,7 @@ end
 function StatComponent:SetStat(StatName: string, Value: number)
 	local Definition = self.Config.Stats[StatName]
 	if not Definition then
-		warn(string.format(" Unknown stat: '%s'", StatName))
+		warn(string.format(Types.EngineName .. "Unknown stat: '%s'", StatName))
 		return
 	end
 

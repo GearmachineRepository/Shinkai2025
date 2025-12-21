@@ -2,6 +2,10 @@
 
 local Types = {}
 
+Types.EngineName = "Arch"
+Types.EngineVersion = "1.0.0"
+Types.EngineAuthor = "Gearmachine"
+
 export type CleanupTask = RBXScriptConnection | Instance | (() -> ()) | { Destroy: (any) -> () } | { Disconnect: (any) -> () }
 
 export type Maid = {
