@@ -36,18 +36,14 @@ function MovementComponent.new(Entity: any): MovementComponent
 		LastWalkSpeedUpdate = 0,
 	}, MovementComponent) :: any
 
-	self:SetupMovementTracking()
-
-	return self
-end
-
-function MovementComponent:SetupMovementTracking()
 	local Connection = self.Entity.Character:GetAttributeChangedSignal("MovementMode"):Connect(function()
 		local CurrentMode = self.Entity.Character:GetAttribute("MovementMode")
 		self:SetMovementMode(CurrentMode)
 	end)
 
 	self.Maid:GiveTask(Connection)
+
+	return self
 end
 
 function MovementComponent:GetBaseSpeed(Mode: string?): number

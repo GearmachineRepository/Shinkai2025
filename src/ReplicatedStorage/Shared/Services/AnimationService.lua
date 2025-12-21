@@ -1,5 +1,9 @@
 --!strict
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+
 local DEFAULT_FADE_TIME = 0.1
 
 export type PlayOptions = {
@@ -21,11 +25,22 @@ type CharacterState = {
 
 local CharacterStates: { [Humanoid]: CharacterState } = {}
 
-local function NormalizeAnimationId(AnimationId: string): string
-	if string.find(AnimationId, "rbxassetid://") == 1 then
-		return AnimationId
+local function ResolveAnimationId(AnimationKey: string): string?
+	if string.find(AnimationKey, "rbxassetid://") == 1 then
+		return AnimationKey
 	end
-	return "rbxassetid://" .. AnimationId
+
+	if tonumber(AnimationKey) then
+		return "rbxassetid://" .. AnimationKey
+	end
+
+	for _AnimationName, AnimationId in pairs(AnimationDatabase) do
+		if _AnimationName == AnimationKey then
+			return AnimationId
+		end
+	end
+
+	return nil
 end
 
 local function GetHumanoidFromPlayer(Player: Player): Humanoid?
@@ -85,24 +100,26 @@ local function ApplyOptions(Track: AnimationTrack, Options: PlayOptions?)
 	end
 end
 
-local function GetOrLoadTrack(Humanoid: Humanoid, AnimationId: string): AnimationTrack
+local function GetOrLoadTrack(Humanoid: Humanoid, AnimationId: string): AnimationTrack?
 	local State = GetOrCreateState(Humanoid)
-	local NormalizedId = NormalizeAnimationId(AnimationId)
 
-	local CachedTrack = State.Tracks[NormalizedId]
+	local CachedTrack = State.Tracks[AnimationId]
 	if CachedTrack then
 		return CachedTrack
 	end
 
-	local AnimationObject = State.Animations[NormalizedId]
+	local AnimationObject = State.Animations[AnimationId]
 	if not AnimationObject then
-		AnimationObject = Instance.new("Animation")
-		AnimationObject.AnimationId = NormalizedId
-		State.Animations[NormalizedId] = AnimationObject
+		local AnimationInstance = Instance.new("Animation")
+		AnimationInstance.AnimationId = AnimationId
+
+		State.Animations[AnimationId] = AnimationInstance
+
+		AnimationObject = AnimationInstance
 	end
 
 	local NewTrack = State.Animator:LoadAnimation(AnimationObject)
-	State.Tracks[NormalizedId] = NewTrack
+	State.Tracks[AnimationId] = NewTrack
 	return NewTrack
 end
 
@@ -114,26 +131,38 @@ function AnimationService.Preload(Player: Player, Animations: { [string]: string
 		return
 	end
 
-	for _, AnimationId in pairs(Animations) do
-		GetOrLoadTrack(Humanoid, AnimationId)
+	for _, AnimationKey in pairs(Animations) do
+		local ResolvedId = ResolveAnimationId(AnimationKey)
+		if ResolvedId then
+			GetOrLoadTrack(Humanoid, ResolvedId)
+		end
 	end
 end
 
-function AnimationService.Play(Player: Player, AnimationId: string, Options: PlayOptions?): AnimationTrack?
+function AnimationService.Play(Player: Player, AnimationKey: string, Options: PlayOptions?): AnimationTrack?
 	local Humanoid = GetHumanoidFromPlayer(Player)
 	if not Humanoid then
 		return nil
 	end
 
-	local Track = GetOrLoadTrack(Humanoid, AnimationId)
-	ApplyOptions(Track, Options)
+	local ResolvedId = ResolveAnimationId(AnimationKey)
+	if not ResolvedId then
+		warn("Failed to resolve animation:", AnimationKey)
+		return nil
+	end
 
+	local Track = GetOrLoadTrack(Humanoid, ResolvedId)
+	if not Track then
+		return nil
+	end
+
+	ApplyOptions(Track, Options)
 	Track:Play(Options and Options.FadeTime or DEFAULT_FADE_TIME)
 
 	return Track
 end
 
-function AnimationService.Stop(Player: Player, AnimationId: string, FadeTime: number?)
+function AnimationService.Stop(Player: Player, AnimationKey: string, FadeTime: number?)
 	local Humanoid = GetHumanoidFromPlayer(Player)
 	if not Humanoid then
 		return
@@ -144,8 +173,12 @@ function AnimationService.Stop(Player: Player, AnimationId: string, FadeTime: nu
 		return
 	end
 
-	local NormalizedId = NormalizeAnimationId(AnimationId)
-	local Track = State.Tracks[NormalizedId]
+	local ResolvedId = ResolveAnimationId(AnimationKey)
+	if not ResolvedId then
+		return
+	end
+
+	local Track = State.Tracks[ResolvedId]
 	if Track then
 		Track:Stop(FadeTime or DEFAULT_FADE_TIME)
 	end

@@ -107,7 +107,7 @@ function Entity:GetComponent<T>(ComponentName: string): T?
 end
 
 function Entity:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
-	local ModifiedDamage = self.Modifiers:Apply("Damage", Damage, {
+	local ModifiedDamage: number = self.Modifiers:Apply("Damage", Damage, {
 		Source = Source,
 		Direction = Direction,
 		OriginalDamage = Damage,
@@ -121,7 +121,10 @@ function Entity:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
 		ModifiedDamage = ModifiedDamage * (1 - CombatBalance.Blocking.DAMAGE_REDUCTION)
 	end
 
-	self.Humanoid.Health -= ModifiedDamage
+	local Health: number = self.Humanoid.Health
+	Health -= ModifiedDamage
+	self.Humanoid.Health = math.max(0, Health)
+
 	local CurrentHealth = self.Humanoid.Health
 	self.Stats:SetStat("Health", CurrentHealth)
 end

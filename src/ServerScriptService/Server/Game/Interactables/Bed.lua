@@ -36,7 +36,7 @@ local function ExitBed(PlayerWhoSlept: Player, BedModel: Model)
 		Character:SetAttribute(SLEEP_ATTRIBUTE, false)
 	end
 
-	Packets.StopAnimation:FireClient(PlayerWhoSlept)
+	Packets.StopAnimation:FireClient(PlayerWhoSlept, "Sleep", 0.25)
 
 	InteractableBase.CleanupActiveUsers(PlayerWhoSlept, ActiveSleepers)
 	InteractableBase.ReleaseInteractable(BedModel)
@@ -55,7 +55,14 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 	end
 
 	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.BodyFatigue then
+	if not EntityInstance then
+		return
+	end
+
+	local SweatComponent = EntityInstance:GetComponent("Sweat")
+	local BodyComponent = EntityInstance:GetComponent("BodyFatigue")
+
+	if not SweatComponent or not BodyComponent then
 		return
 	end
 
@@ -93,15 +100,17 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 	local MaxFatigue = EntityInstance.Stats:GetStat(StatTypes.MAX_BODY_FATIGUE)
 	local ReductionRate = MaxFatigue / FatigueBalance.Rest.TIME_TO_FULL_REST
 
-	Packets.PlayAnimation:FireClient(Player, "sleep")
+	Packets.PlayAnimation:FireClient(Player, "Sleep")
 
 	local RestConnection = UpdateService.RegisterWithCleanup(function(DeltaTime: number)
 		local CurrentFatigue = EntityInstance.Stats:GetStat(StatTypes.BODY_FATIGUE)
 
 		if CurrentFatigue <= 0 then
-			if EntityInstance.Components.Sweat then
-				EntityInstance.Components.Sweat:StopSweating()
+
+			if SweatComponent then
+				SweatComponent:StopSweating()
 			end
+
 			ExitBed(Player, BedModel)
 			return
 		end
@@ -110,7 +119,7 @@ function BedInteractable.OnInteract(Player: Player, BedModel: Model)
 		local NewFatigue = math.max(0, CurrentFatigue - FatigueReduction)
 
 		EntityInstance.Stats:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
-	end, 0.10)
+	end, 0.10) :: any
 
 	ActiveSleepers[Player] = {
 		Connection = JumpConnection,

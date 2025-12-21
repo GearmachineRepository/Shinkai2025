@@ -40,26 +40,20 @@ function TrainingComponent.new(Entity: any, PlayerData: any): TrainingComponent
 		Maid = Maid.new(),
 	}, TrainingComponent) :: any
 
-	self:InitializeStatAttributes()
+	local Character = self.Entity.Character
+	if Character then
+		for _, StatName in { "MaxStamina", "Durability", "RunSpeed", "StrikingPower", "StrikeSpeed", "Muscle" } do
+			local XP = self.PlayerData.Stats[StatName .. "_XP"] or 0
+			local Stars = self.PlayerData.Stats[StatName .. "_Stars"] or 0
+			local AvailablePoints = self.PlayerData.Stats[StatName .. "_AvailablePoints"] or 0
+
+			Character:SetAttribute(StatName .. "_XP", XP)
+			Character:SetAttribute(StatName .. "_Stars", Stars)
+			Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
+		end
+	end
 
 	return self
-end
-
-function TrainingComponent:InitializeStatAttributes()
-	local Character = self.Entity.Character
-	if not Character then
-		return
-	end
-
-	for _, StatName in { "MaxStamina", "Durability", "RunSpeed", "StrikingPower", "StrikeSpeed", "Muscle" } do
-		local XP = self.PlayerData.Stats[StatName .. "_XP"] or 0
-		local Stars = self.PlayerData.Stats[StatName .. "_Stars"] or 0
-		local AvailablePoints = self.PlayerData.Stats[StatName .. "_AvailablePoints"] or 0
-
-		Character:SetAttribute(StatName .. "_XP", XP)
-		Character:SetAttribute(StatName .. "_Stars", Stars)
-		Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
-	end
 end
 
 function TrainingComponent:StartTraining(TrainingType: string)

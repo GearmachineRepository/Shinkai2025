@@ -12,70 +12,76 @@ local EntityEvents = require(Shared.Events.EntityEvents)
 local CallbackRegistry = require(Server.Framework.Utilities.CallbackRegistry)
 
 export type CallbackConnection = {
-	Disconnect: () -> (),
-	Connected: boolean,
+    Disconnect: () -> (),
+    Connected: boolean,
 }
 
 export type StateComponent = {
-	Entity: any,
-
-	GetState: (self: StateComponent, StateName: string) -> boolean,
-	SetState: (self: StateComponent, StateName: string, Value: boolean) -> (),
-	OnStateChanged: (self: StateComponent, StateName: string, Callback: (Value: boolean) -> ()) -> CallbackConnection,
-	Destroy: (self: StateComponent) -> (),
+    Entity: any,
+    GetState: (self: StateComponent, StateName: string) -> boolean,
+    SetState: (self: StateComponent, StateName: string, Value: boolean) -> (),
+    OnStateChanged: (self: StateComponent, StateName: string, Callback: (Value: boolean) -> ()) -> CallbackConnection,
+    Destroy: (self: StateComponent) -> (),
 }
 
 type StateComponentInternal = StateComponent & {
-	States: { [string]: boolean },
+    States: { [string]: boolean },
 }
 
 local StateComponent = {}
 StateComponent.__index = StateComponent
 
 function StateComponent.new(Entity: any): StateComponent
-	local self: StateComponentInternal = setmetatable({
-		Entity = Entity,
-		States = {},
-	}, StateComponent) :: any
+    local self: StateComponentInternal = setmetatable({
+        Entity = Entity,
+        States = {},
+    }, StateComponent) :: any
 
-	for _, StateName in StateTypes do
-		self.States[StateName] = false
-	end
+    for _, StateName in pairs(StateTypes) do
+        self.States[StateName] = false
+    end
 
-	return self
+    return self
 end
 
 function StateComponent:GetState(StateName: string): boolean
-	return self.States[StateName] or false
+    return self.States[StateName] or false
 end
 
 function StateComponent:SetState(StateName: string, Value: boolean)
-	if self.States[StateName] == Value then
-		return
-	end
+    if self.States[StateName] == Value then
+        return
+    end
 
-	self.States[StateName] = Value
+    self.States[StateName] = Value
 
-	if self.Entity.Character then
-		self.Entity.Character:SetAttribute(StateName, Value)
-	end
+    local ReplicationMode = StateTypes.GetReplicationMode(StateName)
 
-	EventBus.Publish(EntityEvents.STATE_CHANGED, {
-		Entity = self.Entity,
-		Character = self.Entity.Character,
-		StateName = StateName,
-		Value = Value,
-	})
+    if ReplicationMode ~= "LocalOnly" and self.Entity.Character then
+        self.Entity.Character:SetAttribute(StateName, Value)
+    end
 
-	CallbackRegistry.Fire(StateName, Value)
+    EventBus.Publish(EntityEvents.STATE_CHANGED, {
+        Entity = self.Entity,
+        Character = self.Entity.Character,
+        StateName = StateName,
+        Value = Value,
+        ReplicationMode = ReplicationMode,
+    })
+
+    CallbackRegistry.Fire(StateName, Value)
+end
+
+function StateComponent:OnStateChanged(StateName: string, Callback: (Value: boolean) -> ()): CallbackConnection
+    return CallbackRegistry.Register(StateName, Callback)
 end
 
 function StateComponent:Destroy()
-	if self.Entity.Character then
-		CallbackRegistry.ClearScope(self.Entity.Character)
-	end
+    if self.Entity.Character then
+        CallbackRegistry.ClearScope(self.Entity.Character)
+    end
 
-	table.clear(self.States)
+    table.clear(self.States)
 end
 
 return StateComponent

@@ -3,9 +3,8 @@ local Packet = require(script.Parent.Parent:WaitForChild("Packages"):WaitForChil
 
 return {
 	-- Animations
-	PlayAnimation = Packet("PlayAnimation", Packet.String),
-	StopAnimation = Packet("StopAnimation"),
-
+	PlayAnimation = Packet("PlayAnimation", Packet.String, Packet.Any),
+	StopAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
 	-- Equipment
 	EquipItem = Packet("EquipItem", Packet.NumberU16, Packet.String),
 	UnequipItem = Packet("UnequipItem", Packet.String),

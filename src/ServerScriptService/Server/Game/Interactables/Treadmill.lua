@@ -33,8 +33,6 @@ local TreadmillInteractable = {} :: InteractableModule
 local ActiveTrainers: { [Player]: InteractableBase.ActiveUser } = {}
 
 local function CleanupTreadmillEffects(Player: Player, TreadmillModel: Model)
-	Packets.StopAnimation:FireClient(Player)
-
 	local PrimaryPart = TreadmillModel.PrimaryPart
 	if not PrimaryPart then
 		return
@@ -44,6 +42,13 @@ local function CleanupTreadmillEffects(Player: Player, TreadmillModel: Model)
 	if TreadmillSound then
 		TreadmillSound:Stop()
 		TreadmillSound:Destroy()
+	end
+
+	if Player.Character then
+		local MovementMode = Player.Character:GetAttribute(MOVEMENT_MODE_ATTRIBUTE) :: string?
+		if MovementMode == "Run" or MovementMode == "Jog" then
+			Packets.StopAnimation:FireClient(Player, MovementMode, 0.25)
+		end
 	end
 
 	local Tread = TreadmillModel:FindFirstChild("Tread") :: BasePart?
@@ -62,10 +67,14 @@ local function ExitTreadmill(PlayerWhoTrained: Player, TreadmillModel: Model)
 
 	local Character = PlayerWhoTrained.Character
 	if Character then
+		local MovementMode = Character:GetAttribute(MOVEMENT_MODE_ATTRIBUTE) :: string?
+		if MovementMode == "Run" or MovementMode == "Jog" then
+			Packets.StopAnimation:FireClient(PlayerWhoTrained, MovementMode, 0.25)
+		end
 		InteractableBase.RemoveWeld(Character, WELD_NAME)
 		Character:SetAttribute(TRAINING_ATTRIBUTE, false)
 		Character:SetAttribute(TREADMILL_MODE_ATTRIBUTE, nil)
-		Character:SetAttribute(MOVEMENT_MODE_ATTRIBUTE, "walk")
+		Character:SetAttribute(MOVEMENT_MODE_ATTRIBUTE, "Walk")
 	end
 
 	CleanupTreadmillEffects(PlayerWhoTrained, TreadmillModel)
@@ -99,14 +108,21 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 	end
 
 	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Training then
+	if not EntityInstance then
 		return
 	end
 
-	local TrainingComponent = EntityInstance.Components.Training
-	local StaminaComponent = EntityInstance.Components.Stamina
+	local TrainingComponent = EntityInstance:GetComponent("Training")
+	local StaminaComponent = EntityInstance:GetComponent("Stamina")
 
-	if not TrainingComponent:CanTrain() then
+	if not TrainingComponent or not StaminaComponent then
+		ExitTreadmill(Player, TreadmillModel)
+		return
+	end
+
+	local CanTrain = TrainingComponent:CanTrain() :: boolean?
+
+	if not CanTrain then
 		ExitTreadmill(Player, TreadmillModel)
 		return
 	end
@@ -120,7 +136,7 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 		TreadmillSound:Play()
 	end
 
-	local AnimationName = if TrainingMode == "MaxStamina" then "jog" else "run"
+	local AnimationName = if TrainingMode == "MaxStamina" then "Jog" else "Run"
 	Packets.PlayAnimation:FireClient(Player, AnimationName)
 	Character:SetAttribute(MOVEMENT_MODE_ATTRIBUTE, AnimationName)
 
@@ -182,7 +198,7 @@ local function StartTraining(Player: Player, TreadmillModel: Model, TrainingMode
 			TrainingComponent:GrantStatGain(StatToTrain, PendingXpGain)
 			PendingXpGain = 0
 		end
-	end, 0.10)
+	end, 0.10) :: any
 
 	local ActiveUser = ActiveTrainers[Player]
 	if ActiveUser then
@@ -208,11 +224,21 @@ function TreadmillInteractable.OnInteract(Player: Player, TreadmillModel: Model)
 
 	local EntityInstance = Entity.GetEntity(Character)
 
-	if not EntityInstance or not EntityInstance.Components.Training then
+	if not EntityInstance then
 		return
 	end
 
-	if not EntityInstance.Components.Training:CanTrain() then
+	local TrainingComponent = EntityInstance:GetComponent("Training")
+	local StaminaComponent = EntityInstance:GetComponent("Stamina")
+
+	if not TrainingComponent or not StaminaComponent then
+		ExitTreadmill(Player, TreadmillModel)
+		return
+	end
+
+	local CanTrain = TrainingComponent:CanTrain() :: boolean?
+	if not CanTrain then
+		ExitTreadmill(Player, TreadmillModel)
 		return
 	end
 
