@@ -2,9 +2,7 @@
 
 local Types = {}
 
-Types.EngineName = "Arch"
-Types.EngineVersion = "1.0.0"
-Types.EngineAuthor = "Gearmachine"
+Types.EngineName = "Ensemble"
 
 export type CleanupTask = RBXScriptConnection | Instance | (() -> ()) | { Destroy: (any) -> () } | { Disconnect: (any) -> () }
 
@@ -143,22 +141,22 @@ export type HookComponent = {
 }
 
 export type Entity = {
-    Character: Model,
-    Humanoid: Humanoid,
-    IsPlayer: boolean,
-    Player: Player?,
-    Context: EntityContext,
+	Character: Model,
+	Humanoid: Humanoid,
+	IsPlayer: boolean,
+	Player: Player?,
+	Context: EntityContext,
 
-    States: any,
-    Stats: any,
-    Modifiers: any,
-    Hooks: any,
+	States: StateComponent,
+	Stats: StatComponent,
+	Modifiers: ModifierComponent,
+	Hooks: HookComponent,
 
-    AddComponent: (self: Entity, ComponentName: string, ComponentInstance: any) -> (),
-    GetComponent: <T>(self: Entity, ComponentName: string) -> T?,
-    HasComponent: (self: Entity, ComponentName: string) -> boolean,
-    FireCreated: (self: Entity) -> (),
-    Destroy: (self: Entity) -> (),
+	GetComponent: <T>(self: Entity, ComponentName: string) -> T?,
+	HasComponent: (self: Entity, ComponentName: string) -> boolean,
+	AddComponent: (self: Entity, ComponentName: string, ComponentInstance: any) -> (),
+	FireCreated: (self: Entity) -> (),
+	Destroy: (self: Entity) -> (),
 }
 
 export type EntityBuilder = {

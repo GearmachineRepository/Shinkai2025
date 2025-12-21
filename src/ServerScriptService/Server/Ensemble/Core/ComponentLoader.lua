@@ -87,12 +87,12 @@ function ComponentLoader.Configure(ComponentsFolder: Instance)
 
 		local LoadedComponent, ErrorMessage = LoadSingleComponent(Child)
 		if not LoadedComponent then
-			error(string.format(Types.EngineName .. "Component '%s' failed to load: %s", Child.Name, ErrorMessage or "Unknown error"))
+			error(string.format(Types.EngineName .. " Component '%s' failed to load: %s", Child.Name, ErrorMessage or "Unknown error"))
 		end
 
 		local ComponentName = LoadedComponent.Metadata.ComponentName
 		if State.LoadedComponents[ComponentName] then
-			error(string.format(Types.EngineName .. "Duplicate component name: '%s'", ComponentName))
+			error(string.format(Types.EngineName .. " Duplicate component name: '%s'", ComponentName))
 		end
 
 		State.LoadedComponents[ComponentName] = LoadedComponent
@@ -153,7 +153,7 @@ function ComponentLoader.ValidateDependencies()
 		end
 
 		if HasCycle(ComponentName) then
-			error(string.format(Types.EngineName .. "Circular dependency detected involving '%s'", ComponentName))
+			error(string.format(Types.EngineName .. " Circular dependency detected involving '%s'", ComponentName))
 		end
 	end
 end

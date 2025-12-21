@@ -41,13 +41,13 @@ function HookComponent:RegisterHook(HookName: string)
 	end
 
 	if not self.HookLoader then
-		warn(string.format(Types.EngineName .. "HookLoader not configured, cannot load hook: '%s'", HookName))
+		warn(string.format(Types.EngineName .. " HookLoader not configured, cannot load hook: '%s'", HookName))
 		return
 	end
 
 	local Hook = self.HookLoader.GetHook(HookName)
 	if not Hook then
-		warn(string.format(Types.EngineName .. "Hook not found: '%s'", HookName))
+		warn(string.format(Types.EngineName .. " Hook not found: '%s'", HookName))
 		return
 	end
 
@@ -57,7 +57,7 @@ function HookComponent:RegisterHook(HookName: string)
 		local Success, CleanupOrError = pcall(Hook.OnActivate, self.Entity)
 
 		if not Success then
-			warn(string.format(Types.EngineName .. "Hook '%s' activation failed: %s", HookName, tostring(CleanupOrError)))
+			warn(string.format(Types.EngineName .. " Hook '%s' activation failed: %s", HookName, tostring(CleanupOrError)))
 			self.ActiveHooks[HookName] = nil
 			return
 		end
@@ -83,7 +83,7 @@ function HookComponent:UnregisterHook(HookName: string)
 	if Cleanup then
 		local Success, ErrorMessage = pcall(Cleanup)
 		if not Success then
-			warn(string.format(Types.EngineName .. "Hook '%s' cleanup failed: %s", HookName, tostring(ErrorMessage)))
+			warn(string.format(Types.EngineName .. " Hook '%s' cleanup failed: %s", HookName, tostring(ErrorMessage)))
 		end
 		self.CleanupFunctions[HookName] = nil
 	end
@@ -91,7 +91,7 @@ function HookComponent:UnregisterHook(HookName: string)
 	if Hook.OnDeactivate then
 		local Success, ErrorMessage = pcall(Hook.OnDeactivate, self.Entity)
 		if not Success then
-			warn(string.format(Types.EngineName .. "Hook '%s' deactivation failed: %s", HookName, tostring(ErrorMessage)))
+			warn(string.format(Types.EngineName .. " Hook '%s' deactivation failed: %s", HookName, tostring(ErrorMessage)))
 		end
 	end
 

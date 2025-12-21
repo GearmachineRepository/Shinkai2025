@@ -3,10 +3,10 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
 
-local Entity = require(Server.Framework.Core.Entity)
+local Arch = require(Server.Arch)
 local Packets = require(Shared.Networking.Packets)
 
 local VALID_MOVEMENT_MODES = {
@@ -29,8 +29,13 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 		return
 	end
 
-	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Stamina then
+	local Entity = Arch.GetEntity(Character)
+	if not Entity then
+		return
+	end
+
+	local Stamina = Entity:GetComponent("Stamina") :: any
+	if not Stamina then
 		return
 	end
 
@@ -40,13 +45,13 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 	end
 
 	if MovementMode == "jog" then
-		if EntityInstance.Components.Stamina:CanJog() then
+		if Stamina:CanJog() then
 			Character:SetAttribute("MovementMode", "jog")
 		else
 			Character:SetAttribute("MovementMode", "walk")
 		end
 	elseif MovementMode == "run" then
-		if EntityInstance.Components.Stamina:CanSprint() then
+		if Stamina:CanSprint() then
 			Character:SetAttribute("MovementMode", "run")
 		else
 			Character:SetAttribute("MovementMode", "walk")

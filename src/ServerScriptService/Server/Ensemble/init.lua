@@ -33,7 +33,7 @@ local Initialized = false
 local function FormatValidationErrors(Errors: { Types.ValidationError }): string
 	local Lines = {}
 	for _, Error in Errors do
-		table.insert(Lines, string.format(Types.EngineName .. " - %s: %s", Error.Field, Error.Message))
+		table.insert(Lines, string.format(Types.EngineName .. "  - %s: %s", Error.Field, Error.Message))
 	end
 	return table.concat(Lines, "\n")
 end
@@ -41,47 +41,47 @@ end
 local function ValidateConfigs(Configs: EngineConfigs)
 	local StateResult = StateSchema.Validate(Configs.States)
 	if not StateResult.Valid then
-		error(string.format(Types.EngineName .. "State config validation failed:\n%s", FormatValidationErrors(StateResult.Errors)))
+		error(string.format(Types.EngineName .. " State config validation failed:\n%s", FormatValidationErrors(StateResult.Errors)))
 	end
 
 	local StatResult = StatSchema.Validate(Configs.Stats)
 	if not StatResult.Valid then
-		error(string.format(Types.EngineName .. "Stat config validation failed:\n%s", FormatValidationErrors(StatResult.Errors)))
+		error(string.format(Types.EngineName .. " Stat config validation failed:\n%s", FormatValidationErrors(StatResult.Errors)))
 	end
 
 	local EventResult = EventSchema.Validate(Configs.Events)
 	if not EventResult.Valid then
-		error(string.format(Types.EngineName .. "Event config validation failed:\n%s", FormatValidationErrors(EventResult.Errors)))
+		error(string.format(Types.EngineName .. " Event config validation failed:\n%s", FormatValidationErrors(EventResult.Errors)))
 	end
 end
 
 function Arch.Init(Config: InitConfig)
 	if Initialized then
-		error(Types.EngineName .. "Engine already initialized")
+		error(Types.EngineName .. " Engine already initialized")
 	end
 
 	if not Config.Components then
-		error(Types.EngineName .. "Config.Components folder is required")
+		error(Types.EngineName .. " Config.Components folder is required")
 	end
 
 	if not Config.Hooks then
-		error(Types.EngineName .. "Config.Hooks folder is required")
+		error(Types.EngineName .. " Config.Hooks folder is required")
 	end
 
 	if not Config.Configs then
-		error(Types.EngineName .. "Config.Configs is required")
+		error(Types.EngineName .. " Config.Configs is required")
 	end
 
 	if not Config.Configs.States then
-		error(Types.EngineName .. "Config.Configs.States is required")
+		error(Types.EngineName .. " Config.Configs.States is required")
 	end
 
 	if not Config.Configs.Stats then
-		error(Types.EngineName .. "Config.Configs.Stats is required")
+		error(Types.EngineName .. " Config.Configs.Stats is required")
 	end
 
 	if not Config.Configs.Events then
-		error(Types.EngineName .. "Config.Configs.Events is required")
+		error(Types.EngineName .. " Config.Configs.Events is required")
 	end
 
 	ValidateConfigs(Config.Configs)
@@ -104,14 +104,14 @@ function Arch.Init(Config: InitConfig)
 
 	Initialized = true
 
-	print(Types.EngineName .. "Engine initialized successfully")
-	print(string.format(Types.EngineName .. " Components: %d", #ComponentLoader.GetAllComponentNames()))
-	print(string.format(Types.EngineName .. " Hooks: %d", #HookLoader.GetAllHookNames()))
+	print(Types.EngineName .. " Engine initialized successfully")
+	print(string.format(Types.EngineName .. "  Components: %d", #ComponentLoader.GetAllComponentNames()))
+	print(string.format(Types.EngineName .. "  Hooks: %d", #HookLoader.GetAllHookNames()))
 end
 
 function Arch.CreateEntity(Character: Model, Context: EntityContext?): EntityBuilder
 	if not Initialized then
-		error(Types.EngineName .. "Engine not initialized. Call Arch.Init() first")
+		error(Types.EngineName .. " Engine not initialized. Call Arch.Init() first")
 	end
 
 	return EntityBuilder.new(Character, Context or {})

@@ -36,11 +36,11 @@ end
 function Entity.new(Character: Model, Context: EntityContext): Types.Entity
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
 	if not Humanoid then
-		error(string.format(Types.EngineName .. "Character '%s' has no Humanoid", Character.Name))
+		error(string.format(Types.EngineName .. " Character '%s' has no Humanoid", Character.Name))
 	end
 
 	if EntityRegistry[Character] then
-		error(string.format(Types.EngineName .. "Entity already exists for character '%s'", Character.Name))
+		error(string.format(Types.EngineName .. " Entity already exists for character '%s'", Character.Name))
 	end
 
 	local self: EntityInternal = setmetatable({
@@ -91,7 +91,7 @@ end
 
 function Entity:AddComponent(ComponentName: string, ComponentInstance: any)
 	if self.Components[ComponentName] then
-		warn(string.format(Types.EngineName .. "Component '%s' already exists on entity", ComponentName))
+		warn(string.format(Types.EngineName .. " Component '%s' already exists on entity", ComponentName))
 		return
 	end
 

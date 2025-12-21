@@ -5,28 +5,42 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CollectionService = game:GetService("CollectionService")
 
-local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
 
-local EntityService = require(Server.Framework.Core.EntityService)
-local EntityUpdateSystem = require(Server.Framework.Systems.EntityUpdateSystem)
+local Ensemble = require(Server.Ensemble)
+local ArchTypes = require(Server.Ensemble.Types)
+
 local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
--- local DebugLogger = require(Shared.Debug.DebugLogger)
 local DataModule = require(Server.Game.Data.DataModule)
-local Maid = require(Shared.General.Maid)
+
+local StateConfig = require(Server.Game.Configs.StateConfig)
+local StatConfig = require(Server.Game.Configs.StatConfig)
+local EventConfig = require(Server.Game.Configs.EventConfig)
+
+Ensemble.Init({
+	Components = Server.Game.Components,
+	Hooks = Server.Game.Hooks,
+
+	Configs = {
+		States = StateConfig,
+		Stats = StatConfig,
+		Events = EventConfig,
+	},
+
+	Archetypes = {
+		Player = { "Stamina", "Hunger", "Training", "Movement", "Inventory" },
+		NPC = { "Movement", "Combat" },
+		TrainingDummy = { "Movement" },
+	},
+})
 
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local EntityAssets = Assets:WaitForChild("Entity")
 local CharacterTemplate = EntityAssets:WaitForChild("Character")
 
-local PlayerMaids: { [Player]: Maid.MaidSelf } = {}
+local PlayerMaids: { [Player]: ArchTypes.Maid } = {}
 local PlayerCharacterConnections: { [Player]: RBXScriptConnection } = {}
-
-task.defer(function()
-	require(Server.Game.Systems.ComponentInitializer)
-end)
-
-print("EntityUpdateSystem loaded:", EntityUpdateSystem)
 
 local function GetSpawnLocation(): CFrame
 	local SpawnLocations = {}
@@ -70,8 +84,7 @@ end
 local function CleanupOldCharacter(Player: Player)
 	local OldCharacter = Player.Character
 	if OldCharacter then
-		-- DebugLogger.Info(script.Name, "Cleaning up old character for: %s", Player.Name)
-		EntityService.DestroyEntity(OldCharacter)
+		Ensemble.DestroyEntity(OldCharacter)
 	end
 end
 
@@ -94,7 +107,14 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 		return
 	end
 
-	local Entity = EntityService.CreateEntity(Character, Player, PlayerData)
+	local Entity = Ensemble.CreateEntity(Character, {
+		Player = Player,
+		Data = PlayerData,
+	})
+		:WithArchetype("Player")
+		:WithHooks(PlayerData.Hooks)
+		:Build()
+
 	if not Entity then
 		warn("Failed to create entity for", Player.Name)
 		return
@@ -111,20 +131,17 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 
 	PlayerCharacterConnections[Player] = Character.AncestryChanged:Connect(function(_, NewParent)
 		if not NewParent then
-			-- DebugLogger.Info(script.Name, "Character removed from workspace for: %s", Player.Name)
-			EntityService.DestroyEntity(Character)
+			Ensemble.DestroyEntity(Character)
 			if PlayerCharacterConnections[Player] then
 				PlayerCharacterConnections[Player]:Disconnect()
 				PlayerCharacterConnections[Player] = nil
 			end
 		end
 	end)
-
-	-- DebugLogger.Info(script.Name, "Loaded character for: %s", Player.Name)
 end
 
 Players.PlayerAdded:Connect(function(Player: Player)
-	local PlayerMaid = Maid.new()
+	local PlayerMaid = Ensemble.Maid.new()
 	PlayerMaids[Player] = PlayerMaid
 
 	local PlayerData = DataModule.LoadData(Player)
@@ -136,8 +153,6 @@ Players.PlayerAdded:Connect(function(Player: Player)
 end)
 
 Players.PlayerRemoving:Connect(function(Player: Player)
-	-- DebugLogger.Info(script.Name, "Player leaving: %s", Player.Name)
-
 	if PlayerCharacterConnections[Player] then
 		PlayerCharacterConnections[Player]:Disconnect()
 		PlayerCharacterConnections[Player] = nil
@@ -150,8 +165,6 @@ Players.PlayerRemoving:Connect(function(Player: Player)
 	end
 
 	if Player.Character then
-		EntityService.DestroyEntity(Player.Character)
+		Ensemble.DestroyEntity(Player.Character)
 	end
-
-	-- DebugLogger.Info(script.Name, "Removed character for: %s", Player.Name)
 end)

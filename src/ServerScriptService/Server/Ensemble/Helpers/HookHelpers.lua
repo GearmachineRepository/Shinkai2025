@@ -144,7 +144,7 @@ function HookHelpers.CombineCleanups(...: (() -> ())?): () -> ()
 				local Success = pcall(Cleanup)
 				local ErrorMessage = if Success then nil else "Unknown error"
 				if not Success then
-					warn(string.format(Types.EngineName .. "Cleanup failed: %s", tostring(ErrorMessage)))
+					warn(string.format(Types.EngineName .. " Cleanup failed: %s", tostring(ErrorMessage)))
 				end
 			end
 		end
