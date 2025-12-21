@@ -1,39 +1,20 @@
 --!strict
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
+local EventBus = require(script.Parent.Parent.Utilities.EventBus)
+local Types = require(script.Parent.Parent.Types)
 
-local Server = ServerScriptService:WaitForChild("Server")
-local EventBus = require(Server.Framework.Utilities.EventBus)
-local EntityEvents = require(ReplicatedStorage.Shared.Events.EntityEvents)
+type ModifierFunction = Types.ModifierFunction
+type Modifier = Types.Modifier
 
-export type ModifierFunction = (BaseValue: number, Data: { [string]: any }?) -> number
-
-export type Modifier = {
-	Type: string,
-	Priority: number,
-	ModifyFunction: ModifierFunction,
-}
-
-export type ModifierComponent = {
+type ModifierComponentInternal = Types.ModifierComponent & {
 	Entity: any,
-
-	Register: (self: ModifierComponent, Type: string, Priority: number, ModifyFunction: ModifierFunction) -> () -> (),
-	Unregister: (self: ModifierComponent, Type: string, ModifyFunction: ModifierFunction) -> (),
-	Apply: (self: ModifierComponent, Type: string, BaseValue: number, Data: { [string]: any }?) -> number,
-	GetCount: (self: ModifierComponent, Type: string) -> number,
-	Clear: (self: ModifierComponent, Type: string?) -> (),
-	Destroy: (self: ModifierComponent) -> (),
-}
-
-type ModifierComponentInternal = ModifierComponent & {
 	ModifiersByType: { [string]: { Modifier } },
 }
 
 local ModifierComponent = {}
 ModifierComponent.__index = ModifierComponent
 
-function ModifierComponent.new(Entity: any): ModifierComponent
+function ModifierComponent.new(Entity: any): Types.ModifierComponent
 	local self: ModifierComponentInternal = setmetatable({
 		Entity = Entity,
 		ModifiersByType = {},
@@ -49,17 +30,19 @@ function ModifierComponent:Register(Type: string, Priority: number, ModifyFuncti
 		self.ModifiersByType[Type] = Modifiers
 	end
 
-	table.insert(Modifiers, {
+	local NewModifier: Modifier = {
 		Type = Type,
 		Priority = Priority,
 		ModifyFunction = ModifyFunction,
-	})
+	}
+
+	table.insert(Modifiers, NewModifier)
 
 	table.sort(Modifiers, function(ModifierA, ModifierB)
 		return ModifierA.Priority < ModifierB.Priority
 	end)
 
-	EventBus.Publish(EntityEvents.MODIFIER_ADDED, {
+	EventBus.Publish("ModifierAdded", {
 		Entity = self.Entity,
 		Character = self.Entity.Character,
 		Type = Type,
@@ -77,11 +60,11 @@ function ModifierComponent:Unregister(Type: string, ModifyFunction: ModifierFunc
 		return
 	end
 
-	for Index, Modifier in ipairs(Modifiers) do
-		if Modifier.ModifyFunction == ModifyFunction then
+	for Index, ModifierEntry in ipairs(Modifiers) do
+		if ModifierEntry.ModifyFunction == ModifyFunction then
 			table.remove(Modifiers, Index)
 
-			EventBus.Publish(EntityEvents.MODIFIER_REMOVED, {
+			EventBus.Publish("ModifierRemoved", {
 				Entity = self.Entity,
 				Character = self.Entity.Character,
 				Type = Type,
@@ -97,12 +80,13 @@ function ModifierComponent:Apply(Type: string, BaseValue: number, Data: { [strin
 		return BaseValue
 	end
 
-	local Result = BaseValue
-	for _, Modifier in ipairs(Modifiers) do
-		Result = Modifier.ModifyFunction(Result, Data or {})
+	local CurrentValue = BaseValue
+
+	for _, ModifierEntry in ipairs(Modifiers) do
+		CurrentValue = ModifierEntry.ModifyFunction(CurrentValue, Data)
 	end
 
-	return Result
+	return CurrentValue
 end
 
 function ModifierComponent:GetCount(Type: string): number
@@ -112,8 +96,27 @@ end
 
 function ModifierComponent:Clear(Type: string?)
 	if Type then
-		self.ModifiersByType[Type] = nil
+		local Modifiers = self.ModifiersByType[Type]
+		if Modifiers then
+			for _ = #Modifiers, 1, -1 do
+				EventBus.Publish("ModifierRemoved", {
+					Entity = self.Entity,
+					Character = self.Entity.Character,
+					Type = Type,
+				})
+			end
+			self.ModifiersByType[Type] = nil
+		end
 	else
+		for ModifierType, Modifiers in self.ModifiersByType do
+			for _ = #Modifiers, 1, -1 do
+				EventBus.Publish("ModifierRemoved", {
+					Entity = self.Entity,
+					Character = self.Entity.Character,
+					Type = ModifierType,
+				})
+			end
+		end
 		table.clear(self.ModifiersByType)
 	end
 end
