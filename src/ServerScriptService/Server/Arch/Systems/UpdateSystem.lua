@@ -51,7 +51,7 @@ local function UpdateEntity(EntityData: EntityUpdateData, DeltaTime: number)
 		if Accumulator >= UpdateRate then
 			local Success, ErrorMessage = pcall(ComponentTable.Update, ComponentTable, Accumulator)
 			if not Success then
-				warn(string.format("[Arch] Component '%s' update failed: %s", ComponentName, tostring(ErrorMessage)))
+				warn(string.format(" Component '%s' update failed: %s", ComponentName, tostring(ErrorMessage)))
 			end
 			EntityData.ComponentAccumulators[ComponentName] = 0
 		else

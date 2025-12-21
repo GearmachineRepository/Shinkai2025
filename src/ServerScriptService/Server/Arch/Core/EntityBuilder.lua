@@ -46,7 +46,7 @@ end
 
 function EntityBuilder:WithComponent(ComponentName: string, ...: any): EntityBuilder
 	if not ComponentLoader.HasComponent(ComponentName) then
-		error(string.format("[Arch] Unknown component: '%s'", ComponentName))
+		error(string.format(" Unknown component: '%s'", ComponentName))
 	end
 
 	self.State.ComponentsToAdd[ComponentName] = { ... }
@@ -70,12 +70,12 @@ end
 
 function EntityBuilder:WithArchetype(ArchetypeName: string): EntityBuilder
 	if not self.State.ArchetypesConfig then
-		error("[Arch] No archetypes configured. Pass 'Archetypes' in Arch.Init()")
+		error(" No archetypes configured. Pass 'Archetypes' in Arch.Init()")
 	end
 
 	local ArchetypeComponents = self.State.ArchetypesConfig[ArchetypeName]
 	if not ArchetypeComponents then
-		error(string.format("[Arch] Unknown archetype: '%s'", ArchetypeName))
+		error(string.format(" Unknown archetype: '%s'", ArchetypeName))
 	end
 
 	for _, ComponentName in ArchetypeComponents do

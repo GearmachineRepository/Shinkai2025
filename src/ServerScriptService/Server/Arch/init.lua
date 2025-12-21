@@ -41,47 +41,47 @@ end
 local function ValidateConfigs(Configs: EngineConfigs)
 	local StateResult = StateSchema.Validate(Configs.States)
 	if not StateResult.Valid then
-		error(string.format("[Arch] State config validation failed:\n%s", FormatValidationErrors(StateResult.Errors)))
+		error(string.format(" State config validation failed:\n%s", FormatValidationErrors(StateResult.Errors)))
 	end
 
 	local StatResult = StatSchema.Validate(Configs.Stats)
 	if not StatResult.Valid then
-		error(string.format("[Arch] Stat config validation failed:\n%s", FormatValidationErrors(StatResult.Errors)))
+		error(string.format(" Stat config validation failed:\n%s", FormatValidationErrors(StatResult.Errors)))
 	end
 
 	local EventResult = EventSchema.Validate(Configs.Events)
 	if not EventResult.Valid then
-		error(string.format("[Arch] Event config validation failed:\n%s", FormatValidationErrors(EventResult.Errors)))
+		error(string.format(" Event config validation failed:\n%s", FormatValidationErrors(EventResult.Errors)))
 	end
 end
 
 function Arch.Init(Config: InitConfig)
 	if Initialized then
-		error("[Arch] Engine already initialized")
+		error(" Engine already initialized")
 	end
 
 	if not Config.Components then
-		error("[Arch] Config.Components folder is required")
+		error(" Config.Components folder is required")
 	end
 
 	if not Config.Hooks then
-		error("[Arch] Config.Hooks folder is required")
+		error(" Config.Hooks folder is required")
 	end
 
 	if not Config.Configs then
-		error("[Arch] Config.Configs is required")
+		error(" Config.Configs is required")
 	end
 
 	if not Config.Configs.States then
-		error("[Arch] Config.Configs.States is required")
+		error(" Config.Configs.States is required")
 	end
 
 	if not Config.Configs.Stats then
-		error("[Arch] Config.Configs.Stats is required")
+		error(" Config.Configs.Stats is required")
 	end
 
 	if not Config.Configs.Events then
-		error("[Arch] Config.Configs.Events is required")
+		error(" Config.Configs.Events is required")
 	end
 
 	ValidateConfigs(Config.Configs)
@@ -104,14 +104,14 @@ function Arch.Init(Config: InitConfig)
 
 	Initialized = true
 
-	print("[Arch] Engine initialized successfully")
+	print(" Engine initialized successfully")
 	print(string.format("  Components: %d", #ComponentLoader.GetAllComponentNames()))
 	print(string.format("  Hooks: %d", #HookLoader.GetAllHookNames()))
 end
 
 function Arch.CreateEntity(Character: Model, Context: EntityContext?): EntityBuilder
 	if not Initialized then
-		error("[Arch] Engine not initialized. Call Arch.Init() first")
+		error(" Engine not initialized. Call Arch.Init() first")
 	end
 
 	return EntityBuilder.new(Character, Context or {})

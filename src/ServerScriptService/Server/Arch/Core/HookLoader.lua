@@ -73,12 +73,12 @@ function HookLoader.Configure(HooksFolder: Instance)
 
 		local Hook, ErrorMessage = LoadSingleHook(Child)
 		if not Hook then
-			error(string.format("[Arch] Hook '%s' failed to load: %s", Child.Name, ErrorMessage or "Unknown error"))
+			error(string.format(" Hook '%s' failed to load: %s", Child.Name, ErrorMessage or "Unknown error"))
 		end
 
 		local HookName = Hook.HookName
 		if State.LoadedHooks[HookName] then
-			error(string.format("[Arch] Duplicate hook name: '%s'", HookName))
+			error(string.format(" Duplicate hook name: '%s'", HookName))
 		end
 
 		State.LoadedHooks[HookName] = Hook

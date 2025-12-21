@@ -28,7 +28,7 @@ end
 
 function StateComponent.new(Entity: any): Types.StateComponent
 	if not ActiveConfig then
-		error("[Arch] StateComponent.SetConfig must be called before creating entities")
+		error(" StateComponent.SetConfig must be called before creating entities")
 	end
 
 	local self: StateComponentInternal = setmetatable({
@@ -55,7 +55,7 @@ end
 function StateComponent:SetState(StateName: string, Value: boolean)
 	local Definition = self.Config.States[StateName]
 	if not Definition then
-		warn(string.format("[Arch] Unknown state: '%s'", StateName))
+		warn(string.format(" Unknown state: '%s'", StateName))
 		return
 	end
 
