@@ -1,10 +1,8 @@
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Server = ServerScriptService:WaitForChild("Server")
-local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
@@ -51,7 +49,7 @@ local function GetServerTime(): number
 	return workspace:GetServerTimeNow()
 end
 
-function StatusEffectComponent.new(Entity: Types.Entity, Context: Types.EntityContext): Self
+function StatusEffectComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
 	local self: Self = setmetatable({
 		Entity = Entity,
 		Maid = Ensemble.Maid.new(),
@@ -65,7 +63,7 @@ end
 
 function StatusEffectComponent.Apply(self: Self, EffectId: string, Duration: number, Config: StatusEffectConfig?)
 	local ExistingEffect = self.ActiveEffects[EffectId]
-	local EffectConfig = Config or {}
+	local EffectConfig = Config or {} :: StatusEffectConfig
 
 	self.EffectConfigs[EffectId] = EffectConfig
 
