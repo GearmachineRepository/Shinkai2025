@@ -65,6 +65,11 @@ local Config: StateConfig = {
 			Default = false,
 			Replication = "Owner",
 		},
+
+		MovementLocked = {
+			Default = false,
+			Replication = "Owner",
+		},
 	},
 }
 
