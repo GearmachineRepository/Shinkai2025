@@ -60,8 +60,18 @@ end
 
 local function CheckDistance(Player: Player, InteractableObject: Model): (boolean, string?)
 	local Character = Player.Character
-	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part
+	if not Character then
+		return false
+	end
+	local HumanoidRootPart = Character:FindFirstChild("HumanoidRootPart") :: Part?
+	if not HumanoidRootPart then
+		return false
+	end
+
 	local InteractablePrimaryPart = InteractableObject.PrimaryPart
+	if not InteractablePrimaryPart then
+		return false
+	end
 
 	local IsActiveForPlayer = InteractableObject:GetAttribute("ActiveFor") == Player.UserId
 	local MaxDistance = if IsActiveForPlayer then ACTIVE_INTERACTION_DISTANCE else INTERACTION_DISTANCE
@@ -91,8 +101,8 @@ local function HandleInteraction(Player: Player, InteractableObject: Instance, I
 		return
 	end
 
-	local InteractableType = InteractableObject:GetAttribute("InteractableType") or InteractableObject.Name
-	local InteractableHandler = LoadInteractableModule(InteractableType)
+	local InteractableType = InteractableObject:GetAttribute("InteractableType") or InteractableObject.Name :: string
+	local InteractableHandler = LoadInteractableModule(InteractableType :: string)
 
 	if not InteractableHandler then
 		return

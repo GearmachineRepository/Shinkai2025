@@ -4,10 +4,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
 
-local Entity = require(Server.Framework.Core.Entity)
+local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 
 local function ValidateSlotIndex(SlotIndex: number): boolean
@@ -24,12 +24,17 @@ local function HandleEquipTool(Player: Player, SlotIndex: number)
 		return
 	end
 
-	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Tool then
+	local EntityInstance = Ensemble.GetEntity(Character)
+	if not EntityInstance then
 		return
 	end
 
-	EntityInstance.Components.Tool:EquipTool(SlotIndex)
+	local ToolComponent = EntityInstance:GetComponent("Tool")
+	if not ToolComponent then
+		return
+	end
+
+	ToolComponent:EquipTool(SlotIndex)
 end
 
 local function HandleUnequipTool(Player: Player, SlotIndex: number)
@@ -42,13 +47,18 @@ local function HandleUnequipTool(Player: Player, SlotIndex: number)
 		return
 	end
 
-	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Tool then
+	local EntityInstance = Ensemble.GetEntity(Character)
+	if not EntityInstance then
 		return
 	end
 
-	if EntityInstance.Components.Tool:IsToolEquipped(SlotIndex) then
-		EntityInstance.Components.Tool:UnequipTool()
+	local ToolComponent = EntityInstance:GetComponent("Tool")
+	if not ToolComponent then
+		return
+	end
+
+	if ToolComponent:IsToolEquipped(SlotIndex) then
+		ToolComponent:UnequipTool()
 	end
 end
 
@@ -58,12 +68,15 @@ local function SendHotbarToClient(Player: Player)
 		return
 	end
 
-	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Inventory then
+	local EntityInstance = Ensemble.GetEntity(Character)
+	if not EntityInstance  then
 		return
 	end
 
-	local InventoryComponent = EntityInstance.Components.Inventory
+	local InventoryComponent = EntityInstance:GetComponent("Inventory")
+	if not InventoryComponent then
+		return
+	end
 	local HotbarData: { [number]: any } = {}
 
 	for SlotIndex = 1, 10 do
@@ -86,12 +99,17 @@ local function SendEquippedToolToClient(Player: Player)
 		return
 	end
 
-	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Tool then
+	local EntityInstance = Ensemble.GetEntity(Character)
+	if not EntityInstance then
 		return
 	end
 
-	local EquippedTool = EntityInstance.Components.Tool:GetEquippedTool()
+	local ToolComponent = EntityInstance:GetComponent("Tool")
+	if not ToolComponent then
+		return
+	end
+
+	local EquippedTool = ToolComponent:GetEquippedTool()
 	local SlotIndex = EquippedTool and EquippedTool.SlotIndex or nil
 
 	Packets.EquippedToolUpdate:FireClient(Player, SlotIndex)

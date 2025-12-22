@@ -1,12 +1,12 @@
 --!strict
 
-local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
 
-local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Server = ServerScriptService:WaitForChild("Server")
 
-local Entity = require(Server.Framework.Core.Entity)
+local Ensemble = require(Server.Ensemble)
 local StatSystem = require(Server.Game.Systems.StatSystem)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
@@ -59,12 +59,16 @@ local function HandleAllocateStatPoint(Player: Player, StatName: string)
 		return
 	end
 
-	local EntityInstance = Entity.GetEntity(Character)
-	if not EntityInstance or not EntityInstance.Components.Training then
+	local EntityInstance = Ensemble.GetEntity(Character)
+
+	if not EntityInstance then
 		return
 	end
 
-	local TrainingComponent = EntityInstance.Components.Training
+	local TrainingComponent = EntityInstance:GetComponent("Training")
+	if not TrainingComponent then
+		return
+	end
 	local PlayerData = TrainingComponent.PlayerData
 
 	local Success, _ErrorMessage = StatSystem.AllocateStar(PlayerData, StatName)
