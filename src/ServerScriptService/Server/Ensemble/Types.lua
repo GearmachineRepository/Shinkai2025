@@ -7,10 +7,11 @@ Types.EngineName = "Ensemble"
 export type CleanupTask = RBXScriptConnection | Instance | (() -> ()) | { Destroy: (any) -> () } | { Disconnect: (any) -> () }
 
 export type Maid = {
+	Tasks: { [any]: CleanupTask },
 	GiveTask: (self: Maid, Task: CleanupTask) -> CleanupTask,
 	Set: (self: Maid, Name: string, Task: CleanupTask?) -> (),
+	CleanupItem: (self: Maid, Task: CleanupTask) -> (),
 	DoCleaning: (self: Maid) -> (),
-	Destroy: (self: Maid) -> (),
 }
 
 export type Connection = {

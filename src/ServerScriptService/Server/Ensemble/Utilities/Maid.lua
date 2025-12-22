@@ -11,16 +11,10 @@ type MaidInternal = Types.Maid & {
 local Maid = {}
 Maid.__index = Maid
 
-function Maid.new(): Types.Maid
-	local self: MaidInternal = setmetatable({
+function Maid.new(): MaidInternal
+	return setmetatable({
 		Tasks = {},
 	}, Maid) :: any
-
-	return self
-end
-
-function Maid.IsMaid(Value: any): boolean
-	return type(Value) == "table" and getmetatable(Value) == Maid
 end
 
 function Maid:GiveTask(Task: CleanupTask): CleanupTask
@@ -28,7 +22,16 @@ function Maid:GiveTask(Task: CleanupTask): CleanupTask
 	return Task
 end
 
-local function CleanupItem(Task: CleanupTask)
+function Maid:Set(Name: string, Task: CleanupTask?)
+	local Tasks = self.Tasks
+	local OldTask = Tasks[Name]
+	if OldTask then
+		self:CleanupItem(OldTask)
+	end
+	Tasks[Name] = Task
+end
+
+function Maid:CleanupItem(Task: CleanupTask)
 	local TaskType = typeof(Task)
 
 	if TaskType == "function" then
@@ -37,9 +40,9 @@ local function CleanupItem(Task: CleanupTask)
 	end
 
 	if TaskType == "RBXScriptConnection" then
-		local TaskConnection = Task :: RBXScriptConnection
-		if TaskConnection.Connected then
-			TaskConnection:Disconnect()
+		local Connection = Task :: RBXScriptConnection
+		if Connection.Connected then
+			Connection:Disconnect()
 		end
 		return
 	end
@@ -53,31 +56,29 @@ local function CleanupItem(Task: CleanupTask)
 		return
 	end
 
-	local TableTask = Task :: any
+	local AnyTask = Task :: any
 
-	if type(TableTask.Destroy) == "function" then
-		TableTask:Destroy()
+	local DestroyUnknown = AnyTask.Destroy :: any
+	if type(DestroyUnknown) == "function" then
+		(DestroyUnknown :: (any) -> ())(AnyTask)
 		return
 	end
 
-	if type(TableTask.Disconnect) == "function" then
-		TableTask:Disconnect()
+	local DisconnectUnknown = AnyTask.Disconnect :: any
+	if type(DisconnectUnknown) == "function" then
+		(DisconnectUnknown :: (any) -> ())(AnyTask)
 		return
 	end
 
-	if type(TableTask.cancel) == "function" and type(TableTask.getStatus) == "function" then
-		if TableTask:getStatus() == "Started" then
-			TableTask:cancel()
+	local CancelUnknown = AnyTask.cancel :: any
+	local GetStatusUnknown = AnyTask.getStatus :: any
+	if type(CancelUnknown) == "function" and type(GetStatusUnknown) == "function" then
+		local GetStatus = GetStatusUnknown :: (any) -> string
+		if GetStatus(AnyTask) == "Started" then
+			local Cancel = CancelUnknown :: (any) -> ()
+			Cancel(AnyTask)
 		end
 	end
-end
-
-function Maid:Set(Name: string, Task: CleanupTask?)
-	local OldTask = self.Tasks[Name]
-	if OldTask then
-		CleanupItem(OldTask)
-	end
-	self.Tasks[Name] = Task :: CleanupTask
 end
 
 function Maid:DoCleaning()
@@ -86,7 +87,7 @@ function Maid:DoCleaning()
 	local Key, Value = next(Tasks)
 	while Value ~= nil do
 		Tasks[Key] = nil
-		CleanupItem(Value)
+		self:CleanupItem(Value :: CleanupTask)
 		Key, Value = next(Tasks)
 	end
 end
