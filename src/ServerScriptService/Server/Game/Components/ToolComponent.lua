@@ -1,51 +1,53 @@
 --!strict
 
-export type ToolComponent = {
-	Entity: any,
-	EquipTool: (self: ToolComponent, SlotIndex: number) -> boolean,
-	UnequipTool: (self: ToolComponent) -> (),
-	GetEquippedTool: (self: ToolComponent) -> { ToolId: string, SlotIndex: number }?,
-	IsToolEquipped: (self: ToolComponent, SlotIndex: number) -> boolean,
-	Destroy: (self: ToolComponent) -> (),
-}
+local ServerScriptService = game:GetService("ServerScriptService")
 
-type ToolComponentInternal = ToolComponent & {
+local Server = ServerScriptService:WaitForChild("Server")
+
+local Types = require(Server.Ensemble.Types)
+
+local ToolComponent = {}
+ToolComponent.__index = ToolComponent
+
+ToolComponent.ComponentName = "Tool"
+ToolComponent.Dependencies = { "Inventory" }
+
+type Self = {
+	Entity: Types.Entity,
 	Character: Model,
 	Player: Player,
 	EquippedTool: { ToolId: string, SlotIndex: number }?,
 }
 
-local ToolComponent = {}
-ToolComponent.__index = ToolComponent
-
-function ToolComponent.new(Entity: any): ToolComponent
-	local self: ToolComponentInternal = setmetatable({
+function ToolComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
 		Character = Entity.Character,
-		Player = Entity.Player,
+		Player = Entity.Player :: Player,
 		EquippedTool = nil,
 	}, ToolComponent) :: any
 
 	return self
 end
 
-function ToolComponent:EquipTool(SlotIndex: number): boolean
-	if not self.Entity.Components.Inventory then
+function ToolComponent.EquipTool(self: Self, SlotIndex: number): boolean
+	local Inventory = self.Entity:GetComponent("Inventory") :: any
+	if not Inventory then
 		return false
 	end
 
-	local ItemInSlot = self.Entity.Components.Inventory:GetItemInSlot(SlotIndex)
+	local ItemInSlot = Inventory:GetItemInSlot(SlotIndex)
 	if not ItemInSlot then
 		return false
 	end
 
 	if self.EquippedTool then
 		if self.EquippedTool.SlotIndex == SlotIndex then
-			self:UnequipTool()
+			ToolComponent.UnequipTool(self)
 			return true
 		end
 
-		self:UnequipTool()
+		ToolComponent.UnequipTool(self)
 	end
 
 	self.EquippedTool = {
@@ -59,7 +61,7 @@ function ToolComponent:EquipTool(SlotIndex: number): boolean
 	return true
 end
 
-function ToolComponent:UnequipTool()
+function ToolComponent.UnequipTool(self: Self)
 	if not self.EquippedTool then
 		return
 	end
@@ -69,11 +71,11 @@ function ToolComponent:UnequipTool()
 	self.Character:SetAttribute("EquippedToolSlot", nil)
 end
 
-function ToolComponent:GetEquippedTool(): { ToolId: string, SlotIndex: number }?
+function ToolComponent.GetEquippedTool(self: Self): { ToolId: string, SlotIndex: number }?
 	return self.EquippedTool
 end
 
-function ToolComponent:IsToolEquipped(SlotIndex: number): boolean
+function ToolComponent.IsToolEquipped(self: Self, SlotIndex: number): boolean
 	if not self.EquippedTool then
 		return false
 	end
@@ -81,8 +83,8 @@ function ToolComponent:IsToolEquipped(SlotIndex: number): boolean
 	return self.EquippedTool.SlotIndex == SlotIndex
 end
 
-function ToolComponent:Destroy()
-	self:UnequipTool()
+function ToolComponent.Destroy(self: Self)
+	ToolComponent.UnequipTool(self)
 end
 
 return ToolComponent

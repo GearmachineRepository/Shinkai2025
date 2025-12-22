@@ -6,7 +6,7 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
-local Arch = require(Server.Arch)
+local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 
 local VALID_MOVEMENT_MODES = {
@@ -29,12 +29,12 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 		return
 	end
 
-	local Entity = Arch.GetEntity(Character)
+	local Entity = Ensemble.GetEntity(Character)
 	if not Entity then
 		return
 	end
 
-	local Stamina = Entity:GetComponent("Stamina") :: any
+	local Stamina = Entity:GetComponent("Stamina")
 	if not Stamina then
 		return
 	end

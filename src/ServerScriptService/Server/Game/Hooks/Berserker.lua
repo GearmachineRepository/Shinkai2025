@@ -3,8 +3,8 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local Server = ServerScriptService:WaitForChild("Server")
 
-local Arch = require(Server.Arch)
-local Helpers = Arch.HookHelpers
+local Ensemble = require(Server.Ensemble)
+local Helpers = Ensemble.HookHelpers
 
 return {
 	HookName = "Berserker",

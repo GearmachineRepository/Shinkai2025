@@ -29,7 +29,7 @@ Ensemble.Init({
 	},
 
 	Archetypes = {
-		Player = { "Stamina", "Hunger", "Training", "Movement", "Inventory" },
+		Player = { "Stamina", "Hunger", "Training", "Movement", "Inventory", "StateHandler", "Tool", "BodyFatigue", "BodyScaling", "Sweat", "StatusEffect" },
 		NPC = { "Movement", "Combat" },
 		TrainingDummy = { "Movement" },
 	},

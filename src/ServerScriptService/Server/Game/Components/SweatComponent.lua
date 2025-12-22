@@ -1,60 +1,62 @@
 --!strict
 
+local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local Ensemble = require(Server.Ensemble)
+local Types = require(Server.Ensemble.Types)
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local Formulas = require(Shared.General.Formulas)
-local Maid = require(Shared.General.Maid)
 local SweatBalance = require(Shared.Configurations.Balance.SweatBalance)
 
-export type SweatComponent = {
-	Entity: any,
-	Update: (self: SweatComponent) -> (),
-	GetStatGainMultiplier: (self: SweatComponent) -> number,
-	GetHungerDrainMultiplier: (self: SweatComponent) -> number,
-	Destroy: (self: SweatComponent) -> (),
-}
+local SweatComponent = {}
+SweatComponent.__index = SweatComponent
 
-type SweatComponentInternal = SweatComponent & {
+SweatComponent.ComponentName = "Sweat"
+SweatComponent.Dependencies = { "Stats" }
+SweatComponent.UpdateRate = 1 / 2
+
+type Self = {
+	Entity: Types.Entity,
+	Maid: Types.Maid,
 	Character: Model,
 	IsActive: boolean,
 	LastActivityTime: number,
 	SweatStartTime: number,
 	LastSweatState: boolean,
-	Maid: Maid.MaidSelf,
 }
 
-local SweatComponent = {}
-SweatComponent.__index = SweatComponent
-
-function SweatComponent.new(Entity: any): SweatComponent
-	local self: SweatComponentInternal = setmetatable({
+function SweatComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
+		Maid = Ensemble.Maid.new(),
 		Character = Entity.Character,
 		IsActive = false,
 		LastActivityTime = 0,
 		SweatStartTime = 0,
-		Maid = Maid.new(),
 		LastSweatState = false,
 	}, SweatComponent) :: any
 
-	self:SetupActivityTracking()
+	SweatComponent.SetupActivityTracking(self)
 
 	return self
 end
 
-function SweatComponent:SetupActivityTracking()
+function SweatComponent.SetupActivityTracking(self: Self)
 	local AttributesToTrack = { "MovementMode", "Training", "UsingSkill", "Attacking" }
 
 	for _, AttributeName in AttributesToTrack do
 		self.Maid:GiveTask(self.Character:GetAttributeChangedSignal(AttributeName):Connect(function()
-			self:CheckActivity()
+			SweatComponent.CheckActivity(self)
 		end))
 	end
 end
 
-function SweatComponent:CheckActivity()
+function SweatComponent.CheckActivity(self: Self)
 	local IsSprinting = self.Character:GetAttribute("Sprinting")
 	local IsTraining = self.Character:GetAttribute("Training")
 	local IsUsingSkill = self.Character:GetAttribute("UsingSkill")
@@ -67,7 +69,7 @@ function SweatComponent:CheckActivity()
 	end
 end
 
-function SweatComponent:Update()
+function SweatComponent.Update(self: Self, _DeltaTime: number)
 	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	local MaxStamina = self.Entity.Stats:GetStat(StatTypes.MAX_STAMINA)
 	local StaminaPercent = Formulas.SafeDivide(CurrentStamina, MaxStamina)
@@ -78,16 +80,16 @@ function SweatComponent:Update()
 	local ShouldStartSweating = StaminaPercent < SweatBalance.Thresholds.STAMINA_THRESHOLD_PERCENT and IsRecentlyActive
 
 	if ShouldStartSweating and not self.IsActive then
-		self:StartSweating()
+		SweatComponent.StartSweating(self)
 	elseif self.IsActive then
 		local TimeSinceSweatStart = tick() - self.SweatStartTime
 		if TimeSinceSweatStart >= SweatBalance.Cooldown.DURATION_SECONDS then
-			self:StopSweating()
+			SweatComponent.StopSweating(self)
 		end
 	end
 end
 
-function SweatComponent:StartSweating()
+function SweatComponent.StartSweating(self: Self)
 	self.IsActive = true
 	self.SweatStartTime = tick()
 
@@ -97,7 +99,7 @@ function SweatComponent:StartSweating()
 	end
 end
 
-function SweatComponent:StopSweating()
+function SweatComponent.StopSweating(self: Self)
 	self.IsActive = false
 
 	if self.LastSweatState ~= false then
@@ -106,16 +108,16 @@ function SweatComponent:StopSweating()
 	end
 end
 
-function SweatComponent:GetStatGainMultiplier(): number
+function SweatComponent.GetStatGainMultiplier(self: Self): number
 	return self.IsActive and SweatBalance.Multipliers.STAT_GAIN or 1.0
 end
 
-function SweatComponent:GetHungerDrainMultiplier(): number
+function SweatComponent.GetHungerDrainMultiplier(self: Self): number
 	return self.IsActive and SweatBalance.Multipliers.HUNGER_DRAIN or 1.0
 end
 
-function SweatComponent:Destroy()
-	self:StopSweating()
+function SweatComponent.Destroy(self: Self)
+	SweatComponent.StopSweating(self)
 	self.Maid:DoCleaning()
 end
 

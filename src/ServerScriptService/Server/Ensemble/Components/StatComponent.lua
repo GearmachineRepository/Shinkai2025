@@ -10,7 +10,7 @@ type StatConfig = Types.StatConfig
 type Connection = Types.Connection
 
 type StatComponentInternal = Types.StatComponent & {
-	Entity: any,
+	Entity: Types.Entity,
 	Config: StatConfig,
 	CurrentStats: { [string]: number },
 	StatSignals: { [string]: Types.Signal<number, number> },
@@ -28,7 +28,7 @@ function StatComponent.SetConfig(Config: StatConfig)
 	ActiveConfig = Config
 end
 
-function StatComponent.new(Entity: any, InitialData: { [string]: any }?): Types.StatComponent
+function StatComponent.new(Entity: Types.Entity, InitialData: { [string]: any }?): Types.StatComponent
 	if not ActiveConfig then
 		error(Types.EngineName .. " StatComponent.SetConfig must be called before creating entities")
 	end

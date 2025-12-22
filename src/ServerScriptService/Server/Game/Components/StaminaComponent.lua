@@ -1,72 +1,66 @@
 --!strict
 
+local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local Ensemble = require(Server.Ensemble)
+local Types = require(Server.Ensemble.Types)
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StaminaBalance = require(Shared.Configurations.Balance.StaminaBalance)
 local Formulas = require(Shared.General.Formulas)
-local Maid = require(Shared.General.Maid)
 
-export type StaminaComponent = {
-	Entity: any,
-	CanSprint: (self: StaminaComponent) -> boolean,
-	CanJog: (self: StaminaComponent) -> boolean,
-	ConsumeStamina: (self: StaminaComponent, Amount: number) -> boolean,
-	RestoreStaminaExternal: (self: StaminaComponent, Amount: number) -> (),
-	Update: (self: StaminaComponent, DeltaTime: number, MovementMode: string?, IsMoving: boolean) -> boolean,
-	OnSprintStart: (self: StaminaComponent) -> (),
-	OnSprintEnd: (self: StaminaComponent) -> (),
-	OnJogStart: (self: StaminaComponent) -> (),
-	OnJogEnd: (self: StaminaComponent) -> (),
-	GetStutterStepMultiplier: (self: StaminaComponent, MovementType: string) -> number,
-	Destroy: (self: StaminaComponent) -> (),
-}
+local StaminaComponent = {}
+StaminaComponent.__index = StaminaComponent
 
-type StaminaComponentInternal = StaminaComponent & {
+StaminaComponent.ComponentName = "Stamina"
+StaminaComponent.Dependencies = { "Stats" }
+
+type Self = {
+	Entity: Types.Entity,
+	Maid: Types.Maid,
 	LastStaminaUse: number,
 	IsExhausted: boolean,
 	SprintStartTime: number?,
 	JogStartTime: number?,
 	LastSprintEndTime: number,
 	LastJogEndTime: number,
-	Maid: Maid.MaidSelf,
 	CachedMaxStamina: number,
 	LastStaminaValue: number,
 	SyncAccumulator: number,
 	PendingDelta: number,
 }
 
-local StaminaComponent = {}
-StaminaComponent.__index = StaminaComponent
-
 local function QuantizeStamina(Value: number): number
 	return math.floor((Value / StaminaBalance.Sync.QUANTUM) + 0.5) * StaminaBalance.Sync.QUANTUM
 end
 
-function StaminaComponent.new(Entity: any): StaminaComponent
-	local self: StaminaComponentInternal = setmetatable({
+function StaminaComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
+		Maid = Ensemble.Maid.new(),
 		LastStaminaUse = 0,
 		IsExhausted = false,
 		SprintStartTime = nil,
 		JogStartTime = nil,
 		LastSprintEndTime = 0,
 		LastJogEndTime = 0,
-		Maid = Maid.new(),
 		CachedMaxStamina = 75,
 		LastStaminaValue = 75,
 		SyncAccumulator = 0,
 		PendingDelta = 0,
 	}, StaminaComponent) :: any
 
-	self.CachedMaxStamina = self:GetMaxStamina()
-	self.LastStaminaValue = self.Entity.Stats:GetStat(StatTypes.STAMINA)
+	self.CachedMaxStamina = StaminaComponent.GetMaxStamina(self)
+	self.LastStaminaValue = Entity.Stats:GetStat(StatTypes.STAMINA)
 
 	return self
 end
 
-function StaminaComponent:GetMaxStamina(): number
+function StaminaComponent.GetMaxStamina(self: Self): number
 	local NewMax = self.Entity.Stats:GetStat(StatTypes.MAX_STAMINA)
 	if not Formulas.IsNearlyEqual(NewMax, self.CachedMaxStamina, 0.1) then
 		self.CachedMaxStamina = NewMax
@@ -74,15 +68,15 @@ function StaminaComponent:GetMaxStamina(): number
 	return self.CachedMaxStamina
 end
 
-function StaminaComponent:CanSprint(): boolean
+function StaminaComponent.CanSprint(self: Self): boolean
 	return not self.IsExhausted
 end
 
-function StaminaComponent:CanJog(): boolean
+function StaminaComponent.CanJog(self: Self): boolean
 	return not self.IsExhausted
 end
 
-function StaminaComponent:GetStutterStepMultiplier(MovementType: string): number
+function StaminaComponent.GetStutterStepMultiplier(self: Self, MovementType: string): number
 	local CurrentTime = os.clock()
 	local StartTime = if MovementType == "run" then self.SprintStartTime else self.JogStartTime
 	local LastEndTime = if MovementType == "run" then self.LastSprintEndTime else self.LastJogEndTime
@@ -105,25 +99,25 @@ function StaminaComponent:GetStutterStepMultiplier(MovementType: string): number
 	return 1 - Formulas.FromPercentage(StaminaBalance.StutterStep.REDUCTION_PERCENT, 1)
 end
 
-function StaminaComponent:OnSprintStart()
+function StaminaComponent.OnSprintStart(self: Self)
 	self.SprintStartTime = os.clock()
 end
 
-function StaminaComponent:OnSprintEnd()
+function StaminaComponent.OnSprintEnd(self: Self)
 	self.LastSprintEndTime = os.clock()
 	self.SprintStartTime = nil
 end
 
-function StaminaComponent:OnJogStart()
+function StaminaComponent.OnJogStart(self: Self)
 	self.JogStartTime = os.clock()
 end
 
-function StaminaComponent:OnJogEnd()
+function StaminaComponent.OnJogEnd(self: Self)
 	self.LastJogEndTime = os.clock()
 	self.JogStartTime = nil
 end
 
-function StaminaComponent:ConsumeStamina(Amount: number): boolean
+function StaminaComponent.ConsumeStamina(self: Self, Amount: number): boolean
 	if Amount <= 0 then
 		return true
 	end
@@ -138,12 +132,12 @@ function StaminaComponent:ConsumeStamina(Amount: number): boolean
 	self.PendingDelta -= Amount
 	self.LastStaminaUse = os.clock()
 	self.SyncAccumulator = 0
-	self:ApplyStamina(CurrentStamina + self.PendingDelta, true)
+	StaminaComponent.ApplyStamina(self, CurrentStamina + self.PendingDelta, true)
 
 	return true
 end
 
-function StaminaComponent:RestoreStaminaExternal(Amount: number)
+function StaminaComponent.RestoreStaminaExternal(self: Self, Amount: number)
 	if Amount <= 0 then
 		return
 	end
@@ -151,15 +145,15 @@ function StaminaComponent:RestoreStaminaExternal(Amount: number)
 	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
 	self.PendingDelta += Amount
 	self.SyncAccumulator = 0
-	self:ApplyStamina(CurrentStamina + self.PendingDelta, true)
+	StaminaComponent.ApplyStamina(self, CurrentStamina + self.PendingDelta, true)
 end
 
-function StaminaComponent:ApplyStamina(TargetStamina: number, ForceSync: boolean)
+function StaminaComponent.ApplyStamina(self: Self, TargetStamina: number, ForceSync: boolean)
 	if not self.Entity.Character then
 		return
 	end
 
-	local MaxStamina = self:GetMaxStamina()
+	local MaxStamina = StaminaComponent.GetMaxStamina(self)
 	local Clamped = math.clamp(TargetStamina, 0, MaxStamina)
 	local Quantized = QuantizeStamina(Clamped)
 
@@ -187,24 +181,20 @@ function StaminaComponent:ApplyStamina(TargetStamina: number, ForceSync: boolean
 	end
 end
 
-function StaminaComponent:Update(DeltaTime: number, MovementMode: string?, IsMoving: boolean): boolean
+function StaminaComponent.Update(self: Self, DeltaTime: number, MovementMode: string?, IsMoving: boolean): boolean
 	local CurrentStamina = self.Entity.Stats:GetStat(StatTypes.STAMINA)
-	local MaxStamina = self:GetMaxStamina()
+	local MaxStamina = StaminaComponent.GetMaxStamina(self)
 
 	local DrainMultiplier = 1
-	if self.Entity.Components.BodyFatigue then
-		DrainMultiplier = 1.0
-	end
-
 	local ForceSync = false
 	local AllowMovement = true
 
 	if IsMoving and (MovementMode == "run" or MovementMode == "jog") then
-		if (MovementMode == "run" and not self:CanSprint()) or (MovementMode == "jog" and not self:CanJog()) then
+		if (MovementMode == "run" and not StaminaComponent.CanSprint(self)) or (MovementMode == "jog" and not StaminaComponent.CanJog(self)) then
 			return false
 		end
 
-		local StutterStepMultiplier = self:GetStutterStepMultiplier(MovementMode)
+		local StutterStepMultiplier = StaminaComponent.GetStutterStepMultiplier(self, MovementMode)
 		local CostPerSecond = if MovementMode == "run"
 			then StaminaBalance.StaminaCosts.SPRINT
 			else StaminaBalance.StaminaCosts.JOG
@@ -233,8 +223,9 @@ function StaminaComponent:Update(DeltaTime: number, MovementMode: string?, IsMov
 		else
 			self.PendingDelta += Regen
 
-			if self.Entity.Components.Hunger then
-				self.Entity.Components.Hunger:ConsumeHungerForStamina(Regen)
+			local Hunger = self.Entity:GetComponent("Hunger") :: any
+			if Hunger then
+				Hunger:ConsumeHungerForStamina(Regen)
 			end
 		end
 	end
@@ -243,13 +234,13 @@ function StaminaComponent:Update(DeltaTime: number, MovementMode: string?, IsMov
 	if ForceSync or self.SyncAccumulator >= StaminaBalance.Sync.SYNC_RATE_SECONDS then
 		self.SyncAccumulator = 0
 		local TargetStamina = CurrentStamina + self.PendingDelta
-		self:ApplyStamina(TargetStamina, ForceSync)
+		StaminaComponent.ApplyStamina(self, TargetStamina, ForceSync)
 	end
 
 	return AllowMovement
 end
 
-function StaminaComponent:Destroy()
+function StaminaComponent.Destroy(self: Self)
 	self.Maid:DoCleaning()
 end
 

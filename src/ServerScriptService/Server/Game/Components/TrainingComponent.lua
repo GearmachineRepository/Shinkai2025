@@ -6,42 +6,36 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
+local Ensemble = require(Server.Ensemble)
+local Types = require(Server.Ensemble.Types)
+
 local StatSystem = require(Server.Game.Systems.StatSystem)
 local ProgressionSystem = require(Server.Game.Systems.ProgressionSystem)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
-local Maid = require(Shared.General.Maid)
-
-export type TrainingComponent = {
-	Entity: any,
-	StartTraining: (self: TrainingComponent, TrainingType: string) -> (),
-	StopTraining: (self: TrainingComponent) -> (),
-	ProcessTraining: (self: TrainingComponent, DeltaTime: number) -> (),
-	GrantStatGain: (self: TrainingComponent, StatName: string, Amount: number, FatigueGainOverride: number?) -> (),
-	CanTrain: (self: TrainingComponent) -> boolean,
-	AllocateStatPoint: (self: TrainingComponent, StatName: string) -> boolean,
-	GetTotalAllocatedStars: (self: TrainingComponent) -> number,
-	Destroy: (self: TrainingComponent) -> (),
-}
-
-type TrainingComponentInternal = TrainingComponent & {
-	PlayerData: any,
-	CurrentTraining: string?,
-	Maid: Maid.MaidSelf,
-}
 
 local TrainingComponent = {}
 TrainingComponent.__index = TrainingComponent
 
-function TrainingComponent.new(Entity: any, PlayerData: any): TrainingComponent
-	local self: TrainingComponentInternal = setmetatable({
+TrainingComponent.ComponentName = "Training"
+TrainingComponent.Dependencies = { "Stats" }
+
+type Self = {
+	Entity: Types.Entity,
+	Maid: Types.Maid,
+	PlayerData: any,
+	CurrentTraining: string?,
+}
+
+function TrainingComponent.new(Entity: Types.Entity, Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
-		PlayerData = PlayerData,
+		Maid = Ensemble.Maid.new(),
+		PlayerData = Context.Data,
 		CurrentTraining = nil,
-		Maid = Maid.new(),
 	}, TrainingComponent) :: any
 
-	local Character = self.Entity.Character
-	if Character then
+	local Character = Entity.Character
+	if Character and self.PlayerData then
 		for _, StatName in { "MaxStamina", "Durability", "RunSpeed", "StrikingPower", "StrikeSpeed", "Muscle" } do
 			local XP = self.PlayerData.Stats[StatName .. "_XP"] or 0
 			local Stars = self.PlayerData.Stats[StatName .. "_Stars"] or 0
@@ -56,28 +50,29 @@ function TrainingComponent.new(Entity: any, PlayerData: any): TrainingComponent
 	return self
 end
 
-function TrainingComponent:StartTraining(TrainingType: string)
+function TrainingComponent.StartTraining(self: Self, TrainingType: string)
 	self.CurrentTraining = TrainingType
 end
 
-function TrainingComponent:StopTraining()
+function TrainingComponent.StopTraining(self: Self)
 	self.CurrentTraining = nil
 end
 
-function TrainingComponent:ProcessTraining(_: number)
+function TrainingComponent.ProcessTraining(self: Self, _DeltaTime: number)
 	if not self.CurrentTraining then
 		return
 	end
 end
 
-function TrainingComponent:GrantStatGain(StatName: string, Amount: number, _FatigueGainOverride: number?)
+function TrainingComponent.GrantStatGain(self: Self, StatName: string, Amount: number, _FatigueGainOverride: number?)
 	if Amount <= 0 then
 		return
 	end
 
 	local FinalAmount = Amount
-	if self.Entity.Components.Sweat then
-		FinalAmount = Amount * self.Entity.Components.Sweat:GetStatGainMultiplier()
+	local Sweat = self.Entity:GetComponent("Sweat") :: any
+	if Sweat then
+		FinalAmount = Amount * Sweat:GetStatGainMultiplier()
 	end
 
 	local _XPAwarded = ProgressionSystem.AwardTrainingXP(self.PlayerData, StatName, FinalAmount, self.Entity)
@@ -94,15 +89,16 @@ function TrainingComponent:GrantStatGain(StatName: string, Amount: number, _Fati
 	end
 end
 
-function TrainingComponent:CanTrain(): boolean
-	if not self.Entity.Components.BodyFatigue then
+function TrainingComponent.CanTrain(self: Self): boolean
+	local BodyFatigue = self.Entity:GetComponent("BodyFatigue") :: any
+	if not BodyFatigue then
 		return true
 	end
 
-	return self.Entity.Components.BodyFatigue:CanGainStats()
+	return BodyFatigue:CanGainStats()
 end
 
-function TrainingComponent:AllocateStatPoint(StatName: string): boolean
+function TrainingComponent.AllocateStatPoint(self: Self, StatName: string): boolean
 	local Success, ErrorMessage = StatSystem.AllocateStar(self.PlayerData, StatName)
 
 	if not Success then
@@ -126,11 +122,11 @@ function TrainingComponent:AllocateStatPoint(StatName: string): boolean
 	return true
 end
 
-function TrainingComponent:GetTotalAllocatedStars(): number
+function TrainingComponent.GetTotalAllocatedStars(self: Self): number
 	return StatSystem.GetTotalAllocatedStars(self.PlayerData)
 end
 
-function TrainingComponent:Destroy()
+function TrainingComponent.Destroy(self: Self)
 	self.Maid:DoCleaning()
 end
 

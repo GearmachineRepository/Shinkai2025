@@ -7,7 +7,7 @@ local Types = require(script.Parent.Parent.Types)
 type HookDefinition = Types.HookDefinition
 
 type HookComponentInternal = Types.HookComponent & {
-	Entity: any,
+	Entity: Types.Entity,
 	ActiveHooks: { [string]: HookDefinition },
 	CleanupFunctions: { [string]: () -> () },
 	Maid: Types.Maid,
@@ -23,7 +23,7 @@ function HookComponent.SetHookLoader(Loader: any)
 	ActiveHookLoader = Loader
 end
 
-function HookComponent.new(Entity: any): Types.HookComponent
+function HookComponent.new(Entity: Types.Entity): Types.HookComponent
 	local self: HookComponentInternal = setmetatable({
 		Entity = Entity,
 		ActiveHooks = {},

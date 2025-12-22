@@ -26,7 +26,7 @@ local StatBalance = {
 
 	MovementSpeeds = {
 		WalkSpeed = 8,
-		JogSpeedPercent = 0.57,
+		JogSpeedPercent = 0.625,
 	},
 
 	Caps = {

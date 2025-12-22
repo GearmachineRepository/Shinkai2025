@@ -1,42 +1,43 @@
 --!strict
 
+local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local Types = require(Server.Ensemble.Types)
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local BodyScalingBalance = require(Shared.Configurations.Balance.BodyScalingBalance)
 
-export type BodyScalingComponent = {
-	Entity: any,
-	UpdateBodyScale: (self: BodyScalingComponent) -> (),
-	Destroy: (self: BodyScalingComponent) -> (),
-}
+local BodyScalingComponent = {}
+BodyScalingComponent.__index = BodyScalingComponent
 
-type BodyScalingComponentInternal = BodyScalingComponent & {
+BodyScalingComponent.ComponentName = "BodyScaling"
+BodyScalingComponent.Dependencies = { "Stats" }
+
+type Self = {
+	Entity: Types.Entity,
 	Humanoid: Humanoid,
 	BaseDepth: number,
 	BaseWidth: number,
 }
 
-local BodyScalingComponent = {}
-BodyScalingComponent.__index = BodyScalingComponent
-
-function BodyScalingComponent.new(Entity: any): BodyScalingComponent
-	local Humanoid = Entity.Humanoid
-
-	local self: BodyScalingComponentInternal = setmetatable({
+function BodyScalingComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
-		Humanoid = Humanoid,
-		BaseDepth = Humanoid.BodyDepthScale.Value,
-		BaseWidth = Humanoid.BodyWidthScale.Value,
+		Humanoid = Entity.Humanoid,
+		BaseDepth = 1,
+		BaseWidth = 1,
 	}, BodyScalingComponent) :: any
 
-	self:UpdateBodyScale()
+	BodyScalingComponent.UpdateBodyScale(self)
 
 	return self
 end
 
-function BodyScalingComponent:UpdateBodyScale()
+function BodyScalingComponent.UpdateBodyScale(self: Self)
 	local MuscleStars = self.Entity.Stats:GetStat(StatTypes.MUSCLE .. "_Stars") or 0
 	local MuscleValue = MuscleStars * 12
 	local Fat = self.Entity.Stats:GetStat(StatTypes.FAT)
@@ -49,10 +50,15 @@ function BodyScalingComponent:UpdateBodyScale()
 	local TotalWidthScale =
 		math.clamp(self.BaseWidth + MuscleScale + FatScale, BodyScalingBalance.Scale.MIN, BodyScalingBalance.Scale.MAX)
 
-	self.Humanoid.BodyDepthScale.Value = TotalDepthScale
-	self.Humanoid.BodyWidthScale.Value = TotalWidthScale
+	local BodyDepthScale = self.Humanoid:FindFirstChild("BodyDepthScale") :: NumberValue
+	local BodyWidthScale = self.Humanoid:FindFirstChild("BodyWidthScale") :: NumberValue
+	if not BodyDepthScale or not BodyWidthScale then
+		return
+	end
+	BodyDepthScale.Value = TotalDepthScale
+	BodyWidthScale.Value = TotalWidthScale
 end
 
-function BodyScalingComponent:Destroy() end
+function BodyScalingComponent.Destroy(_self: Self) end
 
 return BodyScalingComponent

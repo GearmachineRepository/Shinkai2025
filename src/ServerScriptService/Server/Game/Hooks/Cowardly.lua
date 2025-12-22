@@ -3,8 +3,8 @@
 local ServerScriptService = game:GetService("ServerScriptService")
 local Server = ServerScriptService:WaitForChild("Server")
 
-local Arch = require(Server.Arch)
-local Helpers = Arch.HookHelpers
+local Ensemble = require(Server.Ensemble)
+local Helpers = Ensemble.HookHelpers
 
 return {
 	HookName = "Cowardly",
@@ -13,7 +13,7 @@ return {
 	OnActivate = function(Entity)
 		local SpeedCleanup: (() -> ())? = nil
 
-		local EventConnection = Arch.Events.Subscribe("CombatEntered", function(EventData)
+		local EventConnection = Ensemble.Events.Subscribe("CombatEntered", function(EventData)
 			if EventData.Entity ~= Entity then
 				return
 			end

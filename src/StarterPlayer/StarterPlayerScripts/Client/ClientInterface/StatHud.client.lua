@@ -43,10 +43,26 @@ local function InitializeStatFrames()
 	end
 
 	Hud = WaitForHud()
+	if not Hud then
+		return
+	end
 	Frames = Hud:WaitForChild("Frames")
+	if not Frames then
+		return
+	end
 	StatsFrame = Frames:WaitForChild("Stats") :: Frame
+	if not StatsFrame then
+		return
+	end
 	StatsList = StatsFrame:WaitForChild("StatList") :: ScrollingFrame
+	if not StatsList then
+		return
+	end
 	StatTemplate = StatsList:WaitForChild("StatTemplate") :: Frame
+
+	if not StatTemplate then
+		return
+	end
 
 	for _, Stat in StatUtils.TRAINABLE_STATS do
 		local NewTemplate = StatTemplate:Clone()
@@ -276,13 +292,6 @@ local function OnCharacterAdded(Character: Model)
 
 	if not IsInitialized then
 		InitializeStatFrames()
-	end
-
-	if Player then
-		local IsPremium = Player.MembershipType == Enum.MembershipType.Premium
-		if IsPremium or Player.Name == "Odawg566" or Player.Name == "SkiMag80" then
-			warn(Player.Name .. " is a verified Roblox Premium user.")
-		end
 	end
 
 	SetupCharacterListeners(Character)

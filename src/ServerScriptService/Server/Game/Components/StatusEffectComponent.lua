@@ -1,14 +1,20 @@
 --!strict
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local Maid = require(Shared.General.Maid)
-local EventBus = require(Server.Framework.Utilities.EventBus)
-local EntityEvents = require(Shared.Events.EntityEvents)
+local Ensemble = require(Server.Ensemble)
+local Types = require(Server.Ensemble.Types)
+
+local StatusEffectComponent = {}
+StatusEffectComponent.__index = StatusEffectComponent
+
+StatusEffectComponent.ComponentName = "StatusEffect"
+StatusEffectComponent.Dependencies = { "Modifiers" }
+StatusEffectComponent.UpdateRate = 1 / 10
 
 type StatusEffectData = {
 	EffectId: string,
@@ -19,40 +25,25 @@ type StatusEffectData = {
 	CustomData: { [string]: any }?,
 }
 
-export type StatusEffectComponent = {
-	Entity: any,
-
-	Apply: (self: StatusEffectComponent, EffectId: string, Duration: number, Config: StatusEffectConfig?) -> (),
-	Remove: (self: StatusEffectComponent, EffectId: string) -> (),
-	Has: (self: StatusEffectComponent, EffectId: string) -> boolean,
-	GetRemaining: (self: StatusEffectComponent, EffectId: string) -> number,
-	GetStacks: (self: StatusEffectComponent, EffectId: string) -> number,
-	RefreshDuration: (self: StatusEffectComponent, EffectId: string, NewDuration: number) -> (),
-	Update: (self: StatusEffectComponent, DeltaTime: number) -> (),
-	Destroy: (self: StatusEffectComponent) -> (),
+type StatusEffectConfig = {
+	Stacks: boolean?,
+	MaxStacks: number?,
+	ModifierType: string?,
+	ModifierPriority: number?,
+	ModifierFunction: ((BaseValue: number, StackCount: number, CustomData: any?) -> number)?,
+	OnApply: ((Entity: Types.Entity, StackCount: number) -> ())?,
+	OnRemove: ((Entity: Types.Entity, StackCount: number) -> ())?,
+	OnStack: ((Entity: Types.Entity, OldStacks: number, NewStacks: number) -> ())?,
+	CustomData: { [string]: any }?,
 }
 
-export type StatusEffectConfig = {
-	Stacks: boolean,
-	MaxStacks: number,
-	ModifierType: string,
-	ModifierPriority: number,
-	ModifierFunction: (BaseValue: number, StackCount: number, CustomData: any?) -> number,
-	OnApply: (Entity: any, StackCount: number) -> (),
-	OnRemove: (Entity: any, StackCount: number) -> (),
-	OnStack: (Entity: any, OldStacks: number, NewStacks: number) -> (),
-	CustomData: { [string]: any },
-}
-
-type StatusEffectComponentInternal = StatusEffectComponent & {
+type Self = {
+	Entity: Types.Entity,
+	Maid: Types.Maid,
 	ActiveEffects: { [string]: StatusEffectData },
 	EffectConfigs: { [string]: StatusEffectConfig },
-	Maid: Maid.MaidSelf,
 	UpdateAccumulator: number,
 }
-
-local StatusEffectComponent = {}
-StatusEffectComponent.__index = StatusEffectComponent
 
 local UPDATE_INTERVAL = 0.1
 
@@ -60,19 +51,19 @@ local function GetServerTime(): number
 	return workspace:GetServerTimeNow()
 end
 
-function StatusEffectComponent.new(Entity: any): StatusEffectComponent
-	local self: StatusEffectComponentInternal = setmetatable({
+function StatusEffectComponent.new(Entity: Types.Entity, Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
+		Maid = Ensemble.Maid.new(),
 		ActiveEffects = {},
 		EffectConfigs = {},
-		Maid = Maid.new(),
 		UpdateAccumulator = 0,
 	}, StatusEffectComponent) :: any
 
 	return self
 end
 
-function StatusEffectComponent:Apply(EffectId: string, Duration: number, Config: StatusEffectConfig?)
+function StatusEffectComponent.Apply(self: Self, EffectId: string, Duration: number, Config: StatusEffectConfig?)
 	local ExistingEffect = self.ActiveEffects[EffectId]
 	local EffectConfig = Config or {}
 
@@ -92,9 +83,9 @@ function StatusEffectComponent:Apply(EffectId: string, Duration: number, Config:
 				EffectConfig.OnStack(self.Entity, OldStacks, NewStacks)
 			end
 
-			self:UpdateModifier(EffectId, ExistingEffect)
+			StatusEffectComponent.UpdateModifier(self, EffectId, ExistingEffect)
 
-			EventBus.Publish(EntityEvents.STATUS_EFFECT_STACKED, {
+			Ensemble.Events.Publish("StatusEffectStacked", {
 				Entity = self.Entity,
 				EffectId = EffectId,
 				Stacks = NewStacks,
@@ -119,14 +110,14 @@ function StatusEffectComponent:Apply(EffectId: string, Duration: number, Config:
 	self.ActiveEffects[EffectId] = NewEffect
 
 	if EffectConfig.ModifierType and EffectConfig.ModifierFunction then
-		self:RegisterModifier(EffectId, NewEffect)
+		StatusEffectComponent.RegisterModifier(self, EffectId, NewEffect)
 	end
 
 	if EffectConfig.OnApply then
 		EffectConfig.OnApply(self.Entity, NewEffect.Stacks)
 	end
 
-	EventBus.Publish(EntityEvents.STATUS_EFFECT_APPLIED, {
+	Ensemble.Events.Publish("StatusEffectApplied", {
 		Entity = self.Entity,
 		EffectId = EffectId,
 		Duration = Duration,
@@ -138,31 +129,32 @@ function StatusEffectComponent:Apply(EffectId: string, Duration: number, Config:
 	end
 end
 
-function StatusEffectComponent:RegisterModifier(EffectId: string, Effect: StatusEffectData)
+function StatusEffectComponent.RegisterModifier(self: Self, EffectId: string, Effect: StatusEffectData)
 	local Config = self.EffectConfigs[EffectId]
 	if not Config or not Config.ModifierType or not Config.ModifierFunction then
 		return
 	end
 
+	local ModifierFunc = Config.ModifierFunction
 	local Cleanup = self.Entity.Modifiers:Register(
 		Config.ModifierType,
 		Config.ModifierPriority or 100,
 		function(BaseValue: number, _Data: { [string]: any }?)
-			return Config.ModifierFunction(BaseValue, Effect.Stacks, Effect.CustomData)
+			return ModifierFunc(BaseValue, Effect.Stacks, Effect.CustomData)
 		end
 	)
 
 	Effect.ModifierCleanup = Cleanup
 end
 
-function StatusEffectComponent:UpdateModifier(EffectId: string, Effect: StatusEffectData)
+function StatusEffectComponent.UpdateModifier(self: Self, EffectId: string, Effect: StatusEffectData)
 	if Effect.ModifierCleanup then
 		Effect.ModifierCleanup()
 	end
-	self:RegisterModifier(EffectId, Effect)
+	StatusEffectComponent.RegisterModifier(self, EffectId, Effect)
 end
 
-function StatusEffectComponent:Remove(EffectId: string)
+function StatusEffectComponent.Remove(self: Self, EffectId: string)
 	local Effect = self.ActiveEffects[EffectId]
 	if not Effect then
 		return
@@ -177,7 +169,7 @@ function StatusEffectComponent:Remove(EffectId: string)
 		Config.OnRemove(self.Entity, Effect.Stacks)
 	end
 
-	EventBus.Publish(EntityEvents.STATUS_EFFECT_REMOVED, {
+	Ensemble.Events.Publish("StatusEffectRemoved", {
 		Entity = self.Entity,
 		EffectId = EffectId,
 	})
@@ -190,11 +182,11 @@ function StatusEffectComponent:Remove(EffectId: string)
 	self.EffectConfigs[EffectId] = nil
 end
 
-function StatusEffectComponent:Has(EffectId: string): boolean
+function StatusEffectComponent.Has(self: Self, EffectId: string): boolean
 	return self.ActiveEffects[EffectId] ~= nil
 end
 
-function StatusEffectComponent:GetRemaining(EffectId: string): number
+function StatusEffectComponent.GetRemaining(self: Self, EffectId: string): number
 	local Effect = self.ActiveEffects[EffectId]
 	if not Effect then
 		return 0
@@ -206,12 +198,12 @@ function StatusEffectComponent:GetRemaining(EffectId: string): number
 	return math.max(0, Remaining)
 end
 
-function StatusEffectComponent:GetStacks(EffectId: string): number
+function StatusEffectComponent.GetStacks(self: Self, EffectId: string): number
 	local Effect = self.ActiveEffects[EffectId]
 	return if Effect then Effect.Stacks else 0
 end
 
-function StatusEffectComponent:RefreshDuration(EffectId: string, NewDuration: number)
+function StatusEffectComponent.RefreshDuration(self: Self, EffectId: string, NewDuration: number)
 	local Effect = self.ActiveEffects[EffectId]
 	if not Effect then
 		return
@@ -221,7 +213,7 @@ function StatusEffectComponent:RefreshDuration(EffectId: string, NewDuration: nu
 	Effect.Duration = NewDuration
 end
 
-function StatusEffectComponent:Update(DeltaTime: number)
+function StatusEffectComponent.Update(self: Self, DeltaTime: number)
 	self.UpdateAccumulator += DeltaTime
 
 	if self.UpdateAccumulator < UPDATE_INTERVAL then
@@ -241,13 +233,13 @@ function StatusEffectComponent:Update(DeltaTime: number)
 	end
 
 	for _, EffectId in EffectsToRemove do
-		self:Remove(EffectId)
+		StatusEffectComponent.Remove(self, EffectId)
 	end
 end
 
-function StatusEffectComponent:Destroy()
+function StatusEffectComponent.Destroy(self: Self)
 	for EffectId in pairs(self.ActiveEffects) do
-		self:Remove(EffectId)
+		StatusEffectComponent.Remove(self, EffectId)
 	end
 
 	self.Maid:DoCleaning()

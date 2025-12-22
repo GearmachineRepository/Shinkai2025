@@ -6,38 +6,37 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
+local Ensemble = require(Server.Ensemble)
+local Types = require(Server.Ensemble.Types)
+
 local ProgressionSystem = require(Server.Game.Systems.ProgressionSystem)
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local Maid = require(Shared.General.Maid)
 local FatigueBalance = require(Shared.Configurations.Balance.FatigueBalance)
-
-export type BodyFatigueComponent = {
-	Entity: any,
-	Update: (self: BodyFatigueComponent, DeltaTime: number) -> (),
-	AddFatigueFromStatGain: (self: BodyFatigueComponent, FatigueGain: number) -> (),
-	CanGainStats: (self: BodyFatigueComponent) -> boolean,
-	Destroy: (self: BodyFatigueComponent) -> (),
-}
-
-type BodyFatigueComponentInternal = BodyFatigueComponent & {
-	PlayerData: any,
-	Maid: Maid.MaidSelf,
-}
 
 local BodyFatigueComponent = {}
 BodyFatigueComponent.__index = BodyFatigueComponent
 
-function BodyFatigueComponent.new(Entity: any, PlayerData: any): BodyFatigueComponent
-	local self: BodyFatigueComponentInternal = setmetatable({
+BodyFatigueComponent.ComponentName = "BodyFatigue"
+BodyFatigueComponent.Dependencies = { "Stats" }
+BodyFatigueComponent.UpdateRate = 1
+
+type Self = {
+	Entity: Types.Entity,
+	Maid: Types.Maid,
+	PlayerData: any,
+}
+
+function BodyFatigueComponent.new(Entity: Types.Entity, Context: Types.EntityContext): Self
+	local self: Self = setmetatable({
 		Entity = Entity,
-		PlayerData = PlayerData,
-		Maid = Maid.new(),
+		Maid = Ensemble.Maid.new(),
+		PlayerData = Context.Data,
 	}, BodyFatigueComponent) :: any
 
 	return self
 end
 
-function BodyFatigueComponent:Update(DeltaTime: number)
+function BodyFatigueComponent.Update(self: Self, DeltaTime: number)
 	local CompatShim = {
 		StatManager = self.Entity.Stats,
 		IsPlayer = self.Entity.Player,
@@ -47,7 +46,7 @@ function BodyFatigueComponent:Update(DeltaTime: number)
 	ProgressionSystem.ProcessFat(self.PlayerData, DeltaTime, CompatShim)
 end
 
-function BodyFatigueComponent:AddFatigueFromStatGain(FatigueGain: number)
+function BodyFatigueComponent.AddFatigueFromStatGain(self: Self, FatigueGain: number)
 	if FatigueGain < FatigueBalance.Updates.UPDATE_THRESHOLD then
 		return
 	end
@@ -60,11 +59,11 @@ function BodyFatigueComponent:AddFatigueFromStatGain(FatigueGain: number)
 	self.Entity.Stats:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
 end
 
-function BodyFatigueComponent:CanGainStats(): boolean
+function BodyFatigueComponent.CanGainStats(self: Self): boolean
 	return ProgressionSystem.CanTrain(self.PlayerData)
 end
 
-function BodyFatigueComponent:Destroy()
+function BodyFatigueComponent.Destroy(self: Self)
 	self.Maid:DoCleaning()
 end
 

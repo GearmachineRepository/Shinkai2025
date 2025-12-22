@@ -14,6 +14,12 @@ local Config: StateConfig = {
 			Conflicts = { "Blocking", "Stunned", "Downed" },
 		},
 
+		Jogging = {
+			Default = false,
+			Replication = "All",
+			Conflicts = { "Blocking", "Stunned", "Downed" },
+		},
+
 		Blocking = {
 			Default = false,
 			Replication = "All",
@@ -53,6 +59,11 @@ local Config: StateConfig = {
 			Default = false,
 			Replication = "None",
 			LockMovement = true,
+		},
+
+		Exhausted = {
+			Default = false,
+			Replication = "Owner",
 		},
 	},
 }

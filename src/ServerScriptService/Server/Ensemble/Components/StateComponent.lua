@@ -10,7 +10,7 @@ type StateConfig = Types.StateConfig
 type Connection = Types.Connection
 
 type StateComponentInternal = Types.StateComponent & {
-	Entity: any,
+	Entity: Types.Entity,
 	Config: StateConfig,
 	CurrentStates: { [string]: boolean },
 	StateSignals: { [string]: Types.Signal<boolean> },
@@ -26,7 +26,7 @@ function StateComponent.SetConfig(Config: StateConfig)
 	ActiveConfig = Config
 end
 
-function StateComponent.new(Entity: any): Types.StateComponent
+function StateComponent.new(Entity: Types.Entity): Types.StateComponent
 	if not ActiveConfig then
 		error(Types.EngineName .. " StateComponent.SetConfig must be called before creating entities")
 	end

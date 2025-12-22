@@ -7,14 +7,14 @@ type ModifierFunction = Types.ModifierFunction
 type Modifier = Types.Modifier
 
 type ModifierComponentInternal = Types.ModifierComponent & {
-	Entity: any,
+	Entity: Types.Entity,
 	ModifiersByType: { [string]: { Modifier } },
 }
 
 local ModifierComponent = {}
 ModifierComponent.__index = ModifierComponent
 
-function ModifierComponent.new(Entity: any): Types.ModifierComponent
+function ModifierComponent.new(Entity: Types.Entity): Types.ModifierComponent
 	local self: ModifierComponentInternal = setmetatable({
 		Entity = Entity,
 		ModifiersByType = {},

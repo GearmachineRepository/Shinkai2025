@@ -65,7 +65,7 @@ local Config: StatConfig = {
 		},
 
 		RunSpeed = {
-			Default = 10,
+			Default = 28,
 			Min = 0,
 			Replication = "None",
 		},
