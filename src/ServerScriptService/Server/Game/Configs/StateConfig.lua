@@ -70,6 +70,11 @@ local Config: StateConfig = {
 			Default = false,
 			Replication = "Owner",
 		},
+
+		Attacking = {
+			Default = false,
+			Replication = "Owner",
+		},
 	},
 }
 

@@ -1,0 +1,197 @@
+--!strict
+
+local ServerScriptService = game:GetService("ServerScriptService")
+local Server = ServerScriptService:WaitForChild("Server")
+
+local Ensemble = require(Server.Ensemble)
+local CombatTypes = require(script.Parent.CombatTypes)
+local ActionRegistry = require(script.Parent.ActionRegistry)
+local AnimationTimingCache = require(script.Parent.AnimationTimingCache)
+
+type ActionContext = CombatTypes.ActionContext
+type ActionDefinition = CombatTypes.ActionDefinition
+type ActionMetadata = CombatTypes.ActionMetadata
+
+local ActionExecutor = {}
+
+local ActiveContexts: { [any]: ActionContext } = {}
+
+local function CreateContext(Entity: CombatTypes.Entity, Metadata: ActionMetadata, InputData: any?): ActionContext
+    return {
+        Entity = Entity,
+        InputData = InputData or {},
+        Metadata = Metadata,
+        StartTime = workspace:GetServerTimeNow(),
+        Interrupted = false,
+        InterruptReason = nil,
+        CustomData = {},
+    }
+end
+
+function ActionExecutor.Execute(
+    Entity: CombatTypes.Entity,
+    ActionName: string,
+    InputData: { [string]: any }?
+): (boolean, string?)
+    local Definition, Metadata = ActionRegistry.GetWithMetadata(ActionName, nil)
+
+    if not Definition then
+        return false, "Unknown action"
+    end
+
+    local Context = CreateContext(Entity, Metadata, InputData)
+
+    if Definition.CanExecute then
+        local CanExecute, Reason = Definition.CanExecute(Context)
+        if not CanExecute then
+            return false, Reason or "Cannot execute"
+        end
+    end
+
+    local ModifiedMetadata = table.clone(Metadata)
+
+    Ensemble.Events.Publish("ActionConfiguring", {
+        Entity = Entity,
+        ActionName = ActionName,
+        Metadata = ModifiedMetadata,
+    })
+
+    Context.Metadata = ModifiedMetadata
+
+    ActiveContexts[Entity] = Context
+
+    if Definition.OnStart then
+        Definition.OnStart(Context)
+    end
+
+    Ensemble.Events.Publish("ActionStarted", {
+        Entity = Entity,
+        ActionName = ActionName,
+        Metadata = ModifiedMetadata,
+        Context = Context,
+    })
+
+    task.spawn(function()
+        Definition.OnExecute(Context)
+
+        if not Context.Interrupted then
+            ActionExecutor.Complete(Entity)
+        end
+    end)
+
+    return true, nil
+end
+
+function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): boolean
+    local Context = ActiveContexts[Entity]
+    if not Context then
+        return false
+    end
+
+    if Context.Interrupted then
+        return false
+    end
+
+    if not Context.Metadata then
+        return false
+    end
+
+    Context.Interrupted = true
+    Context.InterruptReason = Reason
+
+    local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
+
+    if Definition and Definition.OnInterrupt then
+        Definition.OnInterrupt(Context)
+    end
+
+    Ensemble.Events.Publish("ActionInterrupted", {
+        Entity = Entity,
+        ActionName = Context.Metadata.ActionName,
+        Reason = Reason,
+        Context = Context,
+    })
+
+    ActionExecutor.Cleanup(Entity)
+
+    return true
+end
+
+function ActionExecutor.Complete(Entity: CombatTypes.Entity)
+    local Context = ActiveContexts[Entity]
+    if not Context then
+        return
+    end
+
+    if Context.Interrupted then
+        return
+    end
+
+    if not Context.Metadata then
+        return
+    end
+
+    local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
+
+    if Definition and Definition.OnComplete then
+        Definition.OnComplete(Context)
+    end
+
+    Ensemble.Events.Publish("ActionCompleted", {
+        Entity = Entity,
+        ActionName = Context.Metadata.ActionName,
+        Context = Context,
+    })
+
+    ActionExecutor.Cleanup(Entity)
+end
+
+function ActionExecutor.Cleanup(Entity: CombatTypes.Entity)
+    local Context = ActiveContexts[Entity]
+    if not Context then
+        return
+    end
+
+    if not Context.Metadata then
+        return
+    end
+
+    local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
+
+    if Definition and Definition.OnCleanup then
+        Definition.OnCleanup(Context)
+    end
+
+    ActiveContexts[Entity] = nil
+end
+
+function ActionExecutor.GetActiveContext(Entity: CombatTypes.Entity): ActionContext?
+    return ActiveContexts[Entity]
+end
+
+function ActionExecutor.IsExecuting(Entity: CombatTypes.Entity): boolean
+    return ActiveContexts[Entity] ~= nil
+end
+
+function ActionExecutor.GetTimings(AnimationId: string, Fallbacks: { [string]: number }?): { [string]: number }
+    local Timings = {}
+    local Defaults = Fallbacks or {}
+
+    local Cached = AnimationTimingCache.GetAllMarkers(AnimationId)
+
+    if Cached then
+        for MarkerName, MarkerData in Cached do
+            Timings[MarkerName] = MarkerData.Time
+        end
+    end
+
+    for Key, Value in pairs(Defaults) do
+        if Timings[Key] == nil then
+            Timings[Key] = Value
+        end
+    end
+
+    return Timings
+end
+
+return ActionExecutor

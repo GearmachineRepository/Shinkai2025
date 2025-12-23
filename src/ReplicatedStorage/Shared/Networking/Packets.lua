@@ -61,4 +61,12 @@ return {
 	-- VFX
 	PlayVfx = Packet("PlayVfx", Packet.String, Packet.Any),
 	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.NumberF64, Packet.String, Packet.Any),
+
+	-- Combat Actions
+	ActionRequest = Packet("ActionRequest", Packet.String, Packet.Any),
+
+	-- Combat Replication
+	ActionStarted = Packet("ActionStarted", Packet.Instance, Packet.String, Packet.Any),
+	ActionHit = Packet("ActionHit", Packet.Instance, Packet.Instance, Packet.NumberF32),
+	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String),
 }
