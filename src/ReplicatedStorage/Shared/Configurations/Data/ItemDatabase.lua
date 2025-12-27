@@ -36,6 +36,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 			FeintCooldown = 3.0,
 			ComboEndlag = 0.5,
 			HitStun = 0.256,
+			StaminaCostHitReduction = 0.15, --Get 15% stamina back for each successful hit
 			Feintable = true,
 
 			FallbackTimings = {

@@ -9,6 +9,7 @@ local Ensemble = require(Server.Ensemble)
 local CombatTypes = require(script.Parent.CombatTypes)
 local ActionRegistry = require(script.Parent.ActionRegistry)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
+local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local Packets = require(Shared.Networking.Packets)
 
 type ActionContext = CombatTypes.ActionContext
@@ -24,6 +25,51 @@ local EntityFeintCooldowns: { [any]: number } = {}
 
 local COMBO_RESET_TIME = 2.0
 local FEINT_COOLDOWN_ID = "Feint"
+
+local function ApplyItemData(Metadata: ActionMetadata, ItemId: string?)
+	if not ItemId then
+		return
+	end
+
+	local ItemData = ItemDatabase.GetItem(ItemId)
+	if not ItemData then
+		return
+	end
+
+	if ItemData.BaseStats then
+		for Key, Value in ItemData.BaseStats do
+			Metadata[Key] = Value
+		end
+	end
+
+	if ItemData.AnimationSet then
+		Metadata.AnimationSet = ItemData.AnimationSet
+	end
+end
+
+local function ResolveAttackData(Entity: CombatTypes.Entity, Metadata: ActionMetadata): { [string]: any }?
+	local AnimationSetName = Metadata.AnimationSet or "Karate"
+	local ComboCount = ActionExecutor.GetComboCount(Entity)
+
+	local AttackData = AnimationSets.GetAttack(AnimationSetName, ComboCount)
+	if not AttackData then
+		return nil
+	end
+
+	Metadata.BaseDamage = Metadata.BaseDamage or AttackData.Damage
+	Metadata.StaminaCost = Metadata.StaminaCost or AttackData.StaminaCost
+
+	if AttackData.Hitbox then
+		Metadata.HitboxSize = Metadata.HitboxSize or AttackData.Hitbox.Size
+		Metadata.HitboxOffset = Metadata.HitboxOffset or CFrame.new(AttackData.Hitbox.Offset)
+	end
+
+	return {
+		AttackData = AttackData,
+		AnimationSetName = AnimationSetName,
+		ComboCount = ComboCount,
+	}
+end
 
 local function CreateContext(Entity: CombatTypes.Entity, Metadata: ActionMetadata, InputData: any?): ActionContext
 	return {
@@ -44,34 +90,45 @@ function ActionExecutor.Execute(
 ): (boolean, string?)
 
 	if ActiveContexts[Entity] ~= nil then
-		return false, "Already executing"
+		return false, "AlreadyExecuting"
 	end
 
-	local Definition: ActionDefinition?, Metadata: ActionMetadata? = ActionRegistry.GetWithMetadata(ActionName, nil)
-
-	if not Definition or not Metadata then
-		return false, "Unknown action"
+	local Definition: ActionDefinition?, BaseMetadata: ActionMetadata? = ActionRegistry.GetWithMetadata(ActionName, nil)
+	if not Definition or not BaseMetadata then
+		return false, "UnknownAction"
 	end
 
-	local Context = CreateContext(Entity, Metadata, InputData)
+	local Metadata: ActionMetadata = table.clone(BaseMetadata)
+	local FinalInputData = InputData or {} :: {[string]: any}
 
-	if Definition.CanExecute then
-		local CanExecute: boolean, Reason: string? = Definition.CanExecute(Context)
-		if not CanExecute then
-			warn("[ActionExecutor] Could not execute due to reason: " .. tostring(Reason))
-			return false, Reason or "Cannot execute"
+	if not FinalInputData or not FinalInputData["ItemId"] then return false, "No ItemId present" end
+
+	ApplyItemData(Metadata, FinalInputData.ItemId)
+
+	local Context = CreateContext(Entity, Metadata, FinalInputData)
+
+	if Definition.ActionType == "Attack" then
+		local AttackContext = ResolveAttackData(Entity, Metadata)
+		if AttackContext then
+			Context.CustomData.AttackData = AttackContext.AttackData
+			Context.CustomData.AnimationSetName = AttackContext.AnimationSetName
+			Context.CustomData.ComboCount = AttackContext.ComboCount
 		end
 	end
-
-	local ModifiedMetadata: ActionMetadata = table.clone(Metadata)
 
 	Ensemble.Events.Publish("ActionConfiguring", {
 		Entity = Entity,
 		ActionName = ActionName,
-		Metadata = ModifiedMetadata,
+		Metadata = Metadata,
 	})
 
-	Context.Metadata = ModifiedMetadata
+	if Definition.CanExecute then
+		local CanExecute, Reason = Definition.CanExecute(Context)
+		if not CanExecute then
+			return false, Reason or "CannotExecute"
+		end
+	end
+
 	ActiveContexts[Entity] = Context
 
 	if Definition.OnStart then
@@ -81,7 +138,7 @@ function ActionExecutor.Execute(
 	Ensemble.Events.Publish("ActionStarted", {
 		Entity = Entity,
 		ActionName = ActionName,
-		Metadata = ModifiedMetadata,
+		Metadata = Metadata,
 		Context = Context,
 	})
 
@@ -98,15 +155,7 @@ end
 
 function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): boolean
 	local Context = ActiveContexts[Entity]
-	if not Context then
-		return false
-	end
-
-	if Context.Interrupted then
-		return false
-	end
-
-	if not Context.Metadata then
+	if not Context or Context.Interrupted or not Context.Metadata then
 		return false
 	end
 
@@ -122,8 +171,7 @@ function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): 
 		local FeintCooldown = Context.Metadata.FeintCooldown or 0
 
 		if LastFeintTime and FeintCooldown > 0 then
-			local TimeSinceFeint = CurrentTime - LastFeintTime
-			if TimeSinceFeint < FeintCooldown then
+			if (CurrentTime - LastFeintTime) < FeintCooldown then
 				return false
 			end
 		end
@@ -132,8 +180,7 @@ function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): 
 	Context.Interrupted = true
 	Context.InterruptReason = InterruptReason
 
-	local Definition: ActionDefinition? = ActionRegistry.Get(Context.Metadata.ActionName)
-
+	local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
 	if Definition and Definition.OnInterrupt then
 		Definition.OnInterrupt(Context)
 	end
@@ -166,26 +213,16 @@ function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): 
 	end
 
 	ActionExecutor.Cleanup(Entity)
-
 	return true
 end
 
 function ActionExecutor.Complete(Entity: CombatTypes.Entity)
 	local Context = ActiveContexts[Entity]
-	if not Context then
+	if not Context or Context.Interrupted or not Context.Metadata then
 		return
 	end
 
-	if Context.Interrupted then
-		return
-	end
-
-	if not Context.Metadata then
-		return
-	end
-
-	local Definition: ActionDefinition? = ActionRegistry.Get(Context.Metadata.ActionName)
-
+	local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
 	if Definition and Definition.OnComplete then
 		Definition.OnComplete(Context)
 	end
@@ -201,22 +238,16 @@ end
 
 function ActionExecutor.Cleanup(Entity: CombatTypes.Entity)
 	local Context = ActiveContexts[Entity]
-	if not Context then
+	if not Context or not Context.Metadata then
 		return
 	end
 
-	if not Context.Metadata then
-		return
-	end
-
-	local Definition: ActionDefinition? = ActionRegistry.Get(Context.Metadata.ActionName)
-
+	local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
 	if Definition and Definition.OnCleanup then
 		Definition.OnCleanup(Context)
 	end
 
 	Entity.States:SetState("Attacking", false)
-
 	ActiveContexts[Entity] = nil
 end
 
@@ -246,9 +277,7 @@ function ActionExecutor.IncrementCombo(Entity: CombatTypes.Entity, AnimationSetN
 	local SetName = AnimationSetName or "Karate"
 	local ComboLength = AnimationSets.GetComboLength(SetName)
 
-	local NextCombo = (CurrentCombo % ComboLength) + 1
-
-	EntityComboCounts[Entity] = NextCombo
+	EntityComboCounts[Entity] = (CurrentCombo % ComboLength) + 1
 	EntityComboTimers[Entity] = os.clock()
 end
 
@@ -263,8 +292,7 @@ function ActionExecutor.GetFeintCooldownRemaining(Entity: CombatTypes.Entity, Fe
 		return 0
 	end
 
-	local CurrentTime = workspace:GetServerTimeNow()
-	local Elapsed = CurrentTime - LastFeintTime
+	local Elapsed = workspace:GetServerTimeNow() - LastFeintTime
 	return math.max(0, FeintCooldownDuration - Elapsed)
 end
 

@@ -9,7 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
-local NetworkService = require(Server.Game.Systems.NetworkService)
+local NetworkService = require(Server.Game.Services.NetworkService)
 
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)

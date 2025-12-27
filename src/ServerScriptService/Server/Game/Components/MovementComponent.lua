@@ -8,6 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
+local ActionValidator = require(Server.Game.Utilities.ActionValidator)
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
@@ -23,6 +24,11 @@ MovementComponent.Dependencies = { "Stats", "Stamina" }
 MovementComponent.UpdateRate = 1 / 30
 
 local WALKSPEED_UPDATE_THROTTLE = 0.05
+
+local MODE_TO_ACTION = {
+	jog = "Jog",
+	run = "Run",
+}
 
 type Self = {
 	Entity: Types.Entity,
@@ -93,8 +99,14 @@ function MovementComponent.SetMovementMode(self: Self, Mode: string)
 		return
 	end
 
-	if self.Entity.States:GetState(StateTypes.ATTACKING) and (Mode == "run" or Mode == "jog") then
-		return
+	if Mode ~= "walk" then
+		local ActionName = MODE_TO_ACTION[Mode]
+		if ActionName then
+			local CanPerform, _Reason = ActionValidator.CanPerform(self.Entity.States, ActionName)
+			if not CanPerform then
+				return
+			end
+		end
 	end
 
 	if Mode == "run" then

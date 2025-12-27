@@ -25,6 +25,7 @@ local StateTypes = {
     STAGGERED = "Staggered",
     BLINDED = "Blinded",
     BLEEDING = "Bleeding",
+    EXHAUSTED = "Exhausted",
     SLUGGISH = "Sluggish",
     FATIGUED = "Fatigued",
     DIZZY = "Dizzy",

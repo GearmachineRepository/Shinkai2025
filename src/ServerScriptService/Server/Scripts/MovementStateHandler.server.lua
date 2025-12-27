@@ -8,7 +8,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
+local ActionValidator = require(Server.Game.Utilities.ActionValidator)
 
 local VALID_MOVEMENT_MODES = {
 	walk = true,
@@ -16,12 +16,13 @@ local VALID_MOVEMENT_MODES = {
 	run = true,
 }
 
-local function ValidateMovementMode(Mode: string): boolean
-	return VALID_MOVEMENT_MODES[Mode] == true
-end
+local MODE_TO_ACTION = {
+	jog = "Jog",
+	run = "Run",
+}
 
 Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, MovementMode: string)
-	if not ValidateMovementMode(MovementMode) then
+	if not VALID_MOVEMENT_MODES[MovementMode] then
 		return
 	end
 
@@ -35,18 +36,22 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 		return
 	end
 
-	if Entity.States:GetState(StateTypes.ATTACKING) and (MovementMode == "jog" or MovementMode == "run") then
+	if MovementMode == "walk" then
 		Character:SetAttribute("MovementMode", "walk")
 		return
 	end
 
-	local Stamina = Entity:GetComponent("Stamina")
-	if not Stamina then
-		return
+	local ActionName = MODE_TO_ACTION[MovementMode]
+	if ActionName then
+		local CanPerform, _Reason = ActionValidator.CanPerform(Entity.States, ActionName)
+		if not CanPerform then
+			Character:SetAttribute("MovementMode", "walk")
+			return
+		end
 	end
 
-	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
-	if not Humanoid then
+	local Stamina = Entity:GetComponent("Stamina")
+	if not Stamina then
 		return
 	end
 
@@ -62,7 +67,5 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 		else
 			Character:SetAttribute("MovementMode", "walk")
 		end
-	elseif MovementMode == "walk" then
-		Character:SetAttribute("MovementMode", "walk")
 	end
 end)

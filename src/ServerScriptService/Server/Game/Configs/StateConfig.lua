@@ -1,48 +1,78 @@
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Types = require(ServerScriptService.Server.Ensemble.Types)
+local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 type StateConfig = Types.StateConfig
 
 local Config: StateConfig = {
 	States = {
-		Sprinting = {
+		[StateTypes.SPRINTING] = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { "Blocking", "Stunned", "Downed", "Attacking" },
+			Conflicts = { StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.ATTACKING },
 		},
 
-		Jogging = {
+		[StateTypes.JOGGING] = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { "Blocking", "Stunned", "Downed", "Attacking" },
+			Conflicts = { StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.ATTACKING },
 		},
 
-		Blocking = {
+		[StateTypes.BLOCKING] = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { "Sprinting", "Stunned", "Downed", "Attacking" },
+			Conflicts = { StateTypes.SPRINTING, StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.ATTACKING },
 		},
 
-		Stunned = {
-			Default = false,
-			Replication = "All",
-			LockMovement = true,
-			Conflicts = { "Sprinting", "Blocking" },
-		},
-
-		Downed = {
+		[StateTypes.STUNNED] = {
 			Default = false,
 			Replication = "All",
 			LockMovement = true,
-			Conflicts = { "Sprinting", "Blocking" },
+			Conflicts = { StateTypes.SPRINTING, StateTypes.BLOCKING },
 		},
 
-		Invulnerable = {
+		[StateTypes.DOWNED] = {
+			Default = false,
+			Replication = "All",
+			LockMovement = true,
+			Conflicts = { StateTypes.SPRINTING, StateTypes.BLOCKING },
+		},
+
+		[StateTypes.INVULNERABLE] = {
 			Default = false,
 			Replication = "Owner",
+		},
+
+		[StateTypes.IN_CUTSCENE] = {
+			Default = false,
+			Replication = "Owner",
+			LockMovement = true,
+		},
+
+		[StateTypes.ATTACKING] = {
+			Default = false,
+			Replication = "Owner",
+		},
+
+		[StateTypes.ONHIT] = {
+			Default = false,
+			Replication = "Owner",
+		},
+
+		[StateTypes.MOVEMENT_LOCKED] = {
+			Default = false,
+			Replication = "Owner",
+		},
+
+		[StateTypes.DODGING] = {
+			Default = false,
+			Replication = "All",
+			Conflicts = { StateTypes.ATTACKING, StateTypes.BLOCKING },
 		},
 
 		InCombat = {
@@ -62,21 +92,6 @@ local Config: StateConfig = {
 		},
 
 		Exhausted = {
-			Default = false,
-			Replication = "Owner",
-		},
-
-		MovementLocked = {
-			Default = false,
-			Replication = "Owner",
-		},
-
-		Attacking = {
-			Default = false,
-			Replication = "Owner",
-		},
-
-		OnHit = {
 			Default = false,
 			Replication = "Owner",
 		},
