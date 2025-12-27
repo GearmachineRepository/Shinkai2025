@@ -64,7 +64,7 @@ function M1.OnExecute(Context: ActionContext)
 
 	local AnimationLength = AnimationTimingCache.GetLength(AnimationName) or Metadata.FallbackTimings.Length
 	local HitStartTime = AnimationTimingCache.GetTiming(AnimationName, "HitStart", Metadata.FallbackTimings.HitStart)
-	local HitEndTime = AnimationTimingCache.GetTiming(AnimationName, "HitEnd", Metadata.FallbackTimings.HitEnd)
+	local HitEndTime = AnimationTimingCache.GetTiming(AnimationName, "HitStop", Metadata.FallbackTimings.HitEnd)
 
 	if not AnimationLength or not HitStartTime or not HitEndTime then
 		return
