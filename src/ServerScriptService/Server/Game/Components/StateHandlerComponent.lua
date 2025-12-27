@@ -1,5 +1,6 @@
 --!strict
 
+local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -61,9 +62,10 @@ local ANIMATION_REACTIONS = {
 }
 
 local VFX_REACTIONS = {
-	[StateTypes.STUNNED] = "StunStars",
+	--[StateTypes.STUNNED] = "StunStars",
 	[StateTypes.GUARD_BROKEN] = "ShieldBreak",
 	[StateTypes.PARRIED] = "ParryFlash",
+	[StateTypes.ONHIT] = "Hit"
 }
 
 local SFX_REACTIONS = {
@@ -170,10 +172,12 @@ local function SetupAnimationReactions(Entity: Types.Entity, ComponentMaid: Type
 end
 
 local function SetupVFXReactions(Entity: Types.Entity, ComponentMaid: Types.Maid)
-	for StateName, VfxName in VFX_REACTIONS do
+	for StateName, VfxName in pairs(VFX_REACTIONS) do
 		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
-			if Enabled and Entity.Player then
-				Packets.PlayVfx:FireClient(Entity.Player, VfxName, { Target = Entity.Character })
+			if Enabled then
+				for _, Player in pairs(Players:GetPlayers()) do
+					Packets.PlayVfxReplicate:FireClient(Player, Player.UserId, VfxName, { Target = Entity.Character })
+				end
 			end
 		end)
 

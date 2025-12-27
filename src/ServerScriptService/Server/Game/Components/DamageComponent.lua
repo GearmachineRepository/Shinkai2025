@@ -18,8 +18,7 @@ local DamageComponent = {}
 DamageComponent.__index = DamageComponent
 
 DamageComponent.ComponentName = "Damage"
-DamageComponent.Dependencies = { "States" }
-DamageComponent.UpdateRate = 1
+DamageComponent.Dependencies = { "States", "Stats" }
 
 local PING_THRESHOLD_MS = 70
 local MAX_COMP_SECONDS = 0.06
@@ -57,39 +56,50 @@ local function GetCompDelaySeconds(TargetPlayer: Player?): number
 end
 
 function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
-	local ModifiedDamage: number = self.Modifiers:Apply("Damage", Damage, {
-		Source = Source,
-		Direction = Direction,
-		OriginalDamage = Damage,
-	})
-
-    if self.Entity.States:GetState(StateTypes.INVULNERABLE) then
+	if self.Entity.States:GetState(StateTypes.INVULNERABLE) then
 		return
 	end
 
-   	if self.States:GetState(StateTypes.BLOCKING) then
+	local ModifiedDamage = Damage :: number
+
+	if self.Entity.Modifiers then
+		ModifiedDamage = self.Entity.Modifiers:Apply("Damage", Damage, {
+			Source = Source,
+			Direction = Direction,
+			OriginalDamage = Damage,
+		})
+	end
+
+	if self.Entity.States:GetState(StateTypes.BLOCKING) then
 		ModifiedDamage = ModifiedDamage * (1 - CombatBalance.Blocking.DAMAGE_REDUCTION)
 	end
 
-	local Health: number = self.Humanoid.Health
-	Health -= ModifiedDamage
-	self.Humanoid.Health = math.max(0, Health)
+	local Health = self.Entity.Humanoid.Health :: number
 
-	local CurrentHealth = self.Humanoid.Health
-	self.Stats:SetStat("Health", CurrentHealth)
+	local CurrentHealth = Health- ModifiedDamage
+	self.Entity.Humanoid.Health = math.max(0, CurrentHealth)
+	self.Entity.Stats:SetStat("Health", self.Entity.Humanoid.Health)
+
+	self.Entity.States:SetState(StateTypes.ONHIT, true)
+	task.wait(0.1)
+	self.Entity.States:SetState(StateTypes.ONHIT, false)
 end
 
-function DamageComponent:TakeDamageCompensated(Damage: number, Source: Player?, Direction: Vector3?)
-	local DelaySeconds = GetCompDelaySeconds(self.Player)
+function DamageComponent:DealDamage(Damage: number, Source: Player?, Direction: Vector3?)
+	local TargetPlayer = self.Entity.Player
 
-	if DelaySeconds <= 0 then
-		self:TakeDamage(Damage, Source, Direction)
-		return
+	if TargetPlayer then
+		local DelaySeconds = GetCompDelaySeconds(TargetPlayer)
+
+		if DelaySeconds > 0 then
+			task.delay(DelaySeconds, function()
+				self:TakeDamage(Damage, Source, Direction)
+			end)
+			return
+		end
 	end
 
-	task.delay(DelaySeconds, function()
-		self:TakeDamage(Damage, Source, Direction)
-	end)
+	self:TakeDamage(Damage, Source, Direction)
 end
 
 function DamageComponent.Destroy(self: Self)

@@ -21,6 +21,7 @@ local StateTypes = {
     DODGING = "Dodging",
     IFRAME = "Iframe",
     MODE_ACTIVE = "ModeActive",
+    ONHIT = "OnHit",
     STAGGERED = "Staggered",
     BLINDED = "Blinded",
     BLEEDING = "Bleeding",

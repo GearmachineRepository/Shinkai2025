@@ -8,7 +8,6 @@ local InputBuffer = require(Shared.General.InputBuffer)
 local Packets = require(Shared.Networking.Packets)
 --local AnimationService = require(Shared.Services.AnimationService)
 -- local SoundPlayer = require(Shared.General.SoundPlayer)
--- local VfxPlayer = require(Shared.VFX.VfxPlayer)
 
 local PendingActions: { [string]: true } = {}
 local CustomPredictions: { [string]: any } = {}

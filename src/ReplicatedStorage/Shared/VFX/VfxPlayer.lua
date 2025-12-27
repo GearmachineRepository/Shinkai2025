@@ -1,4 +1,5 @@
 --!strict
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -15,6 +16,7 @@ export type VfxInstance = {
 local VfxPlayer = {}
 
 local ActiveVfxByCharacter: { [Model]: { [string]: VfxInstance } } = {}
+local IsInitialized = false
 
 local function GetVfxModule(VfxName: string): any?
 	local VfxModule = VfxModules:FindFirstChild(VfxName)
@@ -57,6 +59,11 @@ function VfxPlayer.Play(Character: Model, VfxName: string, VfxData: any?): VfxIn
 end
 
 function VfxPlayer.PlayLocal(VfxName: string, VfxData: any?): VfxInstance?
+	if not RunService:IsClient() then
+		warn("PlayLocal can only be called from client")
+		return nil
+	end
+
 	local Character = Players.LocalPlayer.Character
 	if not Character then
 		return nil
@@ -114,34 +121,32 @@ function VfxPlayer.CleanupAll(Character: Model)
 	ActiveVfxByCharacter[Character] = nil
 end
 
-function VfxPlayer.OnVfxReplicated(SenderUserId: number, VfxName: string, VfxData: any?)
-	local SenderPlayer = Players:GetPlayerByUserId(SenderUserId)
-	if not SenderPlayer then
+function VfxPlayer.Init()
+	if IsInitialized then
+		warn("VfxPlayer already initialized")
 		return
 	end
 
-	local SenderCharacter = SenderPlayer.Character
-	if not SenderCharacter then
-		return
-	end
+	IsInitialized = true
 
-	VfxPlayer.Play(SenderCharacter, VfxName, VfxData)
-end
+	if RunService:IsClient() then
+		local function OnVfxReplicated(SenderUserId: number, VfxName: string, VfxData: any?)
+			local SenderPlayer = Players:GetPlayerByUserId(SenderUserId)
+			if not SenderPlayer or not SenderPlayer.Character then
+				return
+			end
 
-if RunService:IsClient() then
-	Packets.PlayVfxReplicate.OnClientEvent:Connect(VfxPlayer.OnVfxReplicated)
-
-	Players.PlayerRemoving:Connect(function(Player: Player)
-		if Player.Character then
-			VfxPlayer.CleanupAll(Player.Character)
+			VfxPlayer.Play(SenderPlayer.Character, VfxName, VfxData)
 		end
-	end)
+
+		Packets.PlayVfxReplicate.OnClientEvent:Connect(OnVfxReplicated)
+	end
 
 	local function OnCharacterRemoving(Character: Model)
 		VfxPlayer.CleanupAll(Character)
 	end
 
-	for _, Player in Players:GetPlayers() do
+	local function SetupCharacterCleanup(Player: Player)
 		if Player.Character then
 			Player.Character.AncestryChanged:Connect(function(_, Parent)
 				if not Parent then
@@ -153,35 +158,17 @@ if RunService:IsClient() then
 		Player.CharacterRemoving:Connect(OnCharacterRemoving)
 	end
 
-	Players.PlayerAdded:Connect(function(Player: Player)
-		Player.CharacterRemoving:Connect(OnCharacterRemoving)
+	Players.PlayerRemoving:Connect(function(Player: Player)
+		if Player.Character then
+			VfxPlayer.CleanupAll(Player.Character)
+		end
 	end)
-end
 
-Players.PlayerRemoving:Connect(function(Player: Player)
-	if Player.Character then
-		VfxPlayer.CleanupAll(Player.Character)
-	end
-end)
-
-local function OnCharacterRemoving(Character: Model)
-	VfxPlayer.CleanupAll(Character)
-end
-
-for _, Player in Players:GetPlayers() do
-	if Player.Character then
-		Player.Character.AncestryChanged:Connect(function(_, Parent)
-			if not Parent then
-				OnCharacterRemoving(Player.Character)
-			end
-		end)
+	for _, Player in Players:GetPlayers() do
+		SetupCharacterCleanup(Player)
 	end
 
-	Player.CharacterRemoving:Connect(OnCharacterRemoving)
+	Players.PlayerAdded:Connect(SetupCharacterCleanup)
 end
-
-Players.PlayerAdded:Connect(function(Player: Player)
-	Player.CharacterRemoving:Connect(OnCharacterRemoving)
-end)
 
 return VfxPlayer

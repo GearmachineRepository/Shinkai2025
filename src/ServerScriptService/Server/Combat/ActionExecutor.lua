@@ -47,8 +47,6 @@ function ActionExecutor.Execute(
 		return false, "Already executing"
 	end
 
-	Entity.States:SetState("Attacking", true)
-
 	local Definition: ActionDefinition?, Metadata: ActionMetadata? = ActionRegistry.GetWithMetadata(ActionName, nil)
 
 	if not Definition or not Metadata then
@@ -60,6 +58,7 @@ function ActionExecutor.Execute(
 	if Definition.CanExecute then
 		local CanExecute: boolean, Reason: string? = Definition.CanExecute(Context)
 		if not CanExecute then
+			warn("[ActionExecutor] Could not execute due to reason: " .. tostring(Reason))
 			return false, Reason or "Cannot execute"
 		end
 	end

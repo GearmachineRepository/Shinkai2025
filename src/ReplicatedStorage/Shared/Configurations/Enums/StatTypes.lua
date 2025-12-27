@@ -11,6 +11,7 @@ local StatTypes = {
 	MAX_CARRY_WEIGHT = "MaxCarryWeight",
 	ARMOR = "Armor",
 	PHYSICAL_RESISTANCE = "PhysicalResistance",
+	ONHIT = "OnHit",
 
 	BODY_FATIGUE = "BodyFatigue",
 	MAX_BODY_FATIGUE = "MaxBodyFatigue",

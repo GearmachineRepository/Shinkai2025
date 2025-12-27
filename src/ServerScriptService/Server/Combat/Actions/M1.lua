@@ -29,6 +29,8 @@ M1.DefaultMetadata = {
 	FeintEndlag = 0.25,
 	FeintCooldown = 3.0,
 	ComboEndlag = 0.5,
+	HitStun = 0.25,
+	StaminaCost = 5,
 	Feintable = true,
 
 	FallbackTimings = {
@@ -39,8 +41,34 @@ M1.DefaultMetadata = {
 }
 
 function M1.CanExecute(Context: ActionContext): (boolean, string?)
-	if Context.Metadata == nil then
+	if not Context then
+		return false, "Missing context"
+	end
+
+	if not Context.Metadata then
 		return false, "Missing metadata"
+	end
+
+	if not Context.Entity then
+		return false, "Missing entity"
+	end
+
+	local StatComponent = Context.Entity:GetComponent("Stats")
+	if not StatComponent then return false, "No StatComponent" end
+	local StateComponent = Context.Entity:GetComponent("States")
+	if not StateComponent then return false, "No StateComponent" end
+
+	local StaminaCost = Context.Metadata.StaminaCost :: number
+	if StatComponent:GetStat("Stamina") <= 0 or StatComponent:GetStat("Stamina") - StaminaCost < 0 then
+		return false, "No stamina"
+	end
+
+	if StateComponent:GetState("Exhausted") then
+		return false, "Exhausted"
+	end
+
+	if StateComponent:GetState("Stunned") then
+		return false, "Stunned"
 	end
 
 	return true, nil
@@ -84,16 +112,16 @@ function M1.OnStart(Context: ActionContext)
 	Context.CustomData.AttackData = AttackData
 	Context.CustomData.AnimationSetName = AnimationSetName
 
-	if Metadata.BaseDamage == nil then
+	if not Metadata.BaseDamage then
 		Metadata.BaseDamage = AttackData.Damage
 	end
-	if Metadata.StaminaCost == nil then
+	if not Metadata.StaminaCost then
 		Metadata.StaminaCost = AttackData.StaminaCost
 	end
-	if Metadata.HitboxSize == nil then
+	if not Metadata.HitboxSize then
 		Metadata.HitboxSize = AttackData.Hitbox.Size
 	end
-	if Metadata.HitboxOffset == nil then
+	if not Metadata.HitboxOffset then
 		Metadata.HitboxOffset = CFrame.new(AttackData.Hitbox.Offset)
 	end
 
@@ -109,7 +137,7 @@ function M1.OnStart(Context: ActionContext)
 		SizeOrPart = HitboxSize,
 		InitialCframe = RootPart.CFrame * HitboxOffset,
 		VelocityPrediction = true,
-		Debug = true,
+		Debug = false,
 		LifeTime = 0,
 		LookingFor = "Humanoid",
 		Blacklist = { Context.Entity.Character },
@@ -150,6 +178,12 @@ function M1.OnStart(Context: ActionContext)
 	Context.CustomData.ActiveHitbox = NewHitbox
 end
 
+function M1.Feinted(Context: ActionContext, AnimationName: string)
+	if Context.Entity.Player then
+		Packets.StopAnimation:FireClient(Context.Entity.Player, AnimationName, 0.15)
+	end
+end
+
 function M1.OnExecute(Context: ActionContext)
 	local Metadata = Context.Metadata
 	if Metadata == nil then
@@ -172,6 +206,8 @@ function M1.OnExecute(Context: ActionContext)
 	local HitStartTime = AnimationTimingCache.GetTiming(AnimationName, "HitStart", Metadata.FallbackTimings.HitStart)
 	local HitEndTime = AnimationTimingCache.GetTiming(AnimationName, "HitStop", Metadata.FallbackTimings.HitEnd)
 
+	Context.Entity.States:SetState("Attacking", true)
+
 	if not AnimationLength or not HitStartTime or not HitEndTime then
 		return
 	end
@@ -188,6 +224,7 @@ function M1.OnExecute(Context: ActionContext)
 	end
 
 	if not WaitUntil(HitStartTime) then
+		M1.Feinted(Context, AnimationName)
 		return
 	end
 
@@ -196,6 +233,11 @@ function M1.OnExecute(Context: ActionContext)
 
 	if Context.CustomData.ActiveHitbox then
 		Context.CustomData.ActiveHitbox:Start()
+	end
+
+	local StaminaComponent = Context.Entity:GetComponent("Stamina")
+	if StaminaComponent then
+		StaminaComponent:ConsumeStamina(Metadata.StaminaCost)
 	end
 
 	if not WaitUntil(HitEndTime) then
@@ -214,12 +256,23 @@ function M1.OnExecute(Context: ActionContext)
 end
 
 function M1.OnHit(Context: ActionContext, Target: Entity, HitIndex: number)
-	if Context.CustomData.HitWindowOpen ~= true then
+	if not Context or not Context.Metadata then return end
+	if not Context.CustomData.HitWindowOpen then
 		return
 	end
 
-	if Context.CustomData.HasHit == true then
-		return
+	local DamageComponent = Target:GetComponent("Damage")
+	if DamageComponent then
+		if not Context.Entity.Character or not Context.Entity.Character.PrimaryPart then return end
+		DamageComponent:DealDamage(Context.Metadata.BaseDamage or Context.Metadata.Damage, Context.Entity.Player, Context.Entity.Character.PrimaryPart.CFrame.LookVector)
+	end
+
+	local StateComponent = Target:GetComponent("States")
+	if StateComponent then
+		StateComponent:SetState("Stunned", true)
+		task.delay(Context.Metadata.HitStun, function()
+			StateComponent:SetState("Stunned", false)
+		end)
 	end
 
 	Context.CustomData.HasHit = true

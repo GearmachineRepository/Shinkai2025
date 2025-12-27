@@ -35,6 +35,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 			FeintEndlag = 0.25,
 			FeintCooldown = 3.0,
 			ComboEndlag = 0.5,
+			HitStun = 0.256,
 			Feintable = true,
 
 			FallbackTimings = {
@@ -81,6 +82,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 			FeintEndlag = 0.3,
 			FeintCooldown = 3.5,
 			ComboEndlag = 0.6,
+			StaminaCost = 5,
 			Feintable = true,
 
 			FallbackTimings = {

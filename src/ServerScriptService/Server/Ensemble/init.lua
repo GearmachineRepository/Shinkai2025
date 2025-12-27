@@ -26,7 +26,7 @@ type EntityContext = Types.EntityContext
 type EntityBuilder = Types.EntityBuilder
 type EngineConfigs = Types.EngineConfigs
 
-local Arch = {}
+local Ensemble = {}
 
 local Initialized = false
 
@@ -55,7 +55,7 @@ local function ValidateConfigs(Configs: EngineConfigs)
 	end
 end
 
-function Arch.Init(Config: InitConfig)
+function Ensemble.Init(Config: InitConfig)
 	if Initialized then
 		error(Types.EngineName .. " Engine already initialized")
 	end
@@ -109,36 +109,36 @@ function Arch.Init(Config: InitConfig)
 	print(string.format(Types.EngineName .. "  Hooks: %d", #HookLoader.GetAllHookNames()))
 end
 
-function Arch.CreateEntity(Character: Model, Context: EntityContext?): EntityBuilder
+function Ensemble.CreateEntity(Character: Model, Context: EntityContext?): EntityBuilder
 	if not Initialized then
-		error(Types.EngineName .. " Engine not initialized. Call Arch.Init() first")
+		error(Types.EngineName .. " Engine not initialized. Call Ensemble.Init() first")
 	end
 
 	return EntityBuilder.new(Character, Context or {})
 end
 
-function Arch.GetEntity(Character: Model): Types.Entity?
+function Ensemble.GetEntity(Character: Model): Types.Entity?
 	return Entity.GetEntity(Character)
 end
 
-function Arch.GetAllEntities(): { Types.Entity }
+function Ensemble.GetAllEntities(): { Types.Entity }
 	return Entity.GetAllEntities()
 end
 
-function Arch.DestroyEntity(Character: Model)
+function Ensemble.DestroyEntity(Character: Model)
 	local EntityInstance = Entity.GetEntity(Character)
 	if EntityInstance then
 		EntityInstance:Destroy()
 	end
 end
 
-Arch.Maid = Maid
-Arch.Signal = Signal
-Arch.Events = EventBus
-Arch.HookHelpers = HookHelpers
-Arch.Types = Types
+Ensemble.Maid = Maid
+Ensemble.Signal = Signal
+Ensemble.Events = EventBus
+Ensemble.HookHelpers = HookHelpers
+Ensemble.Types = Types
 
-Arch.ComponentLoader = ComponentLoader
-Arch.HookLoader = HookLoader
+Ensemble.ComponentLoader = ComponentLoader
+Ensemble.HookLoader = HookLoader
 
-return Arch
+return Ensemble

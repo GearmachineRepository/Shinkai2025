@@ -75,6 +75,11 @@ local Config: StateConfig = {
 			Default = false,
 			Replication = "Owner",
 		},
+
+		OnHit = {
+			Default = false,
+			Replication = "Owner",
+		},
 	},
 }
 

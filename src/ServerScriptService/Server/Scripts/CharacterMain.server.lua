@@ -96,7 +96,7 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 
 	Character:PivotTo(SpawnCFrame)
 	Player.Character = Character
-	Character.Parent = workspace
+	Character.Parent = workspace.Characters
 
 	CollectionService:AddTag(Character, "Character")
 	CloneStarterScripts(Character)
