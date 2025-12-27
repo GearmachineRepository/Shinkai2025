@@ -11,7 +11,7 @@ local RegisteredActions: { [string]: ActionDefinition } = {}
 
 function ActionRegistry.Register(Definition: ActionDefinition)
     if RegisteredActions[Definition.ActionName] then
-        warn("[Combat] Action already registered: " .. Definition.ActionName)
+        warn("[ActionRegistry] Action already registered: " .. Definition.ActionName)
         return
     end
 
@@ -60,7 +60,7 @@ function ActionRegistry.LoadFolder(Folder: Instance)
                 ActionRegistry.Register(Result)
                 Count += 1
             elseif not Success then
-                warn("[Combat] Failed to load action: " .. Child.Name .. " - " .. tostring(Result))
+                warn("[ActionRegistry] Failed to load action: " .. Child.Name .. " - " .. tostring(Result))
             end
         end
     end

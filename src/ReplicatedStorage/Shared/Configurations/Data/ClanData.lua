@@ -12,6 +12,18 @@ local ClanTypes = require(script.Parent.Parent.Enums.ClanTypes)
 -- 	Hooks = {},
 -- }
 
+type ClanDefinition = { [string]: {
+	Name: string,
+	RarityWeight: number,
+	Description: string,
+	UnlockedMode: string?,
+	UnlockedStyles: { string },
+	UnlockedSkills: { string }?,
+	StatBonuses: { [string]: number },
+	Hooks: { string },
+	ModeConfig: { [string]: any }?,
+} }
+
 local ClanDefinitions = {
 	[ClanTypes.BROWN] = {
 		Name = "Brown",
@@ -197,7 +209,7 @@ local ClanDefinitions = {
 			RemovalMaxPercent = 100,
 		},
 	},
-}
+} :: ClanDefinition
 
 return {
 	Types = ClanTypes,

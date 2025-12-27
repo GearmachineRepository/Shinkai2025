@@ -10,7 +10,7 @@ local character = script.Parent :: Model
 local humanoid = character:WaitForChild("Humanoid") :: Humanoid
 
 local lastDamageTime = 0
-local RUN_TIME_INTERVAL = 1 / 30
+local RUN_TIME_INTERVAL = 1 / 25
 
 character:GetAttributeChangedSignal("InCombat"):Connect(function()
 	if character:GetAttribute("InCombat") == false then

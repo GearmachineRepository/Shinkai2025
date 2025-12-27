@@ -20,6 +20,8 @@ export type ActionMetadata = {
     StaminaCost: number?,
     Duration: number?,
     Cooldown: number?,
+    Feintable: boolean?,
+
     AnimationId: string?,
     HitboxSize: Vector3?,
     HitboxOffset: CFrame?,

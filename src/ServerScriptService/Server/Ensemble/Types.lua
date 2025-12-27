@@ -156,6 +156,8 @@ export type Entity = {
 	GetComponent: <T>(self: Entity, ComponentName: string) -> T?,
 	HasComponent: (self: Entity, ComponentName: string) -> boolean,
 	AddComponent: (self: Entity, ComponentName: string, ComponentInstance: any) -> (),
+	TakeDamage: (self: Entity, Damage: number, Source: Player?, Direction: Vector3?) -> (),
+	DealDamage: (self: Entity, Target: Model, BaseDamage: number) -> (),
 	FireCreated: (self: Entity) -> (),
 	Destroy: (self: Entity) -> (),
 }

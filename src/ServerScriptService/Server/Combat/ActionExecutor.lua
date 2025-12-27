@@ -16,182 +16,202 @@ local ActionExecutor = {}
 
 local ActiveContexts: { [any]: ActionContext } = {}
 
+-- Creates and initializes a new ActionContext with standard defaults for runtime execution tracking.
 local function CreateContext(Entity: CombatTypes.Entity, Metadata: ActionMetadata, InputData: any?): ActionContext
-    return {
-        Entity = Entity,
-        InputData = InputData or {},
-        Metadata = Metadata,
-        StartTime = workspace:GetServerTimeNow(),
-        Interrupted = false,
-        InterruptReason = nil,
-        CustomData = {},
-    }
+	return {
+		Entity = Entity,
+		InputData = InputData or {},
+		Metadata = Metadata,
+		StartTime = workspace:GetServerTimeNow(),
+		Interrupted = false,
+		InterruptReason = nil,
+		CustomData = {},
+	}
 end
 
+-- Executes an action by name for an entity, running validation hooks, publishing lifecycle events, and starting async execution.
 function ActionExecutor.Execute(
-    Entity: CombatTypes.Entity,
-    ActionName: string,
-    InputData: { [string]: any }?
+	Entity: CombatTypes.Entity,
+	ActionName: string,
+	InputData: { [string]: any }?
 ): (boolean, string?)
-    local Definition, Metadata = ActionRegistry.GetWithMetadata(ActionName, nil)
 
-    if not Definition then
-        return false, "Unknown action"
+    if ActiveContexts[Entity] ~= nil then
+        return false, "Already executing"
     end
 
-    local Context = CreateContext(Entity, Metadata, InputData)
+	local Definition: ActionDefinition?, Metadata: ActionMetadata? = ActionRegistry.GetWithMetadata(ActionName, nil)
 
-    if Definition.CanExecute then
-        local CanExecute, Reason = Definition.CanExecute(Context)
-        if not CanExecute then
-            return false, Reason or "Cannot execute"
-        end
-    end
+	if not Definition or not Metadata then
+		return false, "Unknown action"
+	end
 
-    local ModifiedMetadata = table.clone(Metadata)
+	local Context = CreateContext(Entity, Metadata, InputData)
 
-    Ensemble.Events.Publish("ActionConfiguring", {
-        Entity = Entity,
-        ActionName = ActionName,
-        Metadata = ModifiedMetadata,
-    })
+	if Definition.CanExecute then
+		local CanExecute: boolean, Reason: string? = Definition.CanExecute(Context)
+		if not CanExecute then
+			return false, Reason or "Cannot execute"
+		end
+	end
 
-    Context.Metadata = ModifiedMetadata
+	local ModifiedMetadata: ActionMetadata = table.clone(Metadata)
 
-    ActiveContexts[Entity] = Context
+	Ensemble.Events.Publish("ActionConfiguring", {
+		Entity = Entity,
+		ActionName = ActionName,
+		Metadata = ModifiedMetadata,
+	})
 
-    if Definition.OnStart then
-        Definition.OnStart(Context)
-    end
+	Context.Metadata = ModifiedMetadata
+	ActiveContexts[Entity] = Context
 
-    Ensemble.Events.Publish("ActionStarted", {
-        Entity = Entity,
-        ActionName = ActionName,
-        Metadata = ModifiedMetadata,
-        Context = Context,
-    })
+	if Definition.OnStart then
+		Definition.OnStart(Context)
+	end
 
-    task.spawn(function()
-        Definition.OnExecute(Context)
+	Ensemble.Events.Publish("ActionStarted", {
+		Entity = Entity,
+		ActionName = ActionName,
+		Metadata = ModifiedMetadata,
+		Context = Context,
+	})
 
-        if not Context.Interrupted then
-            ActionExecutor.Complete(Entity)
-        end
-    end)
+	task.spawn(function()
+		Definition.OnExecute(Context)
 
-    return true, nil
+		if not Context.Interrupted then
+			ActionExecutor.Complete(Entity)
+		end
+	end)
+
+	return true, nil
 end
 
+-- Interrupts the currently executing action for an entity, invokes interrupt hooks, publishes an event, and performs cleanup.
 function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): boolean
-    local Context = ActiveContexts[Entity]
-    if not Context then
-        return false
-    end
+	local Context = ActiveContexts[Entity]
+	if not Context then
+		return false
+	end
 
-    if Context.Interrupted then
-        return false
-    end
+	if Context.Interrupted then
+		return false
+	end
 
-    if not Context.Metadata then
-        return false
-    end
+	if not Context.Metadata then
+		return false
+	end
 
-    Context.Interrupted = true
-    Context.InterruptReason = Reason
+	local InterruptReason = Reason or "Unknown"
 
-    local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
+	if InterruptReason == "Feint" then
+		if not Context.CustomData.CanFeint or not Context.Metadata.Feintable then
+			return false
+		end
+	end
 
-    if Definition and Definition.OnInterrupt then
-        Definition.OnInterrupt(Context)
-    end
+	Context.Interrupted = true
+	Context.InterruptReason = InterruptReason
 
-    Ensemble.Events.Publish("ActionInterrupted", {
-        Entity = Entity,
-        ActionName = Context.Metadata.ActionName,
-        Reason = Reason,
-        Context = Context,
-    })
+	local Definition: ActionDefinition? = ActionRegistry.Get(Context.Metadata.ActionName)
 
-    ActionExecutor.Cleanup(Entity)
+	if Definition and Definition.OnInterrupt then
+		Definition.OnInterrupt(Context)
+	end
 
-    return true
+	Ensemble.Events.Publish("ActionInterrupted", {
+		Entity = Entity,
+		ActionName = Context.Metadata.ActionName,
+		Reason = InterruptReason,
+		Context = Context,
+	})
+
+	ActionExecutor.Cleanup(Entity)
+
+	return true
 end
 
+-- Completes the currently executing action for an entity if it was not interrupted, invokes completion hooks, publishes an event, and performs cleanup.
 function ActionExecutor.Complete(Entity: CombatTypes.Entity)
-    local Context = ActiveContexts[Entity]
-    if not Context then
-        return
-    end
+	local Context = ActiveContexts[Entity]
+	if not Context then
+		return
+	end
 
-    if Context.Interrupted then
-        return
-    end
+	if Context.Interrupted then
+		return
+	end
 
-    if not Context.Metadata then
-        return
-    end
+	if not Context.Metadata then
+		return
+	end
 
-    local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
+	local Definition: ActionDefinition? = ActionRegistry.Get(Context.Metadata.ActionName)
 
-    if Definition and Definition.OnComplete then
-        Definition.OnComplete(Context)
-    end
+	if Definition and Definition.OnComplete then
+		Definition.OnComplete(Context)
+	end
 
-    Ensemble.Events.Publish("ActionCompleted", {
-        Entity = Entity,
-        ActionName = Context.Metadata.ActionName,
-        Context = Context,
-    })
+	Ensemble.Events.Publish("ActionCompleted", {
+		Entity = Entity,
+		ActionName = Context.Metadata.ActionName,
+		Context = Context,
+	})
 
-    ActionExecutor.Cleanup(Entity)
+	ActionExecutor.Cleanup(Entity)
 end
 
+-- Performs final teardown for an entity's active action, invoking cleanup hooks and removing the active context.
 function ActionExecutor.Cleanup(Entity: CombatTypes.Entity)
-    local Context = ActiveContexts[Entity]
-    if not Context then
-        return
-    end
+	local Context = ActiveContexts[Entity]
+	if not Context then
+		return
+	end
 
-    if not Context.Metadata then
-        return
-    end
+	if not Context.Metadata then
+		return
+	end
 
-    local Definition = ActionRegistry.Get(Context.Metadata.ActionName)
+	local Definition: ActionDefinition? = ActionRegistry.Get(Context.Metadata.ActionName)
 
-    if Definition and Definition.OnCleanup then
-        Definition.OnCleanup(Context)
-    end
+	if Definition and Definition.OnCleanup then
+		Definition.OnCleanup(Context)
+	end
 
-    ActiveContexts[Entity] = nil
+	ActiveContexts[Entity] = nil
 end
 
+-- Returns the current active ActionContext for an entity, if any.
 function ActionExecutor.GetActiveContext(Entity: CombatTypes.Entity): ActionContext?
-    return ActiveContexts[Entity]
+	return ActiveContexts[Entity]
 end
 
+-- Returns whether an entity currently has an active executing action context.
 function ActionExecutor.IsExecuting(Entity: CombatTypes.Entity): boolean
-    return ActiveContexts[Entity] ~= nil
+	return ActiveContexts[Entity] ~= nil
 end
 
+-- Retrieves animation marker timings from cache and merges in fallback defaults for any missing markers.
 function ActionExecutor.GetTimings(AnimationId: string, Fallbacks: { [string]: number }?): { [string]: number }
-    local Timings = {}
-    local Defaults = Fallbacks or {}
+	local Timings: { [string]: number } = {}
+	local Defaults: { [string]: number } = Fallbacks or {}
 
-    local Cached = AnimationTimingCache.GetAllMarkers(AnimationId)
+	local Cached = AnimationTimingCache.GetAllMarkers(AnimationId)
 
-    if Cached then
-        for MarkerName, MarkerData in Cached do
-            Timings[MarkerName] = MarkerData.Time
-        end
-    end
+	if Cached then
+		for MarkerName, MarkerData in Cached do
+			Timings[MarkerName] = MarkerData.Time
+		end
+	end
 
-    for Key, Value in pairs(Defaults) do
-        if Timings[Key] == nil then
-            Timings[Key] = Value
-        end
-    end
+	for Key, Value in pairs(Defaults) do
+		if Timings[Key] == nil then
+			Timings[Key] = Value
+		end
+	end
 
-    return Timings
+	return Timings
 end
 
 return ActionExecutor

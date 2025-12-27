@@ -20,7 +20,7 @@ MovementComponent.__index = MovementComponent
 
 MovementComponent.ComponentName = "Movement"
 MovementComponent.Dependencies = { "Stats", "Stamina" }
-MovementComponent.UpdateRate = 1 / 10
+MovementComponent.UpdateRate = 1 / 30
 
 local WALKSPEED_UPDATE_THROTTLE = 0.05
 

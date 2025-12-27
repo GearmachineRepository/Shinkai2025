@@ -49,7 +49,7 @@ function CooldownModule:IsOnCooldown(CooldownId: string): boolean
 end
 
 function CooldownModule:GetRemaining(CooldownId: string): number
-	local Cooldown = self.Cooldowns[CooldownId]
+	local Cooldown = self.Cooldowns[CooldownId] :: CooldownData
 	if not Cooldown then
 		return 0
 	end

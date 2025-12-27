@@ -10,6 +10,7 @@ export type ItemDefinition = {
 	Description: string,
 	MaxStackSize: number,
 	Rarity: string,
+	AnimationSet: string?,
 	BaseStats: {
 		Damage: number?,
 		AttackSpeed: number?,
@@ -21,6 +22,21 @@ export type ItemDefinition = {
 }
 
 local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
+	["karate_style"] = {
+		ItemId = "karate_style",
+		ItemName = "Karate",
+		ItemType = "Style",
+		Icon = "rbxassetid://0",
+		Description = "A martial art focused on powerful strikes",
+		MaxStackSize = 1,
+		Rarity = "Common",
+		AnimationSet = "Karate",
+		BaseStats = {
+			Damage = 8,
+			AttackSpeed = 1.0,
+		},
+	},
+
 	["wooden_sword"] = {
 		ItemId = "wooden_sword",
 		ItemName = "Wooden Sword",
@@ -29,6 +45,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		Description = "A basic wooden sword for beginners",
 		MaxStackSize = 1,
 		Rarity = "Common",
+		AnimationSet = "Fists",
 		BaseStats = {
 			Damage = 10,
 			AttackSpeed = 1.0,
@@ -45,6 +62,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		Description = "A sturdy iron blade",
 		MaxStackSize = 1,
 		Rarity = "Uncommon",
+		AnimationSet = "Fists",
 		BaseStats = {
 			Damage = 20,
 			AttackSpeed = 0.9,
@@ -61,6 +79,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		Description = "A swift and deadly katana",
 		MaxStackSize = 1,
 		Rarity = "Rare",
+		AnimationSet = "Fists",
 		BaseStats = {
 			Damage = 35,
 			AttackSpeed = 1.3,
@@ -105,6 +124,7 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		Description = "For hand-to-hand combat training",
 		MaxStackSize = 1,
 		Rarity = "Common",
+		AnimationSet = "Fists",
 		BaseStats = {
 			Damage = 8,
 			AttackSpeed = 1.5,
@@ -138,6 +158,14 @@ end
 
 function ItemDatabase.ItemExists(ItemId: string): boolean
 	return ITEM_DEFINITIONS[ItemId] ~= nil
+end
+
+function ItemDatabase.GetAnimationSet(ItemId: string): string?
+	local ItemDef = ITEM_DEFINITIONS[ItemId]
+	if not ItemDef then
+		return nil
+	end
+	return ItemDef.AnimationSet
 end
 
 function ItemDatabase.RegisterItem(ItemDefinition: ItemDefinition)
