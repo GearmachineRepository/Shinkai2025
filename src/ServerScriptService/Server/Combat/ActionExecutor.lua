@@ -6,7 +6,6 @@ local Server = ServerScriptService:WaitForChild("Server")
 local Ensemble = require(Server.Ensemble)
 local CombatTypes = require(script.Parent.CombatTypes)
 local ActionRegistry = require(script.Parent.ActionRegistry)
-local AnimationTimingCache = require(script.Parent.AnimationTimingCache)
 
 type ActionContext = CombatTypes.ActionContext
 type ActionDefinition = CombatTypes.ActionDefinition
@@ -39,6 +38,8 @@ function ActionExecutor.Execute(
     if ActiveContexts[Entity] ~= nil then
         return false, "Already executing"
     end
+
+	Entity.States:SetState("Attacking", true)
 
 	local Definition: ActionDefinition?, Metadata: ActionMetadata? = ActionRegistry.GetWithMetadata(ActionName, nil)
 
@@ -179,6 +180,8 @@ function ActionExecutor.Cleanup(Entity: CombatTypes.Entity)
 		Definition.OnCleanup(Context)
 	end
 
+	Entity.States:SetState("Attacking", false)
+
 	ActiveContexts[Entity] = nil
 end
 
@@ -190,28 +193,6 @@ end
 -- Returns whether an entity currently has an active executing action context.
 function ActionExecutor.IsExecuting(Entity: CombatTypes.Entity): boolean
 	return ActiveContexts[Entity] ~= nil
-end
-
--- Retrieves animation marker timings from cache and merges in fallback defaults for any missing markers.
-function ActionExecutor.GetTimings(AnimationId: string, Fallbacks: { [string]: number }?): { [string]: number }
-	local Timings: { [string]: number } = {}
-	local Defaults: { [string]: number } = Fallbacks or {}
-
-	local Cached = AnimationTimingCache.GetAllMarkers(AnimationId)
-
-	if Cached then
-		for MarkerName, MarkerData in Cached do
-			Timings[MarkerName] = MarkerData.Time
-		end
-	end
-
-	for Key, Value in pairs(Defaults) do
-		if Timings[Key] == nil then
-			Timings[Key] = Value
-		end
-	end
-
-	return Timings
 end
 
 return ActionExecutor

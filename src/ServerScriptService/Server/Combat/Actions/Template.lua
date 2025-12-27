@@ -24,6 +24,8 @@ Template.DefaultMetadata = {
         HitEnd = 0.35,
     },
 }
+-- Context.Metadata = the actual item stats
+-- Context.CustomData = runtime variables that can be used in the module
 
 -- Returns whether the action is allowed to begin right now (e.g., cooldowns, state gates, stamina checks).
 function Template.CanExecute(Context: ActionContext): (boolean, string?)

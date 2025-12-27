@@ -16,9 +16,8 @@ local ActionRegistry = require(Server.Combat.ActionRegistry)
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
 
-for _, AnimationId in pairs(AnimationDatabase) do
-	AnimationTimingCache.PreloadAnimation(AnimationId)
-end
+local PreloadAmount = AnimationTimingCache.PreloadDatabase(AnimationDatabase)
+warn("Preloaded (" .. PreloadAmount .. ") Animations")
 
 local function GetEntityFromPlayer(Player: Player): EnsembleTypes.Entity?
 	local Character = Player.Character

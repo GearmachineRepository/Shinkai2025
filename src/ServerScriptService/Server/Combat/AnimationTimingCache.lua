@@ -3,97 +3,206 @@
 local KeyframeSequenceProvider = game:GetService("KeyframeSequenceProvider")
 
 type MarkerData = {
-    Time: number,
-    Value: string?,
+	Time: number,
+	Value: string?,
 }
 
 type AnimationData = {
-    Length: number,
-    Markers: { [string]: MarkerData },
+	Length: number,
+	Markers: { [string]: MarkerData },
+
+	PrimaryName: string?,
+	Names: { [string]: true },
+	AnimationId: string,
 }
 
 local AnimationTimingCache = {}
 
-local Cache: { [string]: AnimationData } = {}
-local Loading: { [string]: boolean } = {}
+local CacheByAnimationId: { [string]: AnimationData } = {}
+local LoadingByAnimationId: { [string]: boolean } = {}
 
-function AnimationTimingCache.GetMarkerTime(AnimationId: string, MarkerName: string): number?
-    local Data = Cache[AnimationId]
-    if Data and Data.Markers[MarkerName] then
-        return Data.Markers[MarkerName].Time
-    end
-    return nil
+local AnimationIdByName: { [string]: string } = {}
+local NamesByAnimationId: { [string]: { [string]: true } } = {}
+
+local function RegisterName(AnimationName: string, AnimationId: string)
+	if AnimationName == "" then
+		return
+	end
+
+	AnimationIdByName[AnimationName] = AnimationId
+
+	local ExistingNames = NamesByAnimationId[AnimationId]
+	if ExistingNames == nil then
+		ExistingNames = {}
+		NamesByAnimationId[AnimationId] = ExistingNames
+	end
+
+	ExistingNames[AnimationName] = true
+
+	local ExistingData = CacheByAnimationId[AnimationId]
+	if ExistingData ~= nil then
+		ExistingData.Names[AnimationName] = true
+		if ExistingData.PrimaryName == nil then
+			ExistingData.PrimaryName = AnimationName
+		end
+	end
 end
 
-function AnimationTimingCache.GetLength(AnimationId: string): number?
-    local Data = Cache[AnimationId]
-    return if Data then Data.Length else nil
+local function ResolveAnimationId(AnimationNameOrId: string): string
+	local AnimationId = AnimationIdByName[AnimationNameOrId]
+	if AnimationId ~= nil then
+		return AnimationId
+	end
+
+	return AnimationNameOrId
 end
 
-function AnimationTimingCache.GetAllMarkers(AnimationId: string): { [string]: MarkerData }?
-    local Data = Cache[AnimationId]
-    return if Data then Data.Markers else nil
+local function GetDataByNameOrId(AnimationNameOrId: string): AnimationData?
+	local AnimationId = ResolveAnimationId(AnimationNameOrId)
+	return CacheByAnimationId[AnimationId]
 end
 
-function AnimationTimingCache.IsLoaded(AnimationId: string): boolean
-    return Cache[AnimationId] ~= nil
+function AnimationTimingCache.GetMarkerTime(AnimationNameOrId: string, MarkerName: string): number?
+	local Data = GetDataByNameOrId(AnimationNameOrId)
+	if Data and Data.Markers[MarkerName] then
+		return Data.Markers[MarkerName].Time
+	end
+	return nil
+end
+
+function AnimationTimingCache.GetLength(AnimationNameOrId: string): number?
+	local Data = GetDataByNameOrId(AnimationNameOrId)
+	return if Data then Data.Length else nil
+end
+
+function AnimationTimingCache.GetAllMarkers(AnimationNameOrId: string): { [string]: MarkerData }?
+	local Data = GetDataByNameOrId(AnimationNameOrId)
+	return if Data then Data.Markers else nil
+end
+
+function AnimationTimingCache.IsLoaded(AnimationNameOrId: string): boolean
+	local AnimationId = ResolveAnimationId(AnimationNameOrId)
+	return CacheByAnimationId[AnimationId] ~= nil
+end
+
+function AnimationTimingCache.GetTiming(AnimationName: string, TimingName: string, FallbackValue: number?): number?
+	local CachedTime = AnimationTimingCache.GetMarkerTime(AnimationName, TimingName)
+
+	if CachedTime then
+		return CachedTime
+	end
+
+	if typeof(FallbackValue) == "number" then
+		return FallbackValue
+	end
+
+	return nil
+end
+
+function AnimationTimingCache.GetAnimationId(AnimationName: string): string?
+	return AnimationIdByName[AnimationName]
+end
+
+function AnimationTimingCache.GetAnimationNames(AnimationNameOrId: string): { string }?
+	local AnimationId = ResolveAnimationId(AnimationNameOrId)
+	local NameSet = NamesByAnimationId[AnimationId]
+	if NameSet == nil then
+		return nil
+	end
+
+	local NameList: { string } = {}
+	for Name in NameSet do
+		table.insert(NameList, Name)
+	end
+	return NameList
 end
 
 function AnimationTimingCache.PreloadAnimation(AnimationId: string): boolean
-    if Cache[AnimationId] or Loading[AnimationId] then
-        return Cache[AnimationId] ~= nil
-    end
+	if CacheByAnimationId[AnimationId] or LoadingByAnimationId[AnimationId] then
+		return CacheByAnimationId[AnimationId] ~= nil
+	end
 
-    Loading[AnimationId] = true
+	LoadingByAnimationId[AnimationId] = true
 
-    local Success, Sequence = pcall(function()
-        return KeyframeSequenceProvider:GetKeyframeSequenceAsync(AnimationId)
-    end)
+	local Success, Sequence = pcall(function()
+		return KeyframeSequenceProvider:GetKeyframeSequenceAsync(AnimationId)
+	end)
 
-    Loading[AnimationId] = nil
+	LoadingByAnimationId[AnimationId] = nil
 
-    if not Success or not Sequence then
-        warn("[Combat] Failed to load KeyframeSequence: " .. AnimationId)
-        return false
-    end
+	if not Success or not Sequence then
+		warn("[Combat] Failed to load KeyframeSequence: " .. AnimationId)
+		return false
+	end
 
-    local Markers: { [string]: MarkerData } = {}
-    local MaxTime = 0
+	local Markers: { [string]: MarkerData } = {}
+	local MaxTime = 0
 
-    for _, Keyframe in Sequence:GetKeyframes() do
-        MaxTime = math.max(MaxTime, Keyframe.Time)
+	for _, Keyframe in Sequence:GetKeyframes() do
+		MaxTime = math.max(MaxTime, Keyframe.Time)
 
-        for _, Marker in Keyframe:GetMarkers() do
-            Markers[Marker.Name] = {
-                Time = Keyframe.Time,
-                Value = Marker.Value,
-            }
-        end
-    end
+		for _, Marker in Keyframe:GetMarkers() do
+			Markers[Marker.Name] = {
+				Time = Keyframe.Time,
+				Value = Marker.Value,
+			}
+		end
+	end
 
-    Cache[AnimationId] = {
-        Length = MaxTime,
-        Markers = Markers,
-    }
+	local NameSet = NamesByAnimationId[AnimationId] or {}
 
-    Sequence:Destroy()
-    return true
+	CacheByAnimationId[AnimationId] = {
+		AnimationId = AnimationId,
+		Length = MaxTime,
+		Markers = Markers,
+		PrimaryName = next(NameSet) :: any,
+		Names = NameSet,
+	}
+
+	Sequence:Destroy()
+	return true
 end
 
-function AnimationTimingCache.PreloadFolder(Folder: Instance)
-    local Count = 0
-    for _, Descendant in Folder:GetDescendants() do
-        if Descendant:IsA("Animation") then
-            if AnimationTimingCache.PreloadAnimation(Descendant.AnimationId) then
-                Count += 1
-            end
-        end
-    end
-    return Count
+function AnimationTimingCache.PreloadFolder(Folder: Instance): number
+	local Count = 0
+
+	for _, Descendant in Folder:GetDescendants() do
+		if Descendant:IsA("Animation") then
+			local AnimationName = Descendant.Name
+			local AnimationId = Descendant.AnimationId
+
+			RegisterName(AnimationName, AnimationId)
+
+			if AnimationTimingCache.PreloadAnimation(AnimationId) then
+				Count += 1
+			end
+		end
+	end
+
+	return Count
+end
+
+function AnimationTimingCache.PreloadDatabase(Database: { [string]: string }): number
+	local Count = 0
+
+	for AnimationName, AnimationId in Database do
+		if typeof(AnimationName) == "string" and typeof(AnimationId) == "string" then
+			RegisterName(AnimationName, AnimationId)
+
+			if AnimationTimingCache.PreloadAnimation(AnimationId) then
+				Count += 1
+			end
+		end
+	end
+
+	return Count
 end
 
 function AnimationTimingCache.Clear()
-    table.clear(Cache)
+	table.clear(CacheByAnimationId)
+	table.clear(LoadingByAnimationId)
+	table.clear(AnimationIdByName)
+	table.clear(NamesByAnimationId)
 end
 
 return AnimationTimingCache

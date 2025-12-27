@@ -1,9 +1,13 @@
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
 
+local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local CombatTypes = require(Server.Combat.CombatTypes)
+local Packets = require(Shared.Networking.Packets)
 
 type ActionContext = CombatTypes.ActionContext
 type Entity = CombatTypes.Entity
@@ -20,24 +24,15 @@ M1.DefaultMetadata = {
 	StaminaCost = 5,
 	HitboxSize = Vector3.new(4, 4, 4),
 	HitboxOffset = CFrame.new(0, 0, -3),
+	FeintEndlag = 0.25,
     Feintable = true,
 
 	FallbackTimings = {
 		HitStart = 0.25,
 		HitEnd = 0.55,
+		Length = 1.25
 	},
 }
-
-local function GetTiming(Metadata: ActionMetadata, TimingName: string, FallbackValue: number): number
-	local FallbackTimingsValue = Metadata.FallbackTimings
-	if type(FallbackTimingsValue) == "table" then
-		local TimingValue = (FallbackTimingsValue :: { [string]: any })[TimingName]
-		if type(TimingValue) == "number" then
-			return TimingValue
-		end
-	end
-	return FallbackValue
-end
 
 function M1.CanExecute(Context: ActionContext): (boolean, string?)
 	if Context.Metadata == nil then
@@ -61,26 +56,47 @@ function M1.OnExecute(Context: ActionContext)
 		return
 	end
 
-	local HitStartTime = GetTiming(Metadata, "HitStart", 0.15)
-	local HitEndTime = GetTiming(Metadata, "HitEnd", 0.35)
+	local AnimationName = "Karate1"
 
-	local WindowDuration = math.max(0, HitEndTime - HitStartTime)
+	if Context.Entity.Player then
+		Packets.PlayAnimation:FireClient(Context.Entity.Player, AnimationName)
+	end
 
-	task.wait(HitStartTime)
-	if Context.Interrupted then
+	local AnimationLength = AnimationTimingCache.GetLength(AnimationName) or Metadata.FallbackTimings.Length
+	local HitStartTime = AnimationTimingCache.GetTiming(AnimationName, "HitStart", Metadata.FallbackTimings.HitStart)
+	local HitEndTime = AnimationTimingCache.GetTiming(AnimationName, "HitEnd", Metadata.FallbackTimings.HitEnd)
+
+	if not AnimationLength or not HitStartTime or not HitEndTime then
+		return
+	end
+
+	local StartTimestamp = os.clock()
+
+	local function WaitUntil(AbsoluteSecondsFromStart: number): boolean
+		local Elapsed = os.clock() - StartTimestamp
+		local Remaining = AbsoluteSecondsFromStart - Elapsed
+		if Remaining > 0 then
+			task.wait(Remaining)
+		end
+		return Context.Interrupted ~= true
+	end
+
+	if not WaitUntil(HitStartTime) then
 		return
 	end
 
 	Context.CustomData.CanFeint = false
-
 	Context.CustomData.HitWindowOpen = true
 
-	task.wait(WindowDuration)
-	if Context.Interrupted then
+	if not WaitUntil(HitEndTime) then
 		return
 	end
 
 	Context.CustomData.HitWindowOpen = false
+
+	if not WaitUntil(AnimationLength) then
+		return
+	end
 end
 
 function M1.OnHit(Context: ActionContext, Target: Entity, HitIndex: number)
