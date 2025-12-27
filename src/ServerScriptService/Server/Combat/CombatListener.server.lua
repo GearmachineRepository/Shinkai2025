@@ -1,5 +1,4 @@
 --!strict
--- Server/Combat/CombatListener.server.lua
 
 local ServerScriptService = game:GetService("ServerScriptService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -18,6 +17,8 @@ local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
 
 local PreloadAmount = AnimationTimingCache.PreloadDatabase(AnimationDatabase)
 warn("Preloaded (" .. PreloadAmount .. ") Animations")
+
+local FallBackM1 = "Karate"
 
 local function GetEntityFromPlayer(Player: Player): EnsembleTypes.Entity?
 	local Character = Player.Character
@@ -45,24 +46,35 @@ Packets.PerformAction.OnServerEvent:Connect(function(Player: Player, ActionName:
 		return
 	end
 
-	-- If the player tries to start any action while one is running, interrupt the old one first.
-	-- if ActionExecutor.IsExecuting(Entity) then
-	-- 	ActionExecutor.Interrupt(Entity, "Replaced")
-	-- end
+	local FinalInputData = InputData or {}
 
-	local Success, Reason = ActionExecutor.Execute(Entity, ActionName, InputData)
+	if ActionName == "M1" then
+		local ToolComponent = Entity:GetComponent("Tool")
+		if ToolComponent then
+			local EquippedTool = ToolComponent:GetEquippedTool()
+			if EquippedTool and EquippedTool.ToolId then
+				FinalInputData.ItemId = EquippedTool.ToolId
+			else
+				FinalInputData.ItemId = FallBackM1
+			end
+		else
+			FinalInputData.ItemId = FallBackM1
+		end
+	end
+
+	local Success, Reason = ActionExecutor.Execute(Entity, ActionName, FinalInputData)
 
 	if Success then
 		Packets.ActionApproved:FireClient(Player, ActionName)
 	else
-        if ActionName == "M2" then
-            local Interrupted = ActionExecutor.Interrupt(Entity, "Feint")
-            if not Interrupted then
-                return
-            end
-        else
-		    Packets.ActionDenied:FireClient(Player, Reason or "Failed")
-        end
+		if ActionName == "M2" then
+			local Interrupted = ActionExecutor.Interrupt(Entity, "Feint")
+			if not Interrupted then
+				return
+			end
+		else
+			Packets.ActionDenied:FireClient(Player, Reason or "Failed")
+		end
 	end
 end)
 

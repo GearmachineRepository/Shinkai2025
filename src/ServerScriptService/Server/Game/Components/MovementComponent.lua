@@ -93,6 +93,10 @@ function MovementComponent.SetMovementMode(self: Self, Mode: string)
 		return
 	end
 
+	if self.Entity.States:GetState(StateTypes.ATTACKING) and (Mode == "run" or Mode == "jog") then
+		return
+	end
+
 	if Mode == "run" then
 		MovementComponent.HandleSprintMode(self)
 	elseif Mode == "jog" then

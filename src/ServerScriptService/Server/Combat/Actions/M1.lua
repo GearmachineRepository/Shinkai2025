@@ -8,6 +8,11 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local CombatTypes = require(Server.Combat.CombatTypes)
 local Packets = require(Shared.Networking.Packets)
+local ActionExecutor = require(Server.Combat.ActionExecutor)
+local Ensemble = require(ServerScriptService.Server.Ensemble)
+local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
+local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
+local Hitbox = require(Shared.Packages.Hitbox)
 
 type ActionContext = CombatTypes.ActionContext
 type Entity = CombatTypes.Entity
@@ -20,12 +25,11 @@ M1.ActionType = "Attack"
 
 M1.DefaultMetadata = {
 	ActionName = "M1",
-	BaseDamage = 10,
-	StaminaCost = 5,
-	HitboxSize = Vector3.new(4, 4, 4),
-	HitboxOffset = CFrame.new(0, 0, -3),
+	AnimationSet = "Karate",
 	FeintEndlag = 0.25,
-    Feintable = true,
+	FeintCooldown = 3.0,
+	ComboEndlag = 0.5,
+	Feintable = true,
 
 	FallbackTimings = {
 		HitStart = 0.25,
@@ -46,8 +50,104 @@ function M1.OnStart(Context: ActionContext)
 	Context.CustomData.HitWindowOpen = false
 	Context.CustomData.HasHit = false
 	Context.CustomData.LastHitTarget = nil
-
 	Context.CustomData.CanFeint = true
+
+	local Metadata = Context.Metadata
+	if not Metadata then
+		return
+	end
+
+	local ItemId = Context.InputData and Context.InputData.ItemId
+	if ItemId then
+		local ItemData = ItemDatabase.GetItem(ItemId)
+		if ItemData and ItemData.BaseStats then
+			for Key, Value in ItemData.BaseStats do
+				Metadata[Key] = Value
+			end
+
+			if ItemData.AnimationSet then
+				Metadata.AnimationSet = ItemData.AnimationSet
+			end
+		end
+	end
+
+	local AnimationSetName = Metadata.AnimationSet or "Karate"
+	local ComboCount = ActionExecutor.GetComboCount(Context.Entity)
+
+	local AttackData = AnimationSets.GetAttack(AnimationSetName, ComboCount)
+	if not AttackData then
+		warn("Failed to get attack data for set:", AnimationSetName, "index:", ComboCount)
+		return
+	end
+
+	Context.CustomData.ComboCount = ComboCount
+	Context.CustomData.AttackData = AttackData
+	Context.CustomData.AnimationSetName = AnimationSetName
+
+	if Metadata.BaseDamage == nil then
+		Metadata.BaseDamage = AttackData.Damage
+	end
+	if Metadata.StaminaCost == nil then
+		Metadata.StaminaCost = AttackData.StaminaCost
+	end
+	if Metadata.HitboxSize == nil then
+		Metadata.HitboxSize = AttackData.Hitbox.Size
+	end
+	if Metadata.HitboxOffset == nil then
+		Metadata.HitboxOffset = CFrame.new(AttackData.Hitbox.Offset)
+	end
+
+	local RootPart = Context.Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart
+	if not RootPart then
+		return
+	end
+
+	local HitboxSize: Vector3 = Metadata.HitboxSize or error("Metadata.HitboxSize is required")
+	local HitboxOffset: CFrame = Metadata.HitboxOffset or CFrame.new()
+
+	local NewHitbox = Hitbox.new({
+		SizeOrPart = HitboxSize,
+		InitialCframe = RootPart.CFrame * HitboxOffset,
+		VelocityPrediction = true,
+		Debug = true,
+		LifeTime = 0,
+		LookingFor = "Humanoid",
+		Blacklist = { Context.Entity.Character },
+		DebounceTime = 0,
+		SpatialOption = "InBox",
+	})
+
+	NewHitbox:WeldTo(RootPart, Metadata.HitboxOffset)
+
+	NewHitbox.OnHit:Connect(function(HitCharacters: { Model })
+		if not Context.CustomData.HitWindowOpen then
+			return
+		end
+
+		for _, TargetCharacter in HitCharacters do
+			if Context.CustomData.HasHit then
+				return
+			end
+
+			local TargetEntity = Ensemble.GetEntity(TargetCharacter)
+			if not TargetEntity then
+				continue
+			end
+
+			if TargetEntity == Context.Entity then
+				continue
+			end
+
+			Context.CustomData.HasHit = true
+			Context.CustomData.LastHitTarget = TargetEntity
+
+			if M1.OnHit then
+				M1.OnHit(Context, TargetEntity, 1)
+			end
+		end
+	end)
+
+	Context.CustomData.ActiveHitbox = NewHitbox
 end
 
 function M1.OnExecute(Context: ActionContext)
@@ -56,7 +156,13 @@ function M1.OnExecute(Context: ActionContext)
 		return
 	end
 
-	local AnimationName = "Karate1"
+	local AttackData = Context.CustomData.AttackData
+	if not AttackData then
+		warn("No AttackData in CustomData")
+		return
+	end
+
+	local AnimationName = AttackData.AnimationId
 
 	if Context.Entity.Player then
 		Packets.PlayAnimation:FireClient(Context.Entity.Player, AnimationName)
@@ -88,11 +194,19 @@ function M1.OnExecute(Context: ActionContext)
 	Context.CustomData.CanFeint = false
 	Context.CustomData.HitWindowOpen = true
 
+	if Context.CustomData.ActiveHitbox then
+		Context.CustomData.ActiveHitbox:Start()
+	end
+
 	if not WaitUntil(HitEndTime) then
 		return
 	end
 
 	Context.CustomData.HitWindowOpen = false
+
+	if Context.CustomData.ActiveHitbox then
+		Context.CustomData.ActiveHitbox:Stop()
+	end
 
 	if not WaitUntil(AnimationLength) then
 		return
@@ -113,9 +227,27 @@ function M1.OnHit(Context: ActionContext, Target: Entity, HitIndex: number)
 	Context.CustomData.LastHitIndex = HitIndex
 end
 
+function M1.OnComplete(Context: ActionContext)
+	if not Context or not Context.Metadata then return end
+	local AnimationSetName = Context.CustomData.AnimationSetName or Context.Metadata.AnimationSet
+	local CurrentCombo = ActionExecutor.GetComboCount(Context.Entity)
+	local ComboLength = AnimationSets.GetComboLength(AnimationSetName or "Karate")
+
+	if CurrentCombo == ComboLength and Context.Metadata.ComboEndlag then
+		task.wait(Context.Metadata.ComboEndlag)
+	end
+
+	ActionExecutor.IncrementCombo(Context.Entity, AnimationSetName)
+end
+
 function M1.OnCleanup(Context: ActionContext)
 	Context.CustomData.CanFeint = false
 	Context.CustomData.HitWindowOpen = false
+
+	if Context.CustomData.ActiveHitbox then
+		Context.CustomData.ActiveHitbox:Destroy()
+		Context.CustomData.ActiveHitbox = nil
+	end
 end
 
 return M1

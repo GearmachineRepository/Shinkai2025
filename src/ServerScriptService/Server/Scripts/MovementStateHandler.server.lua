@@ -8,6 +8,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
+local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 local VALID_MOVEMENT_MODES = {
 	walk = true,
@@ -31,6 +32,11 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 
 	local Entity = Ensemble.GetEntity(Character)
 	if not Entity then
+		return
+	end
+
+	if Entity.States:GetState(StateTypes.ATTACKING) and (MovementMode == "jog" or MovementMode == "run") then
+		Character:SetAttribute("MovementMode", "walk")
 		return
 	end
 

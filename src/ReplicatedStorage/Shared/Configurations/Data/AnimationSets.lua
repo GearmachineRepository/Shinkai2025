@@ -38,25 +38,25 @@ local AnimationSets: { [string]: AnimationSet } = {
 
 		Attacks = {
 			[1] = {
-				AnimationId = "",
+				AnimationId = "Karate1",
 				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
 			},
 			[2] = {
-				AnimationId = "",
+				AnimationId = "Karate2",
 				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
 			},
 			[3] = {
-				AnimationId = "",
+				AnimationId = "Karate3",
 				Hitbox = { Size = Vector3.new(5, 4, 6), Offset = Vector3.new(0, 0, -4) },
 				Damage = 10,
 				StaminaCost = 5,
 			},
 			[4] = {
-				AnimationId = "",
+				AnimationId = "Karate4",
 				Hitbox = { Size = Vector3.new(6, 5, 7), Offset = Vector3.new(0, 0, -4) },
 				Damage = 14,
 				StaminaCost = 6,
@@ -64,14 +64,14 @@ local AnimationSets: { [string]: AnimationSet } = {
 		},
 
 		HeavyAttack = {
-			AnimationId = "",
+			AnimationId = "KarateHeavy",
 			Hitbox = { Size = Vector3.new(6, 5, 8), Offset = Vector3.new(0, 0, -5) },
 			Damage = 20,
 			StaminaCost = 12,
 		},
 
-		Block = { AnimationId = "" },
-		BlockHit = { AnimationId = "" },
+		Block = { AnimationId = "Blocking" },
+		BlockHit = { AnimationId = "BlockHit" },
 
 		Sounds = {
 			Swing = "KarateSwing",

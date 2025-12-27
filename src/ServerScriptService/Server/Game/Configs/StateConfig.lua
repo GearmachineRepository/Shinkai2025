@@ -11,19 +11,19 @@ local Config: StateConfig = {
 		Sprinting = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { "Blocking", "Stunned", "Downed" },
+			Conflicts = { "Blocking", "Stunned", "Downed", "Attacking" },
 		},
 
 		Jogging = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { "Blocking", "Stunned", "Downed" },
+			Conflicts = { "Blocking", "Stunned", "Downed", "Attacking" },
 		},
 
 		Blocking = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { "Sprinting", "Stunned", "Downed" },
+			Conflicts = { "Sprinting", "Stunned", "Downed", "Attacking" },
 		},
 
 		Stunned = {

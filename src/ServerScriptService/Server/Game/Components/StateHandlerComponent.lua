@@ -27,7 +27,7 @@ type Self = {
 local CONFLICTING_STATES = {
 	[StateTypes.STUNNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING },
 	[StateTypes.RAGDOLLED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.STUNNED },
-	[StateTypes.ATTACKING] = { StateTypes.BLOCKING, StateTypes.DODGING },
+	[StateTypes.ATTACKING] = { StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING, StateTypes.JOGGING },
 	[StateTypes.BLOCKING] = { StateTypes.ATTACKING, StateTypes.DODGING },
 	[StateTypes.DODGING] = { StateTypes.ATTACKING, StateTypes.BLOCKING },
 	[StateTypes.DOWNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING },
@@ -109,6 +109,19 @@ local function SetupMovementLocking(Entity: Types.Entity, ComponentMaid: Types.M
 	end
 end
 
+local function SetupAttackingMovementRestriction(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	local Connection = Entity.States:OnStateChanged(StateTypes.ATTACKING, function(IsAttacking: boolean)
+		if IsAttacking then
+			local CurrentMode = Entity.Character:GetAttribute("MovementMode")
+			if CurrentMode == "jog" or CurrentMode == "run" then
+				Entity.Character:SetAttribute("MovementMode", "walk")
+			end
+		end
+	end)
+
+	ComponentMaid:GiveTask(Connection)
+end
+
 local function SetupForceField(Entity: Types.Entity, ComponentMaid: Types.Maid)
 	local Connection = Entity.States:OnStateChanged(StateTypes.INVULNERABLE, function(IsInvulnerable: boolean)
 		if IsInvulnerable then
@@ -160,11 +173,7 @@ local function SetupVFXReactions(Entity: Types.Entity, ComponentMaid: Types.Maid
 	for StateName, VfxName in VFX_REACTIONS do
 		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
 			if Enabled and Entity.Player then
-                local PrimaryPart = Entity.Character.PrimaryPart
-                if not PrimaryPart then return end
-				Packets.PlayVfx:FireClient(Entity.Player, VfxName, {
-					CFrame = PrimaryPart.CFrame,
-				})
+				Packets.PlayVfx:FireClient(Entity.Player, VfxName, { Target = Entity.Character })
 			end
 		end)
 
@@ -173,10 +182,10 @@ local function SetupVFXReactions(Entity: Types.Entity, ComponentMaid: Types.Maid
 end
 
 local function SetupSFXReactions(Entity: Types.Entity, ComponentMaid: Types.Maid)
-	for StateName, SfxName in SFX_REACTIONS do
+	for StateName, SoundName in SFX_REACTIONS do
 		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
 			if Enabled and Entity.Player then
-				Packets.PlaySound:FireClient(Entity.Player, SfxName)
+				Packets.PlaySound:FireClient(Entity.Player, SoundName, { Target = Entity.Character })
 			end
 		end)
 
@@ -184,23 +193,28 @@ local function SetupSFXReactions(Entity: Types.Entity, ComponentMaid: Types.Maid
 	end
 end
 
-function StateHandlerComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
-	local self: Self = setmetatable({
+function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
+	local ComponentMaid = Ensemble.Maid.new()
+
+	SetupConflictResolution(Entity, ComponentMaid)
+	SetupMovementLocking(Entity, ComponentMaid)
+	SetupAttackingMovementRestriction(Entity, ComponentMaid)
+	SetupForceField(Entity, ComponentMaid)
+	SetupAnimationReactions(Entity, ComponentMaid)
+	SetupVFXReactions(Entity, ComponentMaid)
+	SetupSFXReactions(Entity, ComponentMaid)
+
+	local self: Self = {
 		Entity = Entity,
-		Maid = Ensemble.Maid.new(),
-	}, StateHandlerComponent) :: any
+		Maid = ComponentMaid,
+	}
 
-	SetupConflictResolution(Entity, self.Maid)
-	SetupMovementLocking(Entity, self.Maid)
-	SetupForceField(Entity, self.Maid)
-	SetupAnimationReactions(Entity, self.Maid)
-	SetupVFXReactions(Entity, self.Maid)
-	SetupSFXReactions(Entity, self.Maid)
+	setmetatable(self, StateHandlerComponent)
 
-	return self
+	return self :: any
 end
 
-function StateHandlerComponent.Destroy(self: Self)
+function StateHandlerComponent:Destroy()
 	self.Maid:DoCleaning()
 end
 

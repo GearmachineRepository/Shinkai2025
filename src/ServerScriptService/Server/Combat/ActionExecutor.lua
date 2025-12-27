@@ -1,11 +1,15 @@
 --!strict
 
 local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local CombatTypes = require(script.Parent.CombatTypes)
 local ActionRegistry = require(script.Parent.ActionRegistry)
+local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
+local Packets = require(Shared.Networking.Packets)
 
 type ActionContext = CombatTypes.ActionContext
 type ActionDefinition = CombatTypes.ActionDefinition
@@ -14,8 +18,13 @@ type ActionMetadata = CombatTypes.ActionMetadata
 local ActionExecutor = {}
 
 local ActiveContexts: { [any]: ActionContext } = {}
+local EntityComboCounts: { [any]: number } = {}
+local EntityComboTimers: { [any]: number } = {}
+local EntityFeintCooldowns: { [any]: number } = {}
 
--- Creates and initializes a new ActionContext with standard defaults for runtime execution tracking.
+local COMBO_RESET_TIME = 2.0
+local FEINT_COOLDOWN_ID = "Feint"
+
 local function CreateContext(Entity: CombatTypes.Entity, Metadata: ActionMetadata, InputData: any?): ActionContext
 	return {
 		Entity = Entity,
@@ -28,16 +37,15 @@ local function CreateContext(Entity: CombatTypes.Entity, Metadata: ActionMetadat
 	}
 end
 
--- Executes an action by name for an entity, running validation hooks, publishing lifecycle events, and starting async execution.
 function ActionExecutor.Execute(
 	Entity: CombatTypes.Entity,
 	ActionName: string,
 	InputData: { [string]: any }?
 ): (boolean, string?)
 
-    if ActiveContexts[Entity] ~= nil then
-        return false, "Already executing"
-    end
+	if ActiveContexts[Entity] ~= nil then
+		return false, "Already executing"
+	end
 
 	Entity.States:SetState("Attacking", true)
 
@@ -89,7 +97,6 @@ function ActionExecutor.Execute(
 	return true, nil
 end
 
--- Interrupts the currently executing action for an entity, invokes interrupt hooks, publishes an event, and performs cleanup.
 function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): boolean
 	local Context = ActiveContexts[Entity]
 	if not Context then
@@ -110,6 +117,17 @@ function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): 
 		if not Context.CustomData.CanFeint or not Context.Metadata.Feintable then
 			return false
 		end
+
+		local CurrentTime = workspace:GetServerTimeNow()
+		local LastFeintTime = EntityFeintCooldowns[Entity]
+		local FeintCooldown = Context.Metadata.FeintCooldown or 0
+
+		if LastFeintTime and FeintCooldown > 0 then
+			local TimeSinceFeint = CurrentTime - LastFeintTime
+			if TimeSinceFeint < FeintCooldown then
+				return false
+			end
+		end
 	end
 
 	Context.Interrupted = true
@@ -128,12 +146,31 @@ function ActionExecutor.Interrupt(Entity: CombatTypes.Entity, Reason: string?): 
 		Context = Context,
 	})
 
+	if InterruptReason == "Feint" then
+		local FeintCooldown = Context.Metadata.FeintCooldown or 0
+		local CurrentTime = workspace:GetServerTimeNow()
+
+		if FeintCooldown > 0 then
+			EntityFeintCooldowns[Entity] = CurrentTime
+
+			if Entity.Player then
+				Packets.StartCooldown:FireClient(Entity.Player, FEINT_COOLDOWN_ID, CurrentTime, FeintCooldown)
+			end
+		end
+
+		if Context.Metadata.FeintEndlag then
+			task.wait(Context.Metadata.FeintEndlag)
+		end
+	else
+		EntityComboCounts[Entity] = nil
+		EntityComboTimers[Entity] = nil
+	end
+
 	ActionExecutor.Cleanup(Entity)
 
 	return true
 end
 
--- Completes the currently executing action for an entity if it was not interrupted, invokes completion hooks, publishes an event, and performs cleanup.
 function ActionExecutor.Complete(Entity: CombatTypes.Entity)
 	local Context = ActiveContexts[Entity]
 	if not Context then
@@ -163,7 +200,6 @@ function ActionExecutor.Complete(Entity: CombatTypes.Entity)
 	ActionExecutor.Cleanup(Entity)
 end
 
--- Performs final teardown for an entity's active action, invoking cleanup hooks and removing the active context.
 function ActionExecutor.Cleanup(Entity: CombatTypes.Entity)
 	local Context = ActiveContexts[Entity]
 	if not Context then
@@ -185,14 +221,56 @@ function ActionExecutor.Cleanup(Entity: CombatTypes.Entity)
 	ActiveContexts[Entity] = nil
 end
 
--- Returns the current active ActionContext for an entity, if any.
 function ActionExecutor.GetActiveContext(Entity: CombatTypes.Entity): ActionContext?
 	return ActiveContexts[Entity]
 end
 
--- Returns whether an entity currently has an active executing action context.
 function ActionExecutor.IsExecuting(Entity: CombatTypes.Entity): boolean
 	return ActiveContexts[Entity] ~= nil
+end
+
+function ActionExecutor.GetComboCount(Entity: CombatTypes.Entity): number
+	local CurrentTime = os.clock()
+	local LastComboTime = EntityComboTimers[Entity]
+
+	if LastComboTime and (CurrentTime - LastComboTime) > COMBO_RESET_TIME then
+		EntityComboCounts[Entity] = nil
+		EntityComboTimers[Entity] = nil
+		return 1
+	end
+
+	return EntityComboCounts[Entity] or 1
+end
+
+function ActionExecutor.IncrementCombo(Entity: CombatTypes.Entity, AnimationSetName: string?)
+	local CurrentCombo = ActionExecutor.GetComboCount(Entity)
+	local SetName = AnimationSetName or "Karate"
+	local ComboLength = AnimationSets.GetComboLength(SetName)
+
+	local NextCombo = (CurrentCombo % ComboLength) + 1
+
+	EntityComboCounts[Entity] = NextCombo
+	EntityComboTimers[Entity] = os.clock()
+end
+
+function ActionExecutor.ResetCombo(Entity: CombatTypes.Entity)
+	EntityComboCounts[Entity] = nil
+	EntityComboTimers[Entity] = nil
+end
+
+function ActionExecutor.GetFeintCooldownRemaining(Entity: CombatTypes.Entity, FeintCooldownDuration: number): number
+	local LastFeintTime = EntityFeintCooldowns[Entity]
+	if not LastFeintTime then
+		return 0
+	end
+
+	local CurrentTime = workspace:GetServerTimeNow()
+	local Elapsed = CurrentTime - LastFeintTime
+	return math.max(0, FeintCooldownDuration - Elapsed)
+end
+
+function ActionExecutor.IsFeintOnCooldown(Entity: CombatTypes.Entity, FeintCooldownDuration: number): boolean
+	return ActionExecutor.GetFeintCooldownRemaining(Entity, FeintCooldownDuration) > 0
 end
 
 return ActionExecutor
