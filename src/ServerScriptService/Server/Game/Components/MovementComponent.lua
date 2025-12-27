@@ -8,7 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
-local ActionValidator = require(Server.Game.Utilities.ActionValidator)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 
 local StatTypes = require(Shared.Configurations.Enums.StatTypes)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)

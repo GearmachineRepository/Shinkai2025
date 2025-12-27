@@ -1,5 +1,4 @@
 --!strict
-
 local ItemDatabase = require(script.Parent.ItemDatabase)
 
 local ItemInstance = {}
@@ -18,7 +17,7 @@ export type ItemStats = {
 export type ItemInstance = {
 	Id: string,
 	Quantity: number,
-	Info: ItemStats?,
+	Info: ItemStats,
 }
 
 function ItemInstance.Create(ItemId: string, Quantity: number?): ItemInstance?
@@ -36,7 +35,7 @@ function ItemInstance.Create(ItemId: string, Quantity: number?): ItemInstance?
 	local Instance: ItemInstance = {
 		Id = ItemId,
 		Quantity = FinalQuantity,
-		Info = nil,
+		Info = {},
 	}
 
 	if ItemDef.BaseStats then
@@ -67,12 +66,12 @@ function ItemInstance.FromData(Data: any): ItemInstance?
 	local Instance: ItemInstance = {
 		Id = Data.Id,
 		Quantity = Data.Quantity or 1,
-		Info = nil,
+		Info = {},
 	}
 
 	if Data.Info then
 		Instance.Info = {}
-		for StatName, StatValue in Data.Info do
+		for StatName, StatValue in pairs(Data.Info) do
 			Instance.Info[StatName] = StatValue
 		end
 	end

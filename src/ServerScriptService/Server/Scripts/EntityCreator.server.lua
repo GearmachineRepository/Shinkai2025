@@ -18,8 +18,7 @@ local function SpawnTestDummy()
 	DummyCharacter.Parent = workspace.Characters
 
 	local DummyEntity = Ensemble.CreateEntity(DummyCharacter, {})
-		:WithComponent("Damage")
-		:WithComponent("StateHandler")
+		:WithArchetype("Entity")
 		:Build()
 
 	if not DummyEntity then

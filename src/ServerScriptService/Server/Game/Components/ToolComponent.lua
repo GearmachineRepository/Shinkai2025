@@ -20,14 +20,14 @@ type Self = {
 }
 
 function ToolComponent.new(Entity: Types.Entity, _Context: Types.EntityContext): Self
-	local self: Self = setmetatable({
+	local ToolComponentInstance: Self = setmetatable({
 		Entity = Entity,
 		Character = Entity.Character,
 		Player = Entity.Player :: Player,
 		EquippedTool = nil,
 	}, ToolComponent) :: any
 
-	return self
+	return ToolComponentInstance
 end
 
 function ToolComponent.EquipTool(self: Self, SlotIndex: number): boolean
@@ -51,12 +51,13 @@ function ToolComponent.EquipTool(self: Self, SlotIndex: number): boolean
 	end
 
 	self.EquippedTool = {
-		ToolId = ItemInSlot.ToolId,
+		ToolId = ItemInSlot.Id,
 		SlotIndex = SlotIndex,
 	}
 
 	self.Character:SetAttribute("EquippedToolId", ItemInSlot.ToolId)
 	self.Character:SetAttribute("EquippedToolSlot", SlotIndex)
+	self.Character:SetAttribute("EquippedItemId", ItemInSlot.Id)
 
 	return true
 end
@@ -69,6 +70,7 @@ function ToolComponent.UnequipTool(self: Self)
 	self.EquippedTool = nil
 	self.Character:SetAttribute("EquippedToolId", nil)
 	self.Character:SetAttribute("EquippedToolSlot", nil)
+	self.Character:SetAttribute("EquippedItemId", nil)
 end
 
 function ToolComponent.GetEquippedTool(self: Self): { ToolId: string, SlotIndex: number }?

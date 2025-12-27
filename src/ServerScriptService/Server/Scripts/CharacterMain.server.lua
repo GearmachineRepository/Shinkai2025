@@ -30,8 +30,7 @@ Ensemble.Init({
 
 	Archetypes = {
 		Player = { "Stamina", "Hunger", "Training", "Movement", "Inventory", "StateHandler", "Tool", "BodyFatigue", "BodyScaling", "Sweat", "StatusEffect", "Damage" },
-		NPC = { "Movement", "Combat", "Damage", "StatusEffect", "StateHandler" },
-		TrainingDummy = { "Movement" },
+		Entity = { "Movement", "Combat", "Damage", "StatusEffect", "StateHandler" },
 	},
 })
 
@@ -119,6 +118,16 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 		warn("Failed to create entity for", Player.Name)
 		return
 	end
+
+	task.delay(2, function()
+		local Inventory = Entity:GetComponent("Inventory")
+		if not Inventory then
+			return
+		end
+
+		local Success = Inventory:AddItemToHotbar(1, "Karate", 1)
+		print(Success)
+	end)
 
 	Humanoid.Died:Once(function()
 		task.wait(3)

@@ -9,7 +9,7 @@ local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local CombatTypes = require(Server.Combat.CombatTypes)
 local ActionExecutor = require(Server.Combat.ActionExecutor)
-local ActionValidator = require(Server.Game.Utilities.ActionValidator)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
@@ -132,7 +132,7 @@ function M1.OnExecute(Context: ActionContext)
 	local AnimationName = AttackData.AnimationId
 
 	if Context.Entity.Player then
-		Packets.PlayAnimation:FireClient(Context.Entity.Player, AnimationName)
+		Packets.PlayAnimation:FireClient(Context.Entity.Player, Context.CustomData.AttackData.AnimationId)
 	end
 
 	local AnimationLength = AnimationTimingCache.GetLength(AnimationName) or Metadata.FallbackTimings.Length
@@ -156,6 +156,10 @@ function M1.OnExecute(Context: ActionContext)
 	end
 
 	if not WaitUntil(HitStartTime) then
+		-- Feinted/interrupted before hit window
+		if Context.Entity.Player then
+			Packets.StopAnimation:FireClient(Context.Entity.Player, Context.CustomData.AttackData.AnimationId, 0.25)
+		end
 		return
 	end
 
@@ -169,7 +173,7 @@ function M1.OnExecute(Context: ActionContext)
 	local StaminaComponent = Context.Entity:GetComponent("Stamina")
 	if not StaminaComponent then
 		M1.OnCleanup(Context)
-		return false, "No stamina"
+		return
 	end
 
 	local StaminaCost = Metadata.StaminaCost :: number
@@ -194,7 +198,9 @@ function M1.OnExecute(Context: ActionContext)
 end
 
 function M1.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
-	if not Context or not Context.Metadata then return end
+	if not Context or not Context.Metadata then
+		return
+	end
 	if not Context.CustomData.HitWindowOpen then
 		return
 	end
@@ -236,10 +242,6 @@ end
 function M1.OnCleanup(Context: ActionContext)
 	Context.CustomData.CanFeint = false
 	Context.CustomData.HitWindowOpen = false
-
-	if Context and Context.Metadata and Context.Entity.Player then
-		Packets.StopAnimation:FireClient(Context.Entity.Player, Context.CustomData.AttackData.AnimationId, 0.15)
-	end
 
 	if Context.CustomData.ActiveHitbox then
 		Context.CustomData.ActiveHitbox:Destroy()

@@ -8,7 +8,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
-local ActionValidator = require(Server.Game.Utilities.ActionValidator)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 
 local VALID_MOVEMENT_MODES = {
 	walk = true,
