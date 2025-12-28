@@ -20,6 +20,7 @@ export type ActionMetadata = {
 	Feintable: boolean,
 	FeintEndlag: number,
 	FeintCooldown: number,
+	HeavyAttackCooldown: number,
 	ComboEndlag: number,
 	ComboResetTime: number,
 	StaminaCostHitReduction: number,

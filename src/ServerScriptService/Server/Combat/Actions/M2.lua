@@ -22,6 +22,8 @@ local M2 = {}
 M2.ActionName = "M2"
 M2.ActionType = "Attack"
 
+local HEAVY_ATTACK_COOLDOWN_ID = "HeavyAttack"
+
 function M2.CanExecute(Context: ActionContext): (boolean, string?)
 	if not Context.Metadata then
 		return false, "NoMetadata"
@@ -39,6 +41,11 @@ function M2.CanExecute(Context: ActionContext): (boolean, string?)
 
 	if StatComponent:GetStat("Stamina") < Context.Metadata.StaminaCost then
 		return false, "NoStamina"
+	end
+
+	local HeavyAttackCooldown = Context.Metadata.HeavyAttackCooldown or 0
+	if ActionExecutor.IsActionOnCooldown(Context.Entity, HEAVY_ATTACK_COOLDOWN_ID, HeavyAttackCooldown) then
+		return false, "OnCooldown"
 	end
 
 	return true, nil
@@ -95,7 +102,9 @@ end
 
 function M2.OnExecute(Context: ActionContext)
 	local Player = Context.Entity.Player
-	if not Player then return end
+	if not Player then
+		return
+	end
 
 	local Metadata = Context.Metadata
 
@@ -106,10 +115,18 @@ function M2.OnExecute(Context: ActionContext)
 
 	local StaminaComponent = Context.Entity:GetComponent("Stamina")
 
-	if not StaminaComponent then return end
-	if not HitStartTime or not HitEndTime then return end
+	if not StaminaComponent then
+		return
+	end
+
+	if not HitStartTime or not HitEndTime then
+		return
+	end
 
 	Context.Entity.States:SetState("Attacking", true)
+
+	local HeavyAttackCooldown = Metadata.HeavyAttackCooldown or 0
+	ActionExecutor.StartActionCooldown(Context.Entity, HEAVY_ATTACK_COOLDOWN_ID, HeavyAttackCooldown)
 
 	Packets.PlayAnimation:FireClient(Player, AnimationName)
 

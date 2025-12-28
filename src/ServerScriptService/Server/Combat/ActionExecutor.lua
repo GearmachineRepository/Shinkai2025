@@ -22,6 +22,7 @@ local ActiveContexts: { [any]: ActionContext } = {}
 local EntityComboCounts: { [any]: number } = {}
 local EntityComboTimers: { [any]: number } = {}
 local EntityFeintCooldowns: { [any]: number } = {}
+local EntityActionCooldowns: { [any]: { [string]: number } } = {}
 
 local COMBO_RESET_TIME = 2.0
 local FEINT_COOLDOWN_ID = "Feint"
@@ -74,6 +75,7 @@ local function BuildMetadata(
 		Feintable = SetMetadata.Feintable,
 		FeintEndlag = SetMetadata.FeintEndlag,
 		FeintCooldown = SetMetadata.FeintCooldown,
+		HeavyAttackCooldown = SetMetadata.HeavyAttackCooldown,
 		ComboEndlag = SetMetadata.ComboEndlag,
 		ComboResetTime = SetMetadata.ComboResetTime,
 		StaminaCostHitReduction = SetMetadata.StaminaCostHitReduction,
@@ -100,9 +102,11 @@ function ActionExecutor.Execute(
 		return false, "UnknownAction"
 	end
 
-	if not InputData then return false, "NoInputData" end
-	local ItemId = InputData.ItemId
+	if not InputData then
+		return false, "NoInputData"
+	end
 
+	local ItemId = InputData.ItemId
 	if not ItemId then
 		return false, "NoItemId"
 	end
@@ -259,46 +263,60 @@ function ActionExecutor.ResetCombo(Entity: CombatTypes.Entity)
 	EntityComboTimers[Entity] = nil
 end
 
-function ActionExecutor.CanFeint(Entity: CombatTypes.Entity): boolean
-	local CooldownTime = EntityFeintCooldowns[Entity]
-	if not CooldownTime then
-		return true
+function ActionExecutor.IsActionOnCooldown(Entity: CombatTypes.Entity, CooldownId: string, CooldownDuration: number): boolean
+	if CooldownDuration <= 0 then
+		return false
+	end
+
+	local CooldownTable = EntityActionCooldowns[Entity]
+	if not CooldownTable then
+		return false
+	end
+
+	local LastUseTime = CooldownTable[CooldownId]
+	if not LastUseTime then
+		return false
 	end
 
 	local CurrentTime = workspace:GetServerTimeNow()
-	return (CurrentTime - CooldownTime) > 0
+	return (CurrentTime - LastUseTime) < CooldownDuration
 end
 
-function ActionExecutor.SetFeintCooldown(Entity: CombatTypes.Entity, Duration: number)
-	EntityFeintCooldowns[Entity] = workspace:GetServerTimeNow() + Duration
-end
-
-function ActionExecutor.Feint(Entity: CombatTypes.Entity): boolean
-	local Context = ActiveContexts[Entity]
-	if not Context then
-		return false
+function ActionExecutor.StartActionCooldown(Entity: CombatTypes.Entity, CooldownId: string, CooldownDuration: number)
+	if CooldownDuration <= 0 then
+		return
 	end
 
-	if not Context.Metadata.Feintable then
-		return false
+	if not EntityActionCooldowns[Entity] then
+		EntityActionCooldowns[Entity] = {}
 	end
 
-	if not ActionExecutor.CanFeint(Entity) then
-		return false
-	end
-
-	if not Context.CustomData.CanFeint then
-		return false
-	end
-
-	ActionExecutor.SetFeintCooldown(Entity, Context.Metadata.FeintCooldown)
-	ActionExecutor.Interrupt(Entity, "Feint")
+	local CurrentTime = workspace:GetServerTimeNow()
+	EntityActionCooldowns[Entity][CooldownId] = CurrentTime
 
 	if Entity.Player then
-		Packets.ActionInterrupted:FireClient(Entity.Player, Entity.Character, "Feint")
+		Packets.StartCooldown:FireClient(Entity.Player, CooldownId, CurrentTime, CooldownDuration)
+	end
+end
+
+function ActionExecutor.GetActionCooldownRemaining(Entity: CombatTypes.Entity, CooldownId: string, CooldownDuration: number): number
+	if CooldownDuration <= 0 then
+		return 0
 	end
 
-	return true
+	local CooldownTable = EntityActionCooldowns[Entity]
+	if not CooldownTable then
+		return 0
+	end
+
+	local LastUseTime = CooldownTable[CooldownId]
+	if not LastUseTime then
+		return 0
+	end
+
+	local CurrentTime = workspace:GetServerTimeNow()
+	local Elapsed = CurrentTime - LastUseTime
+	return math.max(0, CooldownDuration - Elapsed)
 end
 
 return ActionExecutor
