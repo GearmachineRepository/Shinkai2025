@@ -7,8 +7,8 @@ local StaminaBalance = {
 	},
 
 	Regeneration = {
-		RATE = 5,
-		DELAY = 1.5,
+		RATE = 6,
+		DELAY = 0.5,
 	},
 
 	Exhaustion = {

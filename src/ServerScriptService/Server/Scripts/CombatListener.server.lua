@@ -135,18 +135,16 @@ Packets.PerformAction.OnServerEvent:Connect(function(Player: Player, ActionName:
 
 	local FinalInputData = InputData or {}
 
-	if ActionName == "M1" then
-		local ToolComponent = Entity:GetComponent("Tool")
-		if ToolComponent then
-			local EquippedTool = ToolComponent:GetEquippedTool()
-			if EquippedTool and EquippedTool.ToolId then
-				FinalInputData.ItemId = EquippedTool.ToolId
-			else
-				return
-			end
+	local ToolComponent = Entity:GetComponent("Tool")
+	if ToolComponent then
+		local EquippedTool = ToolComponent:GetEquippedTool()
+		if EquippedTool and EquippedTool.ToolId then
+			FinalInputData.ItemId = EquippedTool.ToolId
 		else
 			return
 		end
+	else
+		return
 	end
 
 	local Success, Reason = ActionExecutor.Execute(Entity, ActionName, FinalInputData)
@@ -156,7 +154,7 @@ Packets.PerformAction.OnServerEvent:Connect(function(Player: Player, ActionName:
 		return
 	end
 
-	if ActionName == "M2" then
+	if ActionName == "Feint" then
 		if TryUnpredictableFeint(Entity) then
 			Packets.ActionApproved:FireClient(Player, ActionName)
 			return

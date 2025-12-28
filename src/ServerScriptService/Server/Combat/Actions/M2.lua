@@ -17,17 +17,17 @@ local Hitbox = require(Shared.Packages.Hitbox)
 type ActionContext = CombatTypes.ActionContext
 type Entity = CombatTypes.Entity
 
-local M1 = {}
+local M2 = {}
 
-M1.ActionName = "M1"
-M1.ActionType = "Attack"
+M2.ActionName = "M2"
+M2.ActionType = "Attack"
 
-function M1.CanExecute(Context: ActionContext): (boolean, string?)
+function M2.CanExecute(Context: ActionContext): (boolean, string?)
 	if not Context.Metadata then
 		return false, "NoMetadata"
 	end
 
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "M1")
+	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "M2")
 	if not CanPerform then
 		return false, Reason
 	end
@@ -44,7 +44,7 @@ function M1.CanExecute(Context: ActionContext): (boolean, string?)
 	return true, nil
 end
 
-function M1.OnStart(Context: ActionContext)
+function M2.OnStart(Context: ActionContext)
 	Context.CustomData.HitWindowOpen = false
 	Context.CustomData.HasHit = false
 	Context.CustomData.LastHitTarget = nil
@@ -85,7 +85,7 @@ function M1.OnStart(Context: ActionContext)
 
 			Context.CustomData.HasHit = true
 			Context.CustomData.LastHitTarget = TargetEntity
-			M1.OnHit(Context, TargetEntity, 1)
+			M2.OnHit(Context, TargetEntity, 1)
 			break
 		end
 	end)
@@ -93,7 +93,7 @@ function M1.OnStart(Context: ActionContext)
 	Context.CustomData.ActiveHitbox = NewHitbox
 end
 
-function M1.OnExecute(Context: ActionContext)
+function M2.OnExecute(Context: ActionContext)
 	local Player = Context.Entity.Player
 	if not Player then return end
 
@@ -161,7 +161,7 @@ function M1.OnExecute(Context: ActionContext)
 	Context.Entity.States:SetState("Attacking", false)
 end
 
-function M1.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
+function M2.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
 	local Metadata = Context.Metadata
 
 	local DamageComponent = Target:GetComponent("Damage")
@@ -187,7 +187,7 @@ function M1.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
 	end
 end
 
-function M1.OnComplete(Context: ActionContext)
+function M2.OnComplete(Context: ActionContext)
 	local Metadata = Context.Metadata
 	local ComboLength = AnimationSets.GetComboLength(Metadata.AnimationSet, Metadata.ActionName)
 
@@ -198,13 +198,13 @@ function M1.OnComplete(Context: ActionContext)
 	end
 end
 
-function M1.OnInterrupt(Context: ActionContext)
+function M2.OnInterrupt(Context: ActionContext)
 	if Context.InterruptReason == "Feint" and Context.Metadata.FeintEndlag > 0 then
 		task.wait(Context.Metadata.FeintEndlag)
 	end
 end
 
-function M1.OnCleanup(Context: ActionContext)
+function M2.OnCleanup(Context: ActionContext)
 	Context.CustomData.CanFeint = false
 	Context.CustomData.HitWindowOpen = false
 
@@ -220,4 +220,4 @@ function M1.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Attacking", false)
 end
 
-return M1
+return M2

@@ -2,27 +2,29 @@
 
 local ItemDatabase = {}
 
+export type StatModifiers = {
+	DamageMultiplier: number?,
+	StaminaCostMultiplier: number?,
+	RangeMultiplier: number?,
+	[string]: any,
+}
+
 export type ItemDefinition = {
+	ItemId: string,
 	ItemName: string,
 	ItemType: string,
 	Icon: string,
 	Description: string,
 	MaxStackSize: number,
 	Rarity: number,
-	AnimationSet: string?,
-	BaseStats: {
-		Damage: number?,
-		AttackSpeed: number?,
-		Range: number?,
-		Durability: number?,
-		Defense: number?,
-		[string]: any,
-	}?,
+	AnimationSet: string,
+	StatModifiers: StatModifiers?,
 	Metadata: { [string]: any }?,
 }
 
 local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 	["Karate"] = {
+		ItemId = "Karate",
 		ItemName = "Karate",
 		ItemType = "Style",
 		Icon = "rbxassetid://0",
@@ -30,24 +32,10 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		MaxStackSize = 1,
 		Rarity = 1,
 		AnimationSet = "Karate",
-		BaseStats = {
-			ActionName = "M1",
-			FeintEndlag = 0.25,
-			FeintCooldown = 0.5,
-			ComboEndlag = 0.5,
-			HitStun = 0.256,
-			StaminaCostHitReduction = 0.15, --Get 15% stamina back for each successful hit
-			Feintable = true,
-
-			FallbackTimings = {
-				HitStart = 0.25,
-				HitEnd = 0.55,
-				Length = 1.25
-			},
-		},
 	},
 
 	["Fists"] = {
+		ItemId = "Fists",
 		ItemName = "Fists",
 		ItemType = "Style",
 		Icon = "rbxassetid://0",
@@ -55,22 +43,10 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		MaxStackSize = 1,
 		Rarity = 1,
 		AnimationSet = "Fists",
-		BaseStats = {
-			ActionName = "M1",
-			FeintEndlag = 0.2,
-			FeintCooldown = 2.5,
-			ComboEndlag = 0.3,
-			Feintable = true,
-
-			FallbackTimings = {
-				HitStart = 0.2,
-				HitEnd = 0.5,
-				Length = 1.0
-			},
-		},
 	},
 
 	["MuayThai"] = {
+		ItemId = "MuayThai",
 		ItemName = "Muay Thai",
 		ItemType = "Style",
 		Icon = "rbxassetid://0",
@@ -78,36 +54,39 @@ local ITEM_DEFINITIONS: { [string]: ItemDefinition } = {
 		MaxStackSize = 1,
 		Rarity = 2,
 		AnimationSet = "MuayThai",
-		BaseStats = {
-			ActionName = "M1",
-			FeintEndlag = 0.3,
-			FeintCooldown = 3.5,
-			ComboEndlag = 0.6,
-			StaminaCost = 5,
-			Feintable = true,
+	},
 
-			FallbackTimings = {
-				HitStart = 0.3,
-				HitEnd = 0.6,
-				Length = 1.5
-			},
+	["IronKnuckles"] = {
+		ItemId = "IronKnuckles",
+		ItemName = "Iron Knuckles",
+		ItemType = "Weapon",
+		Icon = "rbxassetid://0",
+		Description = "Heavy knuckles that increase punch damage.",
+		MaxStackSize = 1,
+		Rarity = 2,
+		AnimationSet = "Fists",
+		StatModifiers = {
+			DamageMultiplier = 1.25,
+		},
+		Metadata = {
+			Durability = 100,
 		},
 	},
 
-	["ReverseKick"] = {
-		ItemName = "Reverse Kick",
+	["TrainingGloves"] = {
+		ItemId = "TrainingGloves",
+		ItemName = "Training Gloves",
 		ItemType = "Weapon",
 		Icon = "rbxassetid://0",
-		Description = "A powerful reverse kick.",
+		Description = "Light gloves that reduce stamina cost.",
 		MaxStackSize = 1,
 		Rarity = 1,
-		AnimationSet = "ReverseKick",
-		BaseStats = {
-			Damage = 25,
-			Range = 5,
-			Power = 15,
-			Durability = 100,
-			Cooldown = 5,
+		AnimationSet = "Fists",
+		StatModifiers = {
+			StaminaCostMultiplier = 0.8,
+		},
+		Metadata = {
+			Durability = 50,
 		},
 	},
 }
@@ -136,14 +115,6 @@ end
 
 function ItemDatabase.ItemExists(ItemId: string): boolean
 	return ITEM_DEFINITIONS[ItemId] ~= nil
-end
-
-function ItemDatabase.GetAnimationSet(ItemId: string): string?
-	local ItemDef = ITEM_DEFINITIONS[ItemId]
-	if not ItemDef then
-		return nil
-	end
-	return ItemDef.AnimationSet
 end
 
 return ItemDatabase
