@@ -32,7 +32,7 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) 
 		SizeOrPart = HitboxSize,
 		InitialCframe = RootPart.CFrame * HitboxOffset,
 		VelocityPrediction = true,
-		Debug = false,
+		Debug = true,
 		LifeTime = 0,
 		LookingFor = "Humanoid",
 		Blacklist = { Context.Entity.Character },
@@ -69,9 +69,6 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 	OnAnimationEnd: (() -> ())?,
 })
 	local Player = Context.Entity.Player
-	if not Player then
-		return
-	end
 
 	local Metadata = Context.Metadata
 	local AnimationId = Metadata.AnimationId
@@ -87,7 +84,9 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 		return
 	end
 
-	Packets.PlayAnimation:FireClient(Player, AnimationId)
+	if Player then
+		Packets.PlayAnimation:FireClient(Player, AnimationId)
+	end
 
 	local StartTimestamp = os.clock()
 

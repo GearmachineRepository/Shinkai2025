@@ -13,11 +13,22 @@ local Assets = ReplicatedStorage:WaitForChild("Assets")
 local Entities = Assets:WaitForChild("Entity")
 local TestDummy = Entities:WaitForChild("TestDummy")
 
+local DUMMY_CONFIG = {
+	Combat = {
+		ToolId = "Karate",
+		AttackRange = 6,
+		AggroRange = 30,
+		AutoAttack = true,
+		AttackIntervalMin = 2.0,
+		AttackIntervalMax = 4.0,
+	},
+}
+
 local function SpawnTestDummy()
 	local DummyCharacter = TestDummy:Clone()
 	DummyCharacter.Parent = workspace.Characters
 
-	local DummyEntity = Ensemble.CreateEntity(DummyCharacter, {})
+	local DummyEntity = Ensemble.CreateEntity(DummyCharacter, DUMMY_CONFIG)
 		:WithArchetype("Entity")
 		:Build()
 
@@ -26,16 +37,16 @@ local function SpawnTestDummy()
 	end
 
 	local DummyDie do
-        DummyDie = DummyEntity.Humanoid.Died:Once(function()
-            task.wait(2)
-            Ensemble.DestroyEntity(DummyCharacter)
-            DummyCharacter:Destroy()
+		DummyDie = DummyEntity.Humanoid.Died:Once(function()
+			task.wait(2)
+			Ensemble.DestroyEntity(DummyCharacter)
+			DummyCharacter:Destroy()
 
-            SpawnTestDummy()
+			SpawnTestDummy()
 
-            DummyDie:Disconnect()
-        end)
-    end
+			DummyDie:Disconnect()
+		end)
+	end
 end
 
 SpawnTestDummy()
