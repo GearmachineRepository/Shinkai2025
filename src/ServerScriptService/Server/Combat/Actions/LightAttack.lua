@@ -125,8 +125,8 @@ function LightAttack.OnStart(Context: ActionContext)
 		or 0.65
 	MovementModifiers.SetModifier(Context.Entity, "Attacking", Multiplier)
 
-	AttackBase.SetupHitbox(Context, function(Target: Entity)
-		LightAttack.OnHit(Context, Target, 1)
+	AttackBase.SetupHitbox(Context, function(Target: Entity, HitPosition: Vector3?)
+		LightAttack.OnHit(Context, Target, HitPosition, 1)
 	end)
 end
 
@@ -148,12 +148,12 @@ function LightAttack.OnExecute(Context: ActionContext)
 	})
 end
 
-function LightAttack.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
+function LightAttack.OnHit(Context: ActionContext, Target: Entity, HitPosition: Vector3?, _HitIndex: number?)
 	if not Context.CustomData.HitWindowOpen then
 		return
 	end
 
-	AttackBase.ProcessHit(Context, Target)
+	AttackBase.ProcessHit(Context, Target, HitPosition)
 end
 
 function LightAttack.OnComplete(Context: ActionContext)

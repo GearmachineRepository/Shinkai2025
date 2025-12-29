@@ -119,9 +119,9 @@ local function OnInputBegan(Input, GameProcessedEvent)
 			EnterSprintMode()
 		end
 		LastWPressTime = CurrentTime
-	elseif Input.KeyCode == Enum.KeyCode.LeftShift or Input.KeyCode == Enum.KeyCode.RightShift then
-		IsShiftHeld = true
-		EnterSprintMode()
+	-- elseif Input.KeyCode == Enum.KeyCode.LeftShift or Input.KeyCode == Enum.KeyCode.RightShift then
+	-- 	IsShiftHeld = true
+	-- 	EnterSprintMode()
 	elseif Input.KeyCode == Enum.KeyCode.R then
 		ToggleSprintType()
 	end
@@ -137,11 +137,11 @@ local function OnInputEnded(Input, GameProcessedEvent)
 		if IsInSprintMode then
 			ExitSprintMode()
 		end
-	elseif Input.KeyCode == Enum.KeyCode.LeftShift or Input.KeyCode == Enum.KeyCode.RightShift then
-		IsShiftHeld = false
-		if IsInSprintMode then
-			ExitSprintMode()
-		end
+	-- elseif Input.KeyCode == Enum.KeyCode.LeftShift or Input.KeyCode == Enum.KeyCode.RightShift then
+	-- 	IsShiftHeld = false
+	-- 	if IsInSprintMode then
+	-- 		ExitSprintMode()
+	-- 	end
 	end
 end
 

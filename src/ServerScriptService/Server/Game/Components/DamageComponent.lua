@@ -6,6 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
+local Packets = require(ReplicatedStorage.Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
@@ -22,6 +23,7 @@ DamageComponent.Dependencies = { "States", "Stats" }
 
 local PING_THRESHOLD_MS = 70
 local MAX_COMP_SECONDS = 0.06
+local ON_HIT_HOLD_SECONDS = 0.1
 
 type Self = {
 	Entity: Types.Entity,
@@ -55,7 +57,7 @@ local function GetCompDelaySeconds(TargetPlayer: Player?): number
 	return math.min(RawDelaySeconds, MAX_COMP_SECONDS)
 end
 
-function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
+function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?, HitPosition: Vector3?)
 	if self.Entity.States:GetState(StateTypes.INVULNERABLE) then
 		return
 	end
@@ -74,18 +76,54 @@ function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: 
 		ModifiedDamage = ModifiedDamage * (1 - CombatBalance.Blocking.DAMAGE_REDUCTION)
 	end
 
-	local Health = self.Entity.Humanoid.Health :: number
-
-	local CurrentHealth = Health- ModifiedDamage
+	local CurrentHealth = (self.Entity.Humanoid.Health :: number) - ModifiedDamage
 	self.Entity.Humanoid.Health = math.max(0, CurrentHealth)
 	self.Entity.Stats:SetStat("Health", self.Entity.Humanoid.Health)
 
+	local OnHitCountAttributeName = "OnHitCount"
+	local CurrentOnHitCountValue = self.Entity.Character:GetAttribute(OnHitCountAttributeName)
+	local CurrentOnHitCount = if typeof(CurrentOnHitCountValue) == "number" then CurrentOnHitCountValue else 0
+
+	CurrentOnHitCount += 1
+	self.Entity.Character:SetAttribute(OnHitCountAttributeName, CurrentOnHitCount)
 	self.Entity.States:SetState(StateTypes.ONHIT, true)
-	task.wait(0.1)
-	self.Entity.States:SetState(StateTypes.ONHIT, false)
+
+	local HitType = if self.Entity.States:GetState(StateTypes.BLOCKING) then "BlockHit" else "Hit"
+
+	local SourceUser: number? = nil
+	if Source and Source:IsA("Player") then
+		SourceUser = Source.UserId
+	else
+		SourceUser = Source
+	end
+
+	Packets.PlayVfxReplicate:Fire(
+		SourceUser,
+		HitType,
+		{
+			Target = self.Entity.Character,
+			HitPosition = HitPosition,
+		}
+	)
+
+	task.delay(ON_HIT_HOLD_SECONDS, function()
+		if not self.Entity.Character or not self.Entity.Character.Parent then
+			return
+		end
+
+		local UpdatedOnHitCountValue = self.Entity.Character:GetAttribute(OnHitCountAttributeName)
+		local UpdatedOnHitCount = if typeof(UpdatedOnHitCountValue) == "number" then UpdatedOnHitCountValue else 0
+
+		UpdatedOnHitCount = math.max(0, UpdatedOnHitCount - 1)
+		self.Entity.Character:SetAttribute(OnHitCountAttributeName, UpdatedOnHitCount)
+
+		if UpdatedOnHitCount == 0 then
+			self.Entity.States:SetState(StateTypes.ONHIT, false)
+		end
+	end)
 end
 
-function DamageComponent:DealDamage(Damage: number, Source: Player?, Direction: Vector3?)
+function DamageComponent:DealDamage(Damage: number, Source: Player?, Direction: Vector3?, HitPosition: Vector3?)
 	local TargetPlayer = self.Entity.Player
 
 	if TargetPlayer then
@@ -93,13 +131,13 @@ function DamageComponent:DealDamage(Damage: number, Source: Player?, Direction: 
 
 		if DelaySeconds > 0 then
 			task.delay(DelaySeconds, function()
-				self:TakeDamage(Damage, Source, Direction)
+				self:TakeDamage(Damage, Source, Direction, HitPosition)
 			end)
 			return
 		end
 	end
 
-	self:TakeDamage(Damage, Source, Direction)
+	self:TakeDamage(Damage, Source, Direction, HitPosition)
 end
 
 function DamageComponent.Destroy(self: Self)

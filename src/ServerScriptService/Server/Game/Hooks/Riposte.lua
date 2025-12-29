@@ -44,7 +44,7 @@ return {
 			local DamageComponent = EventData.Target:GetComponent("Damage")
 
 			if DamageComponent then
-				DamageComponent:DealDamage(BonusDamage, Entity.Player, Vector3.zero)
+				DamageComponent:DealDamage(BonusDamage, Entity.Player or Entity.Character, Vector3.zero)
 			end
 
 			RiposteActive = false

@@ -115,7 +115,7 @@ function Block.OnExecute(Context: ActionContext)
 	end
 end
 
-function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?)
+function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?, HitPosition: Vector3?)
 	local Player = Context.Entity.Player
 	local AnimationId = Context.Metadata.AnimationId
 	local ActiveWindow = Context.CustomData.ActiveWindow
@@ -156,7 +156,7 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 		if DamageComponent then
 			-- local AttackerRoot = Attacker.Character and Attacker.Character:FindFirstChild("HumanoidRootPart")
 			-- local KnockbackDirection = if AttackerRoot then AttackerRoot.CFrame.LookVector else Vector3.zero
-			DamageComponent:DealDamage(IncomingDamage, Attacker.Player) --, KnockbackDirection
+			DamageComponent:DealDamage(IncomingDamage, Attacker.Player or Attacker.Character) --, KnockbackDirection
 		end
 
 		Context.Entity.States:SetState(StateTypes.GUARD_BROKEN, true)
@@ -184,6 +184,15 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 	end
 
 	Context.Entity.States:SetState(StateTypes.BLOCK_HIT, true)
+
+	Packets.PlayVfxReplicate:Fire(
+		Attacker.Player or Attacker.Character,
+		"BlockHit",
+		{
+			Target = Context.Entity.Character,
+			HitPosition = HitPosition,
+		}
+	)
 
 	task.delay(CombatBalance.Blocking.BLOCK_HIT_DURATION or 0.3, function()
 		if Context.Entity.States then

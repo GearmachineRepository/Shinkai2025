@@ -125,7 +125,7 @@ function ActionTemplate.OnHit(Context: ActionContext, Target: Entity, _HitIndex:
 	local Damage = Context.Metadata.Damage or 10
 	local DamageComponent = Target:GetComponent("Damage")
 	if DamageComponent then
-		DamageComponent:DealDamage(Damage, Context.Entity.Player, Vector3.zero)
+		DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character, Vector3.zero)
 	end
 
 	Ensemble.Events.Publish(CombatEvents.AttackHit, {

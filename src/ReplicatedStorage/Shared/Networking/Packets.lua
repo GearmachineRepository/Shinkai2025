@@ -62,11 +62,11 @@ return {
 
 	-- Sounds
 	PlaySound = Packet("PlaySound", Packet.String, Packet.Any),
-	PlaySoundReplicate = Packet("PlaySoundReplicate", Packet.NumberF64, Packet.String, Packet.Any),
+	PlaySoundReplicate = Packet("PlaySoundReplicate", Packet.Any, Packet.String, Packet.Any),
 
 	-- VFX
 	PlayVfx = Packet("PlayVfx", Packet.String, Packet.Any),
-	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.NumberF64, Packet.String, Packet.Any),
+	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.Any, Packet.String, Packet.Any),
 
 	-- Network
 	NetworkPing = Packet("NetworkPing", Packet.NumberF32),

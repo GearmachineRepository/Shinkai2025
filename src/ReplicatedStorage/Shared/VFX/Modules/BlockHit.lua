@@ -39,6 +39,8 @@ function BlockHitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		return nil
 	end
 
+	local HitPosition: Vector3? = VfxData.HitPosition
+
 	local OnHitFolder: Instance? = GeneralVFXAssets:FindFirstChild("BlockHitNormal", true)
 
 	-- SoundPlayer.Play(Target, Swings:GetChildren()[math.random(1, #Swings:GetChildren())].Name)
@@ -48,7 +50,7 @@ function BlockHitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		return nil
 	end
 
-	local Playback = VfxTemplatePlayer.PlayFromTemplateFolder(Target, OnHitFolder, DEFAULT_VFX_LIFETIME_SECONDS)
+	local Playback = VfxTemplatePlayer.PlayFromTemplateFolder(Target, OnHitFolder, DEFAULT_VFX_LIFETIME_SECONDS, HitPosition)
 
 	local function Stop()
 		Playback.Cleanup()

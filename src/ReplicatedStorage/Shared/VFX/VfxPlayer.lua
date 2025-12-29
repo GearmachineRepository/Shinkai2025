@@ -130,13 +130,19 @@ function VfxPlayer.Init()
 	IsInitialized = true
 
 	if RunService:IsClient() then
-		local function OnVfxReplicated(SenderUserId: number, VfxName: string, VfxData: any?)
-			local SenderPlayer = Players:GetPlayerByUserId(SenderUserId)
-			if not SenderPlayer or not SenderPlayer.Character then
-				return
+		local function OnVfxReplicated(SenderUserId: number | Instance, VfxName: string, VfxData: any?)
+			local CharacterToSend = SenderUserId :: Model
+
+			if typeof(SenderUserId) == "number" then
+				local SenderPlayer = Players:GetPlayerByUserId(SenderUserId)
+				if not SenderPlayer or not SenderPlayer.Character then
+					CharacterToSend = SenderPlayer.Character :: Model
+				end
 			end
 
-			VfxPlayer.Play(SenderPlayer.Character, VfxName, VfxData)
+			if not CharacterToSend then return end
+
+			VfxPlayer.Play(CharacterToSend, VfxName, VfxData)
 		end
 
 		Packets.PlayVfxReplicate.OnClientEvent:Connect(OnVfxReplicated)

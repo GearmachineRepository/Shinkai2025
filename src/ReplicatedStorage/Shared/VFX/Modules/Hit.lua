@@ -4,7 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local SoundPlayer = require(Shared.General.SoundPlayer)
-local VfxTemplatePlayer = require(Shared.General.VfxEmitter)
+local VfxEmitter = require(Shared.General.VfxEmitter)
 
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local VfxAssets = Assets:WaitForChild("VFXAssets")
@@ -37,6 +37,13 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		return nil
 	end
 
+	local HitPosition: Vector3? = VfxData.HitPosition
+	local SpawnPart: BasePart? = Target.PrimaryPart
+
+	if not SpawnPart then
+		return nil
+	end
+
 	local Humanoid = Target:FindFirstChildOfClass("Humanoid")
 	if not Humanoid then
 		return nil
@@ -56,7 +63,7 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		return nil
 	end
 
-	local Playback = VfxTemplatePlayer.PlayFromTemplateFolder(Target, OnHitFolder, DEFAULT_VFX_LIFETIME_SECONDS)
+	local Playback = VfxEmitter.PlayFromTemplateFolder(Target, OnHitFolder, DEFAULT_VFX_LIFETIME_SECONDS, HitPosition)
 
 	local function Stop()
 		Playback.Cleanup()

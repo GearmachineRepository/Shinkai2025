@@ -125,7 +125,7 @@ function Counter.Trigger(BlockContext: ActionContext, Attacker: Entity)
 			-- 	local KnockbackVelocity = KnockbackDirection * KnockbackForce + Vector3.new(0, KnockbackForce * 0.3, 0)
 			-- 	TargetRootPart.AssemblyLinearVelocity = KnockbackVelocity
 			-- end
-			DamageComponent:DealDamage(Damage, Entity.Player)
+			DamageComponent:DealDamage(Damage, Entity.Player or Entity.Character)
 		end
 
 		local AttackerStates = Attacker.States

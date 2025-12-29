@@ -24,7 +24,28 @@ type ActionContext = CombatTypes.ActionContext
 
 local AttackBase = {}
 
-function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) -> ())
+local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacter: Model): Vector3?
+	local TargetPivot = TargetCharacter:GetPivot()
+	local TargetSize = TargetCharacter:GetExtentsSize()
+	if TargetSize.Magnitude <= 0 then
+		return nil
+	end
+
+	local HalfSize = TargetSize * 0.5
+	local AttackerPosition = AttackerRootPart.Position
+
+	local LocalPoint = TargetPivot:PointToObjectSpace(AttackerPosition)
+
+	local ClampedLocalPoint = Vector3.new(
+		math.clamp(LocalPoint.X, -HalfSize.X, HalfSize.X),
+		math.clamp(LocalPoint.Y, -HalfSize.Y, HalfSize.Y),
+		math.clamp(LocalPoint.Z, -HalfSize.Z, HalfSize.Z)
+	)
+
+	return TargetPivot:PointToWorldSpace(ClampedLocalPoint)
+end
+
+function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, Vector3?) -> ())
 	local RootPart = Context.Entity.Character and Context.Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not RootPart then
 		return
@@ -52,12 +73,8 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) 
 
 	NewHitbox:WeldTo(RootPart, HitboxOffset)
 
-	NewHitbox.OnHit:Connect(function(HitCharacters: { Model })
-		if not Context.CustomData.HitWindowOpen then
-			return
-		end
-
-		if Context.Interrupted then
+	NewHitbox.OnHit:Connect(function(HitCharacters: { Model }, HitParts: { BasePart }?)
+		if not Context.CustomData.HitWindowOpen or Context.CustomData.HasHit then
 			return
 		end
 
@@ -65,15 +82,24 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) 
 			return
 		end
 
-		for _, TargetCharacter in HitCharacters do
+		for Index, TargetCharacter in HitCharacters do
 			local TargetEntity = Ensemble.GetEntity(TargetCharacter)
 			if not TargetEntity or TargetEntity == Context.Entity then
 				continue
 			end
 
+			local HitPosition: Vector3? = nil
+
+			if HitParts and HitParts[Index] then
+				HitPosition = HitParts[Index].Position
+			else
+				HitPosition = GetFallbackHitPosition(RootPart, TargetCharacter)
+			end
+
 			Context.CustomData.HasHit = true
 			Context.CustomData.LastHitTarget = TargetEntity
-			OnHitCallback(TargetEntity)
+			Context.CustomData.LastHitPosition = HitPosition
+			OnHitCallback(TargetEntity, HitPosition)
 			break
 		end
 	end)
@@ -189,7 +215,7 @@ local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
 	end)
 end
 
-function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): boolean
+function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, HitPosition: Vector3?): boolean
 	local TargetContext = ActionExecutor.GetActiveContext(Target)
 	local Metadata = AttackerContext.Metadata
 	local Damage = Metadata.Damage or 10
@@ -213,13 +239,14 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): 
 	end
 
 	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
-		Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags)
+		Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags, HitPosition)
 
 		Ensemble.Events.Publish(CombatEvents.AttackBlocked, {
 			Attacker = AttackerContext.Entity,
 			Target = Target,
 			Damage = Damage,
 			Flags = Flags,
+			HitPosition = HitPosition,
 			AttackerContext = AttackerContext,
 			TargetContext = TargetContext,
 		})
@@ -227,7 +254,7 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): 
 		return true
 	end
 
-	AttackBase.ApplyDamage(AttackerContext, Target)
+	AttackBase.ApplyDamage(AttackerContext, Target, HitPosition)
 	AttackBase.ApplyHitStun(AttackerContext, Target)
 
 	Ensemble.Events.Publish(CombatEvents.AttackHit, {
@@ -235,13 +262,14 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): 
 		Target = Target,
 		Damage = Damage,
 		Flags = Flags,
+		HitPosition = HitPosition,
 		Context = AttackerContext,
 	})
 
 	return false
 end
 
-function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity)
+function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosition: Vector3?)
 	local Metadata = Context.Metadata
 	local Damage = Metadata.Damage or 10
 
@@ -253,7 +281,7 @@ function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity)
 	local RootPart = Context.Entity.Character and Context.Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local KnockbackDirection = if RootPart then RootPart.CFrame.LookVector else Vector3.zero
 
-	DamageComponent:DealDamage(Damage, Context.Entity.Player, KnockbackDirection)
+	DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character, KnockbackDirection, HitPosition)
 
 	Ensemble.Events.Publish(CombatEvents.DamageDealt, {
 		Entity = Context.Entity,
