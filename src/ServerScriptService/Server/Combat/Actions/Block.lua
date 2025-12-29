@@ -109,8 +109,6 @@ function Block.OnExecute(Context: ActionContext)
 end
 
 function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number)
-	local Player = Context.Entity.Player
-
 	local ActiveWindow = Context.CustomData.ActiveWindow
 
 	if ActiveWindow == "PerfectGuard" then
@@ -132,18 +130,43 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 		return
 	end
 
+	local Player = Context.Entity.Player
+	if Player then
+		Packets.PlayAnimation:FireClient(Player, "BlockHit")
+	end
+
 	local DamageReduction = Context.Metadata.DamageReduction or CombatBalance.Blocking.DAMAGE_REDUCTION
-	local StaminaDrain = Context.Metadata.StaminaDrainOnHit or CombatBalance.Blocking.STAMINA_DRAIN_ON_HIT
+	local StaminaScalar = Context.Metadata.StaminaDrainScalar or CombatBalance.Blocking.STAMINA_DRAIN_SCALAR or 1.0
 
 	local ReducedDamage = IncomingDamage * (1 - DamageReduction)
+	local StaminaDrain = IncomingDamage * StaminaScalar
 
 	local StaminaComponent = Context.Entity:GetComponent("Stamina")
 	if StaminaComponent then
-		StaminaComponent:ConsumeStamina(StaminaDrain)
-	end
+		local CurrentStamina = StaminaComponent:GetStamina()
 
-	if Player then
-		Packets.PlayAnimation:FireClient(Player, "BlockHit")
+		if CurrentStamina < StaminaDrain then
+			Context.Entity.States:SetState("GuardBroken", true)
+			Context.Interrupted = true
+			Context.InterruptReason = "GuardBreak"
+
+			Ensemble.Events.Publish(CombatEvents.GuardBroken, {
+				Entity = Context.Entity,
+				Attacker = Attacker,
+				IncomingDamage = IncomingDamage,
+				Context = Context,
+			})
+
+			task.delay(CombatBalance.Blocking.GUARD_BREAK_DURATION or 1.5, function()
+				if Context.Entity.States then
+					Context.Entity.States:SetState("GuardBroken", false)
+				end
+			end)
+
+			return
+		end
+
+		StaminaComponent:ConsumeStamina(StaminaDrain)
 	end
 
 	Ensemble.Events.Publish(CombatEvents.BlockHit, {
@@ -158,7 +181,7 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 	Ensemble.Events.Publish(CombatEvents.DamageBlocked, {
 		Entity = Context.Entity,
 		Attacker = Attacker,
-		BlockedAmount = IncomingDamage - ReducedDamage,
+		BlockedAmount = IncomingDamage,
 		Context = Context,
 	})
 end

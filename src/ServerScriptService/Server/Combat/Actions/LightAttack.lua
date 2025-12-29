@@ -146,17 +146,18 @@ function LightAttack.OnHit(Context: ActionContext, Target: Entity, _HitIndex: nu
 		return
 	end
 
-	AttackBase.ApplyDamage(Context, Target)
-	AttackBase.ApplyHitStun(Context, Target)
+	local WasBlocked = AttackBase.ProcessHit(Context, Target)
 
-	Ensemble.Events.Publish(CombatEvents.AttackHit, {
-		Entity = Context.Entity,
-		Target = Target,
-		ActionName = "LightAttack",
-		ComboIndex = Context.Metadata.ComboIndex,
-		Damage = Context.Metadata.Damage,
-		Context = Context,
-	})
+	if not WasBlocked then
+		Ensemble.Events.Publish(CombatEvents.AttackHit, {
+			Entity = Context.Entity,
+			Target = Target,
+			ActionName = "LightAttack",
+			ComboIndex = Context.Metadata.ComboIndex,
+			Damage = Context.Metadata.Damage,
+			Context = Context,
+		})
+	end
 end
 
 function LightAttack.OnComplete(Context: ActionContext)

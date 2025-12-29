@@ -60,6 +60,11 @@ function StaminaComponent.new(Entity: Types.Entity, _Context: Types.EntityContex
 	return self
 end
 
+function StaminaComponent.GetStamina(self: Self): number
+	local StaminaValue = self.Entity.Stats:GetStat(StatTypes.STAMINA)
+	return StaminaValue
+end
+
 function StaminaComponent.GetMaxStamina(self: Self): number
 	local NewMax = self.Entity.Stats:GetStat(StatTypes.MAX_STAMINA)
 	if not Formulas.IsNearlyEqual(NewMax, self.CachedMaxStamina, 0.1) then

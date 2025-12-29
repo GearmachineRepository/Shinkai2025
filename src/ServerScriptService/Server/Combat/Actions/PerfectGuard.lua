@@ -18,6 +18,7 @@ type ActionContext = CombatTypes.ActionContext
 
 local PerfectGuard = {}
 
+PerfectGuard.ActionName = "PerfectGuard"
 PerfectGuard.WindowDuration = CombatBalance.PerfectBlock.WINDOW_SECONDS
 PerfectGuard.Cooldown = CombatBalance.PerfectBlock.COOLDOWN_SECONDS
 PerfectGuard.SpamCooldown = CombatBalance.PerfectBlock.SPAM_COOLDOWN_SECONDS

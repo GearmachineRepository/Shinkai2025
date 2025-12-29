@@ -4,6 +4,8 @@ local CombatBalance = {
 	Blocking = {
 		DAMAGE_REDUCTION = 0.95,
 		STAMINA_DRAIN_ON_HIT = 5,
+		STAMINA_DRAIN_SCALAR = 1.0,
+		GUARD_BREAK_DURATION = 1.5,
 		CAN_HOLD_INDEFINITELY = true,
 	},
 
@@ -17,7 +19,7 @@ local CombatBalance = {
 	},
 
 	Counter = {
-		WINDOW_SECONDS = 0.325,
+		WINDOW_SECONDS = 5, --0.325,
 		COOLDOWN_SECONDS = 10,
 		SPAM_COOLDOWN_SECONDS = 5,
 		NEGATES_ALL_DAMAGE = true,

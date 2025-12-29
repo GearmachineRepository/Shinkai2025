@@ -21,6 +21,7 @@ type ActionContext = CombatTypes.ActionContext
 
 local Counter = {}
 
+Counter.ActionName = "Counter"
 Counter.WindowDuration = CombatBalance.Counter.WINDOW_SECONDS
 Counter.SpamCooldown = CombatBalance.Counter.SPAM_COOLDOWN_SECONDS
 Counter.Cooldown = CombatBalance.Counter.COOLDOWN_SECONDS

@@ -9,6 +9,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local CombatTypes = require(script.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.ActionExecutor)
+local Block = require(script.Parent.Actions.Block)
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
@@ -39,6 +41,10 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) 
 		DebounceTime = 0,
 		SpatialOption = "InBox",
 	})
+
+	if NewHitbox.Part then
+		NewHitbox.Part.CastShadow = false
+	end
 
 	NewHitbox:WeldTo(RootPart, HitboxOffset)
 
@@ -147,6 +153,39 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 	if Config.OnAnimationEnd then
 		Config.OnAnimationEnd()
 	end
+end
+
+function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): boolean
+	local TargetContext = ActionExecutor.GetActiveContext(Target)
+
+	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
+		local Metadata = AttackerContext.Metadata
+		local Damage = Metadata.Damage or 10
+
+		Block.OnHit(TargetContext, AttackerContext.Entity, Damage)
+
+		Ensemble.Events.Publish(CombatEvents.AttackBlocked, {
+			Attacker = AttackerContext.Entity,
+			Target = Target,
+			Damage = Damage,
+			AttackerContext = AttackerContext,
+			TargetContext = TargetContext,
+		})
+
+		return true
+	end
+
+	AttackBase.ApplyDamage(AttackerContext, Target)
+	AttackBase.ApplyHitStun(AttackerContext, Target)
+
+	Ensemble.Events.Publish(CombatEvents.AttackHit, {
+		Entity = AttackerContext.Entity,
+		Target = Target,
+		Damage = AttackerContext.Metadata.Damage or 10,
+		Context = AttackerContext,
+	})
+
+	return false
 end
 
 function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity)

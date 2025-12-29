@@ -154,16 +154,17 @@ function HeavyAttack.OnHit(Context: ActionContext, Target: Entity, _HitIndex: nu
 		return
 	end
 
-	AttackBase.ApplyDamage(Context, Target)
-	AttackBase.ApplyHitStun(Context, Target)
+	local WasBlocked = AttackBase.ProcessHit(Context, Target)
 
-	Ensemble.Events.Publish(CombatEvents.AttackHit, {
-		Entity = Context.Entity,
-		Target = Target,
-		ActionName = "HeavyAttack",
-		Damage = Context.Metadata.Damage,
-		Context = Context,
-	})
+	if not WasBlocked then
+		Ensemble.Events.Publish(CombatEvents.AttackHit, {
+			Entity = Context.Entity,
+			Target = Target,
+			ActionName = "HeavyAttack",
+			Damage = Context.Metadata.Damage,
+			Context = Context,
+		})
+	end
 end
 
 function HeavyAttack.OnInterrupt(Context: ActionContext)
