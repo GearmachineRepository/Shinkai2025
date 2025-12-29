@@ -13,6 +13,7 @@ local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
+local StunManager = require(Server.Combat.StunManager)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
@@ -27,7 +28,7 @@ Counter.SpamCooldown = CombatBalance.Counter.SPAM_COOLDOWN_SECONDS
 Counter.Cooldown = CombatBalance.Counter.COOLDOWN_SECONDS
 
 local COOLDOWN_ID = "Counter"
-local DEFAULT_KNOCKBACK_FORCE = 50
+-- local DEFAULT_KNOCKBACK_FORCE = 50
 local DAMAGE_MULTIPLIER = 0.8
 
 local function GetCounterData(Entity: Entity): { [string]: any }?
@@ -41,7 +42,7 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		end
 	end
 
-	local AnimationSetName = "Unarmed"
+	local AnimationSetName = "Fists"
 	if ItemId then
 		local ItemData = ItemDatabase.GetItem(ItemId)
 		if ItemData and ItemData.AnimationSet then
@@ -49,7 +50,7 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		end
 	end
 
-	local AnimationSet = AnimationSets[AnimationSetName] or AnimationSets["Unarmed"]
+	local AnimationSet = AnimationSets.Get(AnimationSetName) or AnimationSets.Get("Fists")
 	if not AnimationSet then
 		return nil
 	end
@@ -65,7 +66,7 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		return nil
 	end
 
-	local SetMetadata = AnimationSet.Metadata or {}
+	if not AnimationSet.Metadata then return end
 
 	return {
 		AnimationId = LastM1Data.AnimationId,
@@ -73,9 +74,9 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		HitStun = LastM1Data.HitStun or 0.4,
 		HitboxSize = LastM1Data.Hitbox and LastM1Data.Hitbox.Size or Vector3.new(6, 5, 7),
 		HitboxOffset = LastM1Data.Hitbox and LastM1Data.Hitbox.Offset or Vector3.new(0, 0, -4),
-		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart or 0.2,
-		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd or 0.5,
-		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length or 1.0,
+		FallbackHitStart = AnimationSet.Metadata.FallbackTimings and AnimationSet.Metadata.FallbackTimings.HitStart or 0.2,
+		FallbackHitEnd = AnimationSet.Metadata.FallbackTimings and AnimationSet.Metadata.FallbackTimings.HitEnd or 0.5,
+		FallbackLength = AnimationSet.Metadata.FallbackTimings and AnimationSet.Metadata.FallbackTimings.Length or 1.0,
 	}
 end
 
@@ -89,16 +90,11 @@ function Counter.Trigger(BlockContext: ActionContext, Attacker: Entity)
 
 	ActionExecutor.StartCooldown(Entity, COOLDOWN_ID, Counter.Cooldown)
 
-	if Entity.Player then
-		Packets.StartCooldown:FireClient(Entity.Player, COOLDOWN_ID, Counter.Cooldown, workspace:GetServerTimeNow())
-	end
-
 	Ensemble.Events.Publish(CombatEvents.CounterExecuted, {
 		Entity = Entity,
 		Attacker = Attacker,
 	})
 
-	Entity.States:SetState("Blocking", false)
 	Entity.States:SetState("Attacking", true)
 
 	local Player = Entity.Player
@@ -110,37 +106,31 @@ function Counter.Trigger(BlockContext: ActionContext, Attacker: Entity)
 
 	local AnimationLength = AnimationTimingCache.GetLength(AnimationId) or CounterData.FallbackLength
 	local HitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", CounterData.FallbackHitStart)
-	local _HitEndTime = AnimationTimingCache.GetTiming(AnimationId, "HitStop", CounterData.FallbackHitEnd)
 
 	task.spawn(function()
 		task.wait(HitStartTime)
 
 		local Damage = CounterData.Damage
-		local KnockbackForce = DEFAULT_KNOCKBACK_FORCE
+		-- local KnockbackForce = DEFAULT_KNOCKBACK_FORCE
 
 		local DamageComponent = Attacker:GetComponent("Damage")
 		if DamageComponent then
-			local RootPart = Entity.Character and Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			local KnockbackDirection = if RootPart then RootPart.CFrame.LookVector else Vector3.zero
+			-- local RootPart = Entity.Character and Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			-- local KnockbackDirection = if RootPart then RootPart.CFrame.LookVector else Vector3.zero
 
-			DamageComponent:DealDamage(Damage, Entity.Player, KnockbackDirection)
+			-- DamageComponent:DealDamage(Damage, Entity.Player, KnockbackDirection)
 
-			local TargetRootPart = Attacker.Character and Attacker.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			if TargetRootPart then
-				local KnockbackVelocity = KnockbackDirection * KnockbackForce + Vector3.new(0, KnockbackForce * 0.3, 0)
-				TargetRootPart.AssemblyLinearVelocity = KnockbackVelocity
-			end
+			-- local TargetRootPart = Attacker.Character and Attacker.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			-- if TargetRootPart then
+			-- 	local KnockbackVelocity = KnockbackDirection * KnockbackForce + Vector3.new(0, KnockbackForce * 0.3, 0)
+			-- 	TargetRootPart.AssemblyLinearVelocity = KnockbackVelocity
+			-- end
+			DamageComponent:DealDamage(Damage, Entity.Player)
 		end
 
 		local AttackerStates = Attacker.States
 		if AttackerStates then
-			AttackerStates:SetState("Stunned", true)
-
-			task.delay(CounterData.HitStun, function()
-				if AttackerStates then
-					AttackerStates:SetState("Stunned", false)
-				end
-			end)
+			StunManager.ApplyStun(Attacker, CounterData.HitStun, "Counter")
 		end
 
 		Ensemble.Events.Publish(CombatEvents.CounterHit, {

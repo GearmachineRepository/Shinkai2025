@@ -11,6 +11,7 @@ local CombatTypes = require(script.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.ActionExecutor)
 local Block = require(script.Parent.Actions.Block)
+local StunManager = require(script.Parent.StunManager)
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
@@ -34,7 +35,7 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) 
 		SizeOrPart = HitboxSize,
 		InitialCframe = RootPart.CFrame * HitboxOffset,
 		VelocityPrediction = true,
-		Debug = true,
+		Debug = false,
 		LifeTime = 0,
 		LookingFor = "Humanoid",
 		Blacklist = { Context.Entity.Character },
@@ -220,25 +221,7 @@ function AttackBase.ApplyHitStun(Context: ActionContext, Target: Entity)
 		return
 	end
 
-	StateComponent:SetState("Stunned", true)
-
-	Ensemble.Events.Publish(CombatEvents.HitStunApplied, {
-		Entity = Context.Entity,
-		Target = Target,
-		Duration = HitStun,
-		Context = Context,
-	})
-
-	task.delay(HitStun, function()
-		if StateComponent then
-			StateComponent:SetState("Stunned", false)
-		end
-
-		Ensemble.Events.Publish(CombatEvents.StunEnded, {
-			Entity = Target,
-			Reason = "HitStunExpired",
-		})
-	end)
+	StunManager.ApplyStun(Target, HitStun, "AttackBase")
 end
 
 function AttackBase.HandleStaminaRefund(Context: ActionContext)

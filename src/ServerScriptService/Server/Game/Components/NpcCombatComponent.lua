@@ -83,8 +83,7 @@ function NpcCombatComponent:Update(DeltaTime: number)
 
 	self.NextAttackTime = Interval
 
-	local Success, Reason = self:LightAttack()
-	print(Success, Reason)
+	self:LightAttack()
 end
 
 function NpcCombatComponent:CanAct(): boolean

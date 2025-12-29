@@ -19,6 +19,7 @@ StateHandlerComponent.__index = StateHandlerComponent
 
 StateHandlerComponent.ComponentName = "StateHandler"
 StateHandlerComponent.Dependencies = { "States" }
+StateHandlerComponent.UpdateRate = 1/30
 
 type Self = {
 	Entity: Types.Entity,
@@ -41,12 +42,12 @@ local MOVEMENT_BLOCKING_STATES = {
 }
 
 local ANIMATION_REACTIONS = {
-	[StateTypes.STUNNED] = {
-		AnimationName = "Stunned",
-		FadeTime = 0.25,
-		Priority = Enum.AnimationPriority.Action,
-		Looped = true,
-	},
+	-- [StateTypes.STUNNED] = {
+	-- 	AnimationName = "Stunned",
+	-- 	FadeTime = 0.25,
+	-- 	Priority = Enum.AnimationPriority.Action,
+	-- 	Looped = true,
+	-- },
 	[StateTypes.RAGDOLLED] = {
 		AnimationName = "Ragdoll",
 		FadeTime = 0.1,
@@ -211,11 +212,29 @@ function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
 	local self: Self = {
 		Entity = Entity,
 		Maid = ComponentMaid,
+		LastUpdate = workspace:GetServerTimeNow()
 	}
 
 	setmetatable(self, StateHandlerComponent)
 
 	return self :: any
+end
+
+function StateHandlerComponent:Update(DeltaTime: number)
+	local StunRemaining = self.Entity.Stats:GetStat("StunDuration") or 0
+
+	if StunRemaining > 0 then
+		local NewDuration = math.max(0, StunRemaining - DeltaTime)
+		self.Entity.Stats:SetStat("StunDuration", NewDuration)
+
+		if not self.Entity.States:GetState("Stunned") then
+			self.Entity.States:SetState("Stunned", true)
+		end
+
+		if NewDuration <= 0 then
+			self.Entity.States:SetState("Stunned", false)
+		end
+	end
 end
 
 function StateHandlerComponent:Destroy()

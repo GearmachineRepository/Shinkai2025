@@ -22,6 +22,7 @@ local StatBalance = {
 		RunSpeed = 28,
 		StrikingPower = 0,
 		StrikeSpeed = 0,
+		StunDuration = 0,
 	},
 
 	MovementSpeeds = {

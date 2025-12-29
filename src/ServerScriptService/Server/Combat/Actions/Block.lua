@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CombatTypes = require(Server.Combat.CombatTypes)
 local CombatEvents = require(Server.Combat.CombatEvents)
 local ActionValidator = require(Shared.Utils.ActionValidator)
+local ActionExecutor = require(Server.Combat.ActionExecutor)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
@@ -113,20 +114,23 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 
 	if ActiveWindow == "PerfectGuard" then
 		Context.CustomData.ActiveWindow = nil
+		Context.CustomData.WindowTriggered = true
 		Context.Entity.States:SetState("PerfectGuardWindow", false)
 
 		PerfectGuard.Trigger(Context, Attacker)
+
+		ActionExecutor.Interrupt(Context.Entity, "PerfectGuard")
 		return
 	end
 
 	if ActiveWindow == "Counter" then
 		Context.CustomData.ActiveWindow = nil
+		Context.CustomData.WindowTriggered = true
 		Context.Entity.States:SetState("CounterWindow", false)
 
 		Counter.Trigger(Context, Attacker)
 
-		Context.Interrupted = true
-		Context.InterruptReason = "Counter"
+		ActionExecutor.Interrupt(Context.Entity, "Counter")
 		return
 	end
 

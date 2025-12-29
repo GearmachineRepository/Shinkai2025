@@ -5,6 +5,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local CombatEvents = require(Server.Combat.CombatEvents)
+local StunManager = require(Server.Combat.StunManager)
 
 return {
 	HookName = "CounterStrike",
@@ -25,12 +26,7 @@ return {
 
 			local TargetStates = EventData.Target:GetComponent("States")
 			if TargetStates then
-				task.delay(0.5, function()
-					TargetStates:SetState("Stunned", true)
-					task.delay(0.5, function()
-						TargetStates:SetState("Stunned", false)
-					end)
-				end)
+				StunManager.ApplyStun(EventData.Target, 0.5, "PerfectGuard")
 			end
 		end)
 

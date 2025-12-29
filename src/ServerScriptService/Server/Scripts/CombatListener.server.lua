@@ -83,21 +83,19 @@ local function HandleWindowCommand(Entity: EnsembleTypes.Entity, WindowType: str
 		then require(Server.Combat.Actions.PerfectGuard)
 		else require(Server.Combat.Actions.Counter)
 
-	local RealCooldownId = WindowType
-	local RealCooldown = WindowModule.Cooldown or 10
+	local SuccessCooldownId = WindowType
+	local SuccessCooldownDuration = WindowModule.Cooldown or 10
 
-	if ActionExecutor.IsOnCooldown(Entity, RealCooldownId, RealCooldown) then
+	if ActionExecutor.IsOnCooldown(Entity, SuccessCooldownId, SuccessCooldownDuration) then
 		return false
 	end
 
-	local SpamCooldownId = WindowType .. "Failure"
-	local SpamCooldown = WindowModule.SpamCooldown or 5
+	local FailureCooldownId = WindowType .. "Failure"
+	local FailureCooldownDuration = WindowModule.SpamCooldown or 5
 
-	if ActionExecutor.IsOnCooldown(Entity, SpamCooldownId, SpamCooldown) then
+	if ActionExecutor.IsOnCooldown(Entity, FailureCooldownId, FailureCooldownDuration) then
 		return false
 	end
-
-	ActionExecutor.StartCooldown(Entity, SpamCooldownId, SpamCooldown)
 
 	local WindowDuration = WindowModule.WindowDuration or 0.3
 
@@ -112,16 +110,29 @@ local function HandleWindowCommand(Entity: EnsembleTypes.Entity, WindowType: str
 	})
 
 	task.delay(WindowDuration, function()
-		if ActiveContext.CustomData.ActiveWindow == WindowType then
-			ActiveContext.CustomData.ActiveWindow = nil
-			Entity.States:SetState(WindowType .. "Window", false)
-
-			Ensemble.Events.Publish(CombatEvents.ParryWindowClosed, {
-				Entity = Entity,
-				WindowType = WindowType,
-				DidTrigger = false,
-			})
+		if ActionExecutor.IsOnCooldown(Entity, SuccessCooldownId, SuccessCooldownDuration) then
+			return
 		end
+
+		local CurrentContext = ActionExecutor.GetActiveContext(Entity)
+		if CurrentContext ~= ActiveContext then
+			return
+		end
+
+		if ActiveContext.CustomData.ActiveWindow ~= WindowType then
+			return
+		end
+
+		ActiveContext.CustomData.ActiveWindow = nil
+		Entity.States:SetState(WindowType .. "Window", false)
+
+		ActionExecutor.StartCooldown(Entity, FailureCooldownId, FailureCooldownDuration)
+
+		Ensemble.Events.Publish(CombatEvents.ParryWindowClosed, {
+			Entity = Entity,
+			WindowType = WindowType,
+			DidTrigger = false,
+		})
 	end)
 
 	return true
@@ -201,7 +212,14 @@ local function HandleReleaseAction(Player: Player, RawInput: string)
 		return
 	end
 
-	if ActiveContext.RawInput ~= RawInput then
+	local ContextRawInput = ActiveContext.RawInput
+	local ActionName = ActiveContext.Metadata and ActiveContext.Metadata.ActionName
+
+	if ContextRawInput then
+		if ContextRawInput ~= RawInput then
+			return
+		end
+	elseif ActionName == "Block" and RawInput ~= "Block" then
 		return
 	end
 

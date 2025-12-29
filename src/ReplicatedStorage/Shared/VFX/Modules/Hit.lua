@@ -4,9 +4,13 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local SoundPlayer = require(Shared.General.SoundPlayer)
 
+
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local VfxAssets = Assets:WaitForChild("VFXAssets")
 local HitAssets = VfxAssets:WaitForChild("Hit")
+local Sounds = Assets:WaitForChild("Sounds")
+local PunchHits = Sounds:WaitForChild("PunchHits")
+local Swings = Sounds:WaitForChild("Swings")
 
 local HitVFX = {}
 
@@ -22,7 +26,8 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
     if not Target then return end
     if not Target.PrimaryPart then return nil end
 
-    SoundPlayer.Play(Target, "Hit1")
+    SoundPlayer.Play(Target, Swings:GetChildren()[math.random(1,#Swings:GetChildren())].Name)
+    SoundPlayer.Play(Target, PunchHits:GetChildren()[math.random(1,#PunchHits:GetChildren())].Name)
 
     local OnHitVFX = HitAssets:findFirstChild("OnHit")
     if OnHitVFX then

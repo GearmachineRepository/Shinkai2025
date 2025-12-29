@@ -25,6 +25,12 @@ local Config: StatConfig = {
 			Replication = "All",
 		},
 
+		[StatTypes.STUNDURATION] = {
+			Default = StatBalance.Defaults.StunDuration,
+			Min = 0,
+			Replication = "All",
+		},
+
 		[StatTypes.STAMINA] = {
 			Default = StatBalance.Defaults.Stamina,
 			Min = 0,

@@ -10,7 +10,7 @@ local CombatTypes = require(Server.Combat.CombatTypes)
 local CombatEvents = require(Server.Combat.CombatEvents)
 local ActionExecutor = require(Server.Combat.ActionExecutor)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local Packets = require(Shared.Networking.Packets)
+local StunManager = require(Server.Combat.StunManager)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -31,10 +31,6 @@ function PerfectGuard.Trigger(BlockContext: ActionContext, Attacker: Entity)
 
 	ActionExecutor.StartCooldown(Entity, COOLDOWN_ID, PerfectGuard.Cooldown)
 
-	if Entity.Player then
-		Packets.StartCooldown:FireClient(Entity.Player, COOLDOWN_ID, PerfectGuard.Cooldown, workspace:GetServerTimeNow())
-	end
-
 	Ensemble.Events.Publish(CombatEvents.ParrySuccess, {
 		Entity = Entity,
 		Attacker = Attacker,
@@ -48,25 +44,7 @@ function PerfectGuard.Trigger(BlockContext: ActionContext, Attacker: Entity)
 
 	local AttackerStates = Attacker.States
 	if AttackerStates then
-		AttackerStates:SetState("Stunned", true)
-
-		Ensemble.Events.Publish(CombatEvents.StunApplied, {
-			Entity = Entity,
-			Target = Attacker,
-			Duration = PerfectGuard.StaggerDuration,
-			Reason = "PerfectGuard",
-		})
-
-		task.delay(PerfectGuard.StaggerDuration, function()
-			if AttackerStates then
-				AttackerStates:SetState("Stunned", false)
-
-				Ensemble.Events.Publish(CombatEvents.StunEnded, {
-					Entity = Attacker,
-					Reason = "PerfectGuardStaggerExpired",
-				})
-			end
-		end)
+		StunManager.ApplyStun(Attacker, PerfectGuard.StaggerDuration, "PerfectGuard")
 	end
 end
 
