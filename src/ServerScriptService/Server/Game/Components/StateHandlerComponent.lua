@@ -14,6 +14,7 @@ local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local Packets = require(Shared.Networking.Packets)
 local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local StatBalance = require(Shared.Configurations.Balance.StatBalance)
 
 local StateHandlerComponent = {}
 StateHandlerComponent.__index = StateHandlerComponent
@@ -100,6 +101,17 @@ local function SetupConflictResolution(Entity: Types.Entity, ComponentMaid: Type
 	end
 end
 
+local function CanJump(Entity: Types.Entity, Toggle: boolean)
+	local JumpPower = if not Toggle then StatBalance.Defaults.JumpPower else 0
+	local Character = Entity.Character
+	if Character then
+		local Humanoid = Character:FindFirstChild("Humanoid") :: Humanoid?
+		if Humanoid then
+			Humanoid.JumpPower = JumpPower
+		end
+	end
+end
+
 local function SetupMovementLocking(Entity: Types.Entity, ComponentMaid: Types.Maid)
 	local function UpdateMovementLock()
 		local IsLocked = false
@@ -110,6 +122,8 @@ local function SetupMovementLocking(Entity: Types.Entity, ComponentMaid: Types.M
 				break
 			end
 		end
+
+		CanJump(Entity, IsLocked)
 
 		Entity.States:SetState(StateTypes.MOVEMENT_LOCKED, IsLocked)
 	end
@@ -232,6 +246,8 @@ local function SetupStunnedSpeedModifier(Entity: Types.Entity, ComponentMaid: Ty
 	local RemoveModifier: (() -> ())? = nil
 
 	local Connection = Entity.States:OnStateChanged(StateTypes.STUNNED, function(Enabled: boolean)
+		CanJump(Entity, Enabled)
+
 		if Enabled then
 			local Multiplier = CombatBalance.Stunned.MOVEMENT_SPEED_MULTIPLIER or 0.3
 			RemoveModifier = Entity.Modifiers:Register("WalkSpeed", 50, function(Value: number)

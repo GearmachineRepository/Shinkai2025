@@ -20,6 +20,7 @@ local StatBalance = {
 		Muscle = 0,
 		Durability = 0,
 		RunSpeed = 28,
+		JumpPower = 50,
 		StrikingPower = 0,
 		StrikeSpeed = 0,
 		StunDuration = 0,
