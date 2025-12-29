@@ -2,24 +2,27 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
+local StatTypes = require(ReplicatedStorage.Shared.Configurations.Enums.StatTypes)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 local ActionValidator = {}
 
 ActionValidator.Blocking = {
-	LightAttack = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.BLOCKING },
-	HeavyAttack = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING },
-	Feint = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
-	Block = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING },
-	Dodge = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING },
-	PerfectGuard = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
-	Counter = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
+	LightAttack = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.BLOCKING, StatTypes.GUARD_BROKEN },
+	HeavyAttack = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StatTypes.GUARD_BROKEN },
+	Feint = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StatTypes.GUARD_BROKEN },
+	Block = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StatTypes.GUARD_BROKEN },
+	Dodge = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StatTypes.GUARD_BROKEN },
+	PerfectGuard = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StatTypes.GUARD_BROKEN },
+	Counter = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StatTypes.GUARD_BROKEN },
 
-	M1 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.BLOCKING },
-	M2 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING },
+	Hitbox = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.BLOCKING, StatTypes.GUARD_BROKEN },
 
-	Jog = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED },
-	Run = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED },
+	M1 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.BLOCKING, StatTypes.GUARD_BROKEN },
+	M2 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.GUARD_BROKEN },
+
+	Jog = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StatTypes.GUARD_BROKEN },
+	Run = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StatTypes.GUARD_BROKEN },
 }
 
 ActionValidator.Required = {
@@ -29,10 +32,12 @@ ActionValidator.Required = {
 }
 
 function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, string?)
+	if not States or not ActionName then return false, "No State or ActionName" end
+
 	local BlockingStates = ActionValidator.Blocking[ActionName]
 	if BlockingStates then
 		for _, StateName in BlockingStates do
-			if States:GetState(StateName) then
+			if States and States:GetState(StateName) then
 				return false, StateName
 			end
 		end
@@ -41,7 +46,7 @@ function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, 
 	local RequiredStates = ActionValidator.Required[ActionName]
 	if RequiredStates then
 		for _, StateName in RequiredStates do
-			if not States:GetState(StateName) then
+			if States and not States:GetState(StateName) then
 				return false, "Missing" .. StateName
 			end
 		end

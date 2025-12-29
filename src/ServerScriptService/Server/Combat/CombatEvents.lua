@@ -40,6 +40,8 @@ local CombatEvents = {
 	DodgeCompleted = "DodgeCompleted",
 	DodgeSuccessful = "DodgeSuccessful",
 
+	ClashOccurred = "ClashOccurred",
+
 	ComboAdvanced = "ComboAdvanced",
 	ComboReset = "ComboReset",
 	ComboFinished = "ComboFinished",

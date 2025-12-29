@@ -13,12 +13,13 @@ local Types = require(Server.Ensemble.Types)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local Packets = require(Shared.Networking.Packets)
 local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+
 local StateHandlerComponent = {}
 StateHandlerComponent.__index = StateHandlerComponent
 
 StateHandlerComponent.ComponentName = "StateHandler"
 StateHandlerComponent.Dependencies = { "States" }
-StateHandlerComponent.UpdateRate = 1/30
 
 type Self = {
 	Entity: Types.Entity,
@@ -35,7 +36,8 @@ local CONFLICTING_STATES = {
 }
 
 local MOVEMENT_BLOCKING_STATES = {
-	StateTypes.STUNNED,
+	--StateTypes.STUNNED,
+	StateTypes.GUARD_BROKEN,
 	StateTypes.RAGDOLLED,
 	StateTypes.DOWNED,
 }
@@ -69,9 +71,10 @@ local ANIMATION_REACTIONS = {
 
 local VFX_REACTIONS = {
 	--[StateTypes.STUNNED] = "StunStars",
-	[StateTypes.GUARD_BROKEN] = "ShieldBreak",
+	[StateTypes.GUARD_BROKEN] = "GuardBroken",
 	[StateTypes.PARRIED] = "ParryFlash",
-	[StateTypes.ONHIT] = "Hit"
+	[StateTypes.ONHIT] = "Hit",
+	[StateTypes.BLOCK_HIT] = "BlockHit"
 }
 
 local SFX_REACTIONS = {
@@ -225,6 +228,29 @@ local function SetupForceWalkOnStates(Entity: Types.Entity, ComponentMaid: Types
 	end
 end
 
+local function SetupStunnedSpeedModifier(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	local RemoveModifier: (() -> ())? = nil
+
+	local Connection = Entity.States:OnStateChanged(StateTypes.STUNNED, function(Enabled: boolean)
+		if Enabled then
+			local Multiplier = CombatBalance.Stunned.MOVEMENT_SPEED_MULTIPLIER or 0.3
+			RemoveModifier = Entity.Modifiers:Register("WalkSpeed", 50, function(Value: number)
+				return Value * Multiplier
+			end)
+		elseif RemoveModifier then
+			RemoveModifier()
+			RemoveModifier = nil
+		end
+	end)
+
+	ComponentMaid:GiveTask(Connection)
+	ComponentMaid:GiveTask(function()
+		if RemoveModifier then
+			RemoveModifier()
+		end
+	end)
+end
+
 function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
 	local ComponentMaid = Ensemble.Maid.new()
 
@@ -236,6 +262,7 @@ function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
 	SetupVFXReactions(Entity, ComponentMaid)
 	SetupSFXReactions(Entity, ComponentMaid)
 	SetupForceWalkOnStates(Entity, ComponentMaid)
+	SetupStunnedSpeedModifier(Entity, ComponentMaid)
 
 	local self: Self = {
 		Entity = Entity,
@@ -246,23 +273,6 @@ function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
 	setmetatable(self, StateHandlerComponent)
 
 	return self :: any
-end
-
-function StateHandlerComponent:Update(DeltaTime: number)
-	local StunRemaining = self.Entity.Stats:GetStat("StunDuration") or 0
-
-	if StunRemaining > 0 then
-		local NewDuration = math.max(0, StunRemaining - DeltaTime)
-		self.Entity.Stats:SetStat("StunDuration", NewDuration)
-
-		if not self.Entity.States:GetState("Stunned") then
-			self.Entity.States:SetState("Stunned", true)
-		end
-
-		if NewDuration <= 0 then
-			self.Entity.States:SetState("Stunned", false)
-		end
-	end
 end
 
 function StateHandlerComponent:Destroy()

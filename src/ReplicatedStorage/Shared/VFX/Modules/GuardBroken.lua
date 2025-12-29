@@ -8,15 +8,12 @@ local VfxTemplatePlayer = require(Shared.General.VfxEmitter)
 
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local VfxAssets = Assets:WaitForChild("VFXAssets")
-local HitAssets = VfxAssets:WaitForChild("Hit")
+local GuardbreakVfx = VfxAssets:WaitForChild("Guardbreak")
 
 local Sounds = Assets:WaitForChild("Sounds")
-local PunchHits = Sounds:WaitForChild("PunchHits")
-local BloodSpills = Sounds:WaitForChild("BloodSpills")
-local BoneBreaks = Sounds:WaitForChild("BoneBreaks")
-local Swings = Sounds:WaitForChild("Swings")
+local GuardBreaks = Sounds:WaitForChild("Guardbreaks")
 
-local HitVFX = {}
+local GuardbrokenVFX = {}
 
 type VfxInstance = {
 	Cleanup: (Rollback: boolean?) -> (),
@@ -28,9 +25,8 @@ type HitVfxData = {
 }
 
 local DEFAULT_VFX_LIFETIME_SECONDS = 10
-local HEALTH_PERCENT_SWAP = 45/100
 
-function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
+function GuardbrokenVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 	local TypedData = VfxData :: HitVfxData?
 	local Target = TypedData and TypedData.Target
 	if not Target then
@@ -42,15 +38,9 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		return nil
 	end
 
-	local OnHitFolder: Instance? = HitAssets:FindFirstChild("OnHit", true)
-	if Humanoid.Health <= Humanoid.MaxHealth * HEALTH_PERCENT_SWAP then
-        SoundPlayer.Play(Target, BloodSpills:GetChildren()[math.random(1, #BloodSpills:GetChildren())].Name)
-        SoundPlayer.Play(Target, BoneBreaks:GetChildren()[math.random(1, #BoneBreaks:GetChildren())].Name)
-		OnHitFolder = HitAssets:FindFirstChild("OnHitBleed", true)
-	end
+	local OnHitFolder: Instance? = GuardbreakVfx:FindFirstChild("GuardbreakNormal", true)
 
-	SoundPlayer.Play(Target, Swings:GetChildren()[math.random(1, #Swings:GetChildren())].Name)
-	SoundPlayer.Play(Target, PunchHits:GetChildren()[math.random(1, #PunchHits:GetChildren())].Name)
+	SoundPlayer.Play(Target, GuardBreaks:GetChildren()[math.random(1, #GuardBreaks:GetChildren())].Name)
 
 	if not OnHitFolder then
 		return nil
@@ -72,4 +62,4 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 	}
 end
 
-return HitVFX
+return GuardbrokenVFX

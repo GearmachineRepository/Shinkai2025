@@ -19,8 +19,8 @@ local DUMMY_CONFIG = {
 		AttackRange = 6,
 		AggroRange = 30,
 		AutoAttack = true,
-		AttackIntervalMin = 2.0,
-		AttackIntervalMax = 4.0,
+		AttackIntervalMin = 1.0,
+		AttackIntervalMax = 1.0,
 	},
 }
 

@@ -60,9 +60,16 @@ function StaminaComponent.new(Entity: Types.Entity, _Context: Types.EntityContex
 	return self
 end
 
+function StaminaComponent.GetRawStamina(self: Self): number
+	return self.Entity.Stats:GetStat(StatTypes.STAMINA)
+end
+
+function StaminaComponent.GetEffectiveStamina(self: Self): number
+	return self.Entity.Stats:GetStat(StatTypes.STAMINA) + self.PendingDelta
+end
+
 function StaminaComponent.GetStamina(self: Self): number
-	local StaminaValue = self.Entity.Stats:GetStat(StatTypes.STAMINA)
-	return StaminaValue
+	return StaminaComponent.GetRawStamina(self)
 end
 
 function StaminaComponent.GetMaxStamina(self: Self): number
@@ -243,6 +250,17 @@ function StaminaComponent.Update(self: Self, DeltaTime: number, MovementMode: st
 	end
 
 	return AllowMovement
+end
+
+function StaminaComponent.SetStamina(self: Self, TargetStamina: number)
+	if not self.Entity.Character then
+		return
+	end
+
+	self.PendingDelta = 0
+	self.SyncAccumulator = 0
+
+	StaminaComponent.ApplyStamina(self, TargetStamina, true)
 end
 
 function StaminaComponent.Destroy(self: Self)

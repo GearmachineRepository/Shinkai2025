@@ -6,6 +6,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
+local CombatBalance = require(ReplicatedStorage.Shared.Configurations.Balance.CombatBalance)
+local ActionValidator = require(ReplicatedStorage.Shared.Utils.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 local CombatTypes = require(script.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.CombatEvents)
@@ -51,7 +53,15 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity) 
 	NewHitbox:WeldTo(RootPart, HitboxOffset)
 
 	NewHitbox.OnHit:Connect(function(HitCharacters: { Model })
-		if not Context.CustomData.HitWindowOpen or Context.CustomData.HasHit then
+		if not Context.CustomData.HitWindowOpen then
+			return
+		end
+
+		if Context.Interrupted then
+			return
+		end
+
+		if not ActionValidator.CanPerform(Context.Entity:GetComponent("States"), "Hitbox") then
 			return
 		end
 
@@ -157,11 +167,50 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 	end
 end
 
+local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
+	ActionExecutor.Interrupt(ContextA.Entity, "Clash")
+	ActionExecutor.Interrupt(ContextB.Entity, "Clash")
+
+	ContextA.Entity.States:SetState("Clashing", true)
+	ContextB.Entity.States:SetState("Clashing", true)
+
+	Ensemble.Events.Publish(CombatEvents.ClashOccurred, {
+		EntityA = ContextA.Entity,
+		EntityB = ContextB.Entity,
+	})
+
+	task.delay(0.3, function()
+		if ContextA.Entity.States then
+			ContextA.Entity.States:SetState("Clashing", false)
+		end
+		if ContextB.Entity.States then
+			ContextB.Entity.States:SetState("Clashing", false)
+		end
+	end)
+end
+
 function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): boolean
 	local TargetContext = ActionExecutor.GetActiveContext(Target)
 	local Metadata = AttackerContext.Metadata
 	local Damage = Metadata.Damage or 10
 	local Flags = AttackFlags.GetFlags(Metadata)
+
+	if AttackerContext.Interrupted or AttackerContext.Entity.States:GetState("Stunned") then
+		return false
+	end
+
+	if TargetContext and TargetContext.Metadata.ActionType == "Attack" then
+		if TargetContext.CustomData.HitWindowOpen then
+			local TargetHitTime = TargetContext.CustomData.HitWindowOpenTime or 0
+			local AttackerHitTime = AttackerContext.CustomData.HitWindowOpenTime or 0
+			local TimeDifference = math.abs(TargetHitTime - AttackerHitTime)
+
+			if TimeDifference <= CombatBalance.Attacking.CLASH_WINDOW_SECONDS then
+				HandleClash(AttackerContext, TargetContext)
+				return true
+			end
+		end
+	end
 
 	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
 		Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags)
@@ -219,9 +268,9 @@ function AttackBase.ApplyHitStun(Context: ActionContext, Target: Entity)
 	local Metadata = Context.Metadata
 	local HitStun = Metadata.HitStun or 0.25
 
-	local StateComponent = Target:GetComponent("States")
-	if not StateComponent then
-		return
+	local TargetContext = ActionExecutor.GetActiveContext(Target)
+	if TargetContext and TargetContext.Metadata.ActionType == "Attack" then
+		ActionExecutor.Interrupt(Target, "HitStun")
 	end
 
 	StunManager.ApplyStun(Target, HitStun, "AttackBase")

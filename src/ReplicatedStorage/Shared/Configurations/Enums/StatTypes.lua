@@ -13,6 +13,7 @@ local StatTypes = {
 	PHYSICAL_RESISTANCE = "PhysicalResistance",
 	ONHIT = "OnHit",
 	STUNDURATION = "StunDuration",
+	GUARD_BROKEN = "Guardbroken",
 
 	BODY_FATIGUE = "BodyFatigue",
 	MAX_BODY_FATIGUE = "MaxBodyFatigue",

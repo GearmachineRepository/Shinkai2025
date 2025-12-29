@@ -29,6 +29,18 @@ local Config: StateConfig = {
 			Conflicts = { StateTypes.SPRINTING, StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.ATTACKING },
 		},
 
+		[StateTypes.BLOCK_HIT] = {
+			Default = false,
+			Replication = "All",
+			Conflicts = {},
+		},
+
+		[StateTypes.GUARD_BROKEN] = {
+			Default = false,
+			Replication = "All",
+			Conflicts = {},
+		},
+
 		[StateTypes.STUNNED] = {
 			Default = false,
 			Replication = "All",

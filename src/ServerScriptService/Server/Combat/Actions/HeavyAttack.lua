@@ -85,6 +85,9 @@ function HeavyAttack.BuildMetadata(_Entity: Entity, InputData: { [string]: any }
 		FallbackHitStart = SetMetadata.FallbackTimings.HitStart,
 		FallbackHitEnd = SetMetadata.FallbackTimings.HitEnd,
 		FallbackLength = SetMetadata.FallbackTimings.Length,
+
+		Flag = AttackData.Flag,
+		Flags = AttackData.Flags,
 	}
 
 	return Metadata
@@ -154,17 +157,7 @@ function HeavyAttack.OnHit(Context: ActionContext, Target: Entity, _HitIndex: nu
 		return
 	end
 
-	local WasBlocked = AttackBase.ProcessHit(Context, Target)
-
-	if not WasBlocked then
-		Ensemble.Events.Publish(CombatEvents.AttackHit, {
-			Entity = Context.Entity,
-			Target = Target,
-			ActionName = "HeavyAttack",
-			Damage = Context.Metadata.Damage,
-			Context = Context,
-		})
-	end
+	AttackBase.ProcessHit(Context, Target)
 end
 
 function HeavyAttack.OnInterrupt(Context: ActionContext)
