@@ -10,9 +10,11 @@ local CombatTypes = require(Server.Combat.CombatTypes)
 local CombatEvents = require(Server.Combat.CombatEvents)
 local ActionValidator = require(Shared.Utils.ActionValidator)
 local ActionExecutor = require(Server.Combat.ActionExecutor)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local MovementModifiers = require(Server.Combat.MovementModifiers)
+local AttackFlags = require(Server.Combat.AttackFlags)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 local PerfectGuard = require(script.Parent.PerfectGuard)
@@ -86,6 +88,9 @@ end
 function Block.OnStart(Context: ActionContext)
 	Context.Entity.States:SetState("Blocking", true)
 
+	local Multiplier = CombatBalance.Blocking.MOVEMENT_SPEED_MULTIPLIER or 0.5
+	MovementModifiers.SetModifier(Context.Entity, "Blocking", Multiplier)
+
 	Ensemble.Events.Publish(CombatEvents.BlockStarted, {
 		Entity = Context.Entity,
 		Context = Context,
@@ -109,32 +114,97 @@ function Block.OnExecute(Context: ActionContext)
 	end
 end
 
-function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number)
+function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?)
+	local Player = Context.Entity.Player
+	local AnimationId = Context.Metadata.AnimationId
 	local ActiveWindow = Context.CustomData.ActiveWindow
+	local IsGuardBreak = AttackFlags.HasFlag(Flags, AttackFlags.GUARD_BREAK)
 
 	if ActiveWindow == "PerfectGuard" then
-		Context.CustomData.ActiveWindow = nil
-		Context.CustomData.WindowTriggered = true
-		Context.Entity.States:SetState("PerfectGuardWindow", false)
+		if not IsGuardBreak then
+			Context.CustomData.ActiveWindow = nil
+			Context.CustomData.WindowTriggered = true
+			Context.Entity.States:SetState("PerfectGuardWindow", false)
 
-		PerfectGuard.Trigger(Context, Attacker)
+			Ensemble.Events.Publish(CombatEvents.PerfectGuardFailed, {
+				Entity = Context.Entity,
+				Attacker = Attacker,
+				Reason = "NotGuardBreak",
+			})
+		else
+			Context.CustomData.ActiveWindow = nil
+			Context.CustomData.WindowTriggered = true
+			Context.Entity.States:SetState("PerfectGuardWindow", false)
 
-		ActionExecutor.Interrupt(Context.Entity, "PerfectGuard")
-		return
+			PerfectGuard.Trigger(Context, Attacker)
+
+			if Player and AnimationId then
+				Packets.StopAnimation:FireClient(Player, AnimationId, 0.1)
+			end
+
+			ActionExecutor.Interrupt(Context.Entity, "PerfectGuard")
+			return
+		end
 	end
 
 	if ActiveWindow == "Counter" then
-		Context.CustomData.ActiveWindow = nil
-		Context.CustomData.WindowTriggered = true
-		Context.Entity.States:SetState("CounterWindow", false)
+		if IsGuardBreak then
+			Context.CustomData.ActiveWindow = nil
+			Context.CustomData.WindowTriggered = true
+			Context.Entity.States:SetState("CounterWindow", false)
 
-		Counter.Trigger(Context, Attacker)
+			Ensemble.Events.Publish(CombatEvents.CounterFailed, {
+				Entity = Context.Entity,
+				Attacker = Attacker,
+				Reason = "GuardBreak",
+			})
+		else
+			Context.CustomData.ActiveWindow = nil
+			Context.CustomData.WindowTriggered = true
+			Context.Entity.States:SetState("CounterWindow", false)
 
-		ActionExecutor.Interrupt(Context.Entity, "Counter")
+			Counter.Trigger(Context, Attacker)
+
+			if Player and AnimationId then
+				Packets.StopAnimation:FireClient(Player, AnimationId, 0.1)
+			end
+
+			ActionExecutor.Interrupt(Context.Entity, "Counter")
+			return
+		end
+	end
+
+	if IsGuardBreak then
+		local StaminaComponent = Context.Entity:GetComponent("Stamina")
+		if StaminaComponent then
+			StaminaComponent:SetStamina(0)
+		end
+
+		Context.Entity.States:SetState("GuardBroken", true)
+		Context.Interrupted = true
+		Context.InterruptReason = "GuardBreak"
+
+		Ensemble.Events.Publish(CombatEvents.GuardBroken, {
+			Entity = Context.Entity,
+			Attacker = Attacker,
+			IncomingDamage = IncomingDamage,
+			Reason = "GuardBreakAttack",
+			Context = Context,
+		})
+
+		if Player and AnimationId then
+			Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
+		end
+
+		task.delay(CombatBalance.Blocking.GUARD_BREAK_DURATION or 1.5, function()
+			if Context.Entity.States then
+				Context.Entity.States:SetState("GuardBroken", false)
+			end
+		end)
+
 		return
 	end
 
-	local Player = Context.Entity.Player
 	if Player then
 		Packets.PlayAnimation:FireClient(Player, "BlockHit")
 	end
@@ -149,7 +219,9 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 	if StaminaComponent then
 		local CurrentStamina = StaminaComponent:GetStamina()
 
-		if CurrentStamina < StaminaDrain then
+		if CurrentStamina <= StaminaDrain then
+			StaminaComponent:SetStamina(0)
+
 			Context.Entity.States:SetState("GuardBroken", true)
 			Context.Interrupted = true
 			Context.InterruptReason = "GuardBreak"
@@ -158,6 +230,7 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 				Entity = Context.Entity,
 				Attacker = Attacker,
 				IncomingDamage = IncomingDamage,
+				Reason = "StaminaDepleted",
 				Context = Context,
 			})
 
@@ -200,6 +273,7 @@ end
 
 function Block.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Blocking", false)
+	MovementModifiers.ClearModifier(Context.Entity, "Blocking")
 
 	local Player = Context.Entity.Player
 	local AnimationId = Context.Metadata.AnimationId

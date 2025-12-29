@@ -34,6 +34,7 @@ local CombatEvents = {
 	CounterAttempted = "CounterAttempted",
 	CounterExecuted = "CounterExecuted",
 	CounterHit = "CounterHit",
+	CounterFailed = "CounterFailed",
 
 	DodgeStarted = "DodgeStarted",
 	DodgeCompleted = "DodgeCompleted",

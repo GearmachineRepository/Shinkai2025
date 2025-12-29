@@ -13,6 +13,8 @@ local ActionExecutor = require(Server.Combat.ActionExecutor)
 local ActionValidator = require(Shared.Utils.ActionValidator)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local MovementModifiers = require(Server.Combat.MovementModifiers)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -118,6 +120,11 @@ function LightAttack.OnStart(Context: ActionContext)
 
 	Context.Entity.States:SetState("Attacking", true)
 
+	local Multiplier = Context.Metadata.MovementSpeedMultiplier
+		or CombatBalance.Attacking.DEFAULT_MOVEMENT_SPEED_MULTIPLIER
+		or 0.65
+	MovementModifiers.SetModifier(Context.Entity, "Attacking", Multiplier)
+
 	AttackBase.SetupHitbox(Context, function(Target: Entity)
 		LightAttack.OnHit(Context, Target, 1)
 	end)
@@ -194,6 +201,7 @@ function LightAttack.OnInterrupt(Context: ActionContext)
 end
 
 function LightAttack.OnCleanup(Context: ActionContext)
+	MovementModifiers.ClearModifier(Context.Entity, "Attacking")
 	AttackBase.CleanupAttack(Context)
 end
 

@@ -35,13 +35,13 @@ local DEFAULT_BINDINGS: { InputBinding } = {
 		Priority = 100,
 		Action = "Counter",
 	},
-	{
-		Input = "M2",
-		RequiredStates = { "Attacking" },
-		BlockingStates = { "Stunned", "Downed", "Ragdolled" },
-		Priority = 90,
-		Action = "Feint",
-	},
+	-- {
+	-- 	Input = "M2",
+	-- 	RequiredStates = { "Attacking" },
+	-- 	BlockingStates = { "Stunned", "Downed", "Ragdolled" },
+	-- 	Priority = 90,
+	-- 	Action = "Feint",
+	-- },
 	{
 		Input = "M1",
 		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted", "Attacking", "Blocking" },

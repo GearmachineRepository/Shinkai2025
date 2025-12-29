@@ -13,6 +13,8 @@ export type AttackData = {
 	Damage: number,
 	StaminaCost: number,
 	HitStun: number,
+	Flag: string?,
+	Flags: { string }?,
 }
 
 export type FallbackTimings = {
@@ -87,28 +89,28 @@ local Sets: { [string]: AnimationSet } = {
 				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
-				HitStun = 0.35,
+				HitStun = 0.8,
 			},
 			[2] = {
 				AnimationId = "Karate2",
 				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
-				HitStun = 0.35,
+				HitStun = 0.8,
 			},
 			[3] = {
 				AnimationId = "Karate3",
 				Hitbox = { Size = Vector3.new(5, 4, 6), Offset = Vector3.new(0, 0, -4) },
 				Damage = 10,
 				StaminaCost = 5,
-				HitStun = 0.45,
+				HitStun = 0.8,
 			},
 			[4] = {
 				AnimationId = "Karate4",
 				Hitbox = { Size = Vector3.new(6, 5, 7), Offset = Vector3.new(0, 0, -4) },
 				Damage = 14,
 				StaminaCost = 6,
-				HitStun = 0.45,
+				HitStun = 0.8,
 			},
 		},
 
@@ -118,7 +120,8 @@ local Sets: { [string]: AnimationSet } = {
 				Hitbox = { Size = Vector3.new(6, 5, 8), Offset = Vector3.new(0, 0, -5) },
 				Damage = 20,
 				StaminaCost = 12,
-				HitStun = 0.5,
+				HitStun = 0.9,
+				Flag = "GuardBreak",
 			}
 		},
 

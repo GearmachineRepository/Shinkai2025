@@ -13,7 +13,6 @@ local Types = require(Server.Ensemble.Types)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local Packets = require(Shared.Networking.Packets)
 local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
-
 local StateHandlerComponent = {}
 StateHandlerComponent.__index = StateHandlerComponent
 
@@ -39,6 +38,12 @@ local MOVEMENT_BLOCKING_STATES = {
 	StateTypes.STUNNED,
 	StateTypes.RAGDOLLED,
 	StateTypes.DOWNED,
+}
+
+local FORCE_WALK_STATES = {
+	StateTypes.STUNNED,
+	StateTypes.GUARD_BROKEN,
+	StateTypes.EXHAUSTED,
 }
 
 local ANIMATION_REACTIONS = {
@@ -198,6 +203,28 @@ local function SetupSFXReactions(Entity: Types.Entity, ComponentMaid: Types.Maid
 	end
 end
 
+local function SetupForceWalkOnStates(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	for _, StateName in FORCE_WALK_STATES do
+		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
+			if not Enabled then
+				return
+			end
+
+			local Character = Entity.Character
+			if not Character then
+				return
+			end
+
+			local CurrentMode = Character:GetAttribute("MovementMode")
+			if CurrentMode and CurrentMode ~= "walk" then
+				Character:SetAttribute("MovementMode", "walk")
+			end
+		end)
+
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
 function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
 	local ComponentMaid = Ensemble.Maid.new()
 
@@ -208,6 +235,7 @@ function StateHandlerComponent.new(Entity: Types.Entity): Types.Component
 	SetupAnimationReactions(Entity, ComponentMaid)
 	SetupVFXReactions(Entity, ComponentMaid)
 	SetupSFXReactions(Entity, ComponentMaid)
+	SetupForceWalkOnStates(Entity, ComponentMaid)
 
 	local self: Self = {
 		Entity = Entity,

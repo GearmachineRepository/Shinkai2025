@@ -15,6 +15,7 @@ local StunManager = require(script.Parent.StunManager)
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
+local AttackFlags = require(script.Parent.AttackFlags)
 
 type Entity = CombatTypes.Entity
 type ActionContext = CombatTypes.ActionContext
@@ -158,17 +159,18 @@ end
 
 function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): boolean
 	local TargetContext = ActionExecutor.GetActiveContext(Target)
+	local Metadata = AttackerContext.Metadata
+	local Damage = Metadata.Damage or 10
+	local Flags = AttackFlags.GetFlags(Metadata)
 
 	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
-		local Metadata = AttackerContext.Metadata
-		local Damage = Metadata.Damage or 10
-
-		Block.OnHit(TargetContext, AttackerContext.Entity, Damage)
+		Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags)
 
 		Ensemble.Events.Publish(CombatEvents.AttackBlocked, {
 			Attacker = AttackerContext.Entity,
 			Target = Target,
 			Damage = Damage,
+			Flags = Flags,
 			AttackerContext = AttackerContext,
 			TargetContext = TargetContext,
 		})
@@ -182,7 +184,8 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity): 
 	Ensemble.Events.Publish(CombatEvents.AttackHit, {
 		Entity = AttackerContext.Entity,
 		Target = Target,
-		Damage = AttackerContext.Metadata.Damage or 10,
+		Damage = Damage,
+		Flags = Flags,
 		Context = AttackerContext,
 	})
 
