@@ -56,7 +56,8 @@ local Config: StateConfig = {
 
 		[StateTypes.ATTACKING] = {
 			Default = false,
-			Replication = "Owner",
+			Replication = "All",
+			Conflicts = { StateTypes.BLOCKING },
 		},
 
 		[StateTypes.ONHIT] = {
@@ -75,6 +76,41 @@ local Config: StateConfig = {
 			Conflicts = { StateTypes.ATTACKING, StateTypes.BLOCKING },
 		},
 
+		[StateTypes.RAGDOLLED] = {
+			Default = false,
+			Replication = "All",
+			LockMovement = true,
+			Conflicts = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING },
+		},
+
+		[StateTypes.EXHAUSTED] = {
+			Default = false,
+			Replication = "All",
+			Conflicts = { StateTypes.ATTACKING, StateTypes.SPRINTING },
+		},
+
+		[StateTypes.GUARD_BROKEN] = {
+			Default = false,
+			Replication = "All",
+			LockMovement = true,
+			Conflicts = { StateTypes.BLOCKING, StateTypes.ATTACKING },
+		},
+
+		[StateTypes.PARRIED] = {
+			Default = false,
+			Replication = "All",
+		},
+
+		PerfectGuardWindow = {
+			Default = false,
+			Replication = "Owner",
+		},
+
+		CounterWindow = {
+			Default = false,
+			Replication = "Owner",
+		},
+
 		InCombat = {
 			Default = false,
 			Replication = "All",
@@ -89,11 +125,6 @@ local Config: StateConfig = {
 			Default = false,
 			Replication = "None",
 			LockMovement = true,
-		},
-
-		Exhausted = {
-			Default = false,
-			Replication = "Owner",
 		},
 	},
 }

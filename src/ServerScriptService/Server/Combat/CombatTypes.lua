@@ -1,49 +1,73 @@
 --!strict
 
-local EnsembleTypes = require(game.ServerScriptService.Server.Ensemble.Types)
+local ServerScriptService = game:GetService("ServerScriptService")
+local EnsembleTypes = require(ServerScriptService.Server.Ensemble.Types)
 
 export type Entity = EnsembleTypes.Entity
 
-export type ActionMetadata = {
-	ActionName: string,
-	AnimationSet: string,
-	AnimationId: string,
-	ComboCount: number,
+export type HitboxData = {
+	Size: Vector3,
+	Offset: Vector3,
+}
 
+export type AttackData = {
+	AnimationId: string,
+	Hitbox: HitboxData,
 	Damage: number,
 	StaminaCost: number,
 	HitStun: number,
+	PostureDamage: number?,
+}
 
-	HitboxSize: Vector3,
-	HitboxOffset: Vector3,
+export type ActionMetadata = {
+	ActionName: string,
+	ActionType: string,
+	AnimationSet: string?,
+	AnimationId: string?,
+	ComboIndex: number?,
 
-	Feintable: boolean,
-	FeintEndlag: number,
-	FeintCooldown: number,
-	HeavyAttackCooldown: number,
-	ComboEndlag: number,
-	ComboResetTime: number,
-	StaminaCostHitReduction: number,
+	Damage: number?,
+	StaminaCost: number?,
+	HitStun: number?,
+	PostureDamage: number?,
 
-	FallbackHitStart: number,
-	FallbackHitEnd: number,
-	FallbackLength: number,
+	HitboxSize: Vector3?,
+	HitboxOffset: Vector3?,
+
+	Feintable: boolean?,
+	FeintEndlag: number?,
+	FeintCooldown: number?,
+	ActionCooldown: number?,
+	ComboEndlag: number?,
+	ComboResetTime: number?,
+	StaminaCostHitReduction: number?,
+
+	FallbackHitStart: number?,
+	FallbackHitEnd: number?,
+	FallbackLength: number?,
+
+	[string]: any,
 }
 
 export type ActionContext = {
 	Entity: Entity,
+	RawInput: string?,
 	InputData: { [string]: any },
 	Metadata: ActionMetadata,
 	StartTime: number,
 	Interrupted: boolean,
 	InterruptReason: string?,
+	InterruptedContext: ActionContext?,
 	CustomData: { [string]: any },
 }
 
 export type ActionDefinition = {
 	ActionName: string,
-	ActionType: "Attack" | "Ability" | "Defensive" | "Movement",
+	ActionType: "Attack" | "Defensive" | "Movement" | "Utility",
+	RequiresActiveAction: boolean?,
+	DefaultMetadata: ActionMetadata?,
 
+	BuildMetadata: ((Entity: Entity, InputData: { [string]: any }?) -> ActionMetadata?)?,
 	CanExecute: ((Context: ActionContext) -> (boolean, string?))?,
 	OnStart: ((Context: ActionContext) -> ())?,
 	OnExecute: (Context: ActionContext) -> (),
@@ -53,21 +77,24 @@ export type ActionDefinition = {
 	OnCleanup: ((Context: ActionContext) -> ())?,
 }
 
-export type StateHandler = {
-	OnEnter: ((Entity: Entity, EventData: any) -> ())?,
-	OnExit: ((Entity: Entity, EventData: any) -> ())?,
-	OnUpdate: ((Entity: Entity, DeltaTime: number) -> ())?,
+export type HitResult = {
+	Target: Entity,
+	Damage: number,
+	HitStun: number,
+	PostureDamage: number,
+	WasBlocked: boolean,
+	WasParried: boolean,
+	HitPosition: Vector3?,
 }
 
-export type HitboxConfig = {
-	Owner: Entity,
-	Size: Vector3,
-	Offset: CFrame,
-	Duration: number,
-	OnHit: (Target: Entity) -> (),
-	MaxTargets: number?,
-	IgnoreList: { Model }?,
-	Shape: "Box" | "Sphere"?,
+export type CombatEvent = {
+	Entity: Entity,
+	ActionName: string?,
+	Context: ActionContext?,
+	Target: Entity?,
+	HitResult: HitResult?,
+	Reason: string?,
+	[string]: any,
 }
 
 return nil

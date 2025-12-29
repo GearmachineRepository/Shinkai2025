@@ -9,7 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
 
 local LOCAL_PLAYER: Player = Players.LocalPlayer
-local PlayerGui: PlayerGui = LOCAL_PLAYER:WaitForChild("PlayerGui")
+local PlayerGui: PlayerGui = LOCAL_PLAYER:WaitForChild("PlayerGui") :: PlayerGui
 
 local MAX_SLOTS: number = 10
 
@@ -112,13 +112,16 @@ local function SetSlotVisual(SlotIndex: number, Item: HotbarItem?): ()
 	SlotUiValue.NameLabel.Text = Item.ToolName
 	SlotUiValue.CooldownOverlay.Visible = false
 
+	local UIStroke = SlotUiValue.SlotFrame:FindFirstChild("UIStroke") :: UIStroke?
+	if not UIStroke then return end
+
 	if EquippedSlot == SlotIndex then
 		SlotUiValue.SlotFrame.BackgroundTransparency = EQUIPPED_BACKGROUND_TRANSPARENCY
 		SlotUiValue.SlotFrame.BackgroundColor3 = EQUIPPED_BACKGROUND_COLOR
-		SlotUiValue.SlotFrame.UIStroke.Thickness = 1
+		UIStroke.Thickness = 1
 	else
 		SlotUiValue.SlotFrame.BackgroundTransparency = SLOT_BACKGROUND_TRANSPARENCY
-		SlotUiValue.SlotFrame.UIStroke.Thickness = 0
+		UIStroke.Thickness = 0
 	end
 end
 

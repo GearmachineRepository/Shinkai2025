@@ -1,10 +1,12 @@
 --!strict
+
 local Packet = require(script.Parent.Parent:WaitForChild("Packages"):WaitForChild("Packet"))
 
 return {
 	-- Animations
 	PlayAnimation = Packet("PlayAnimation", Packet.String, Packet.Any),
 	StopAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
+
 	-- Equipment
 	EquipItem = Packet("EquipItem", Packet.NumberU16, Packet.String),
 	UnequipItem = Packet("UnequipItem", Packet.String),
@@ -49,15 +51,14 @@ return {
 	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberF64),
 	ClearCooldown = Packet("ClearCooldown", Packet.String),
 
-	-- Action
+	-- Combat Actions (Consolidated)
 	PerformAction = Packet("PerformAction", Packet.String, Packet.Any),
+	ReleaseAction = Packet("ReleaseAction", Packet.String),
 	ActionApproved = Packet("ActionApproved", Packet.String),
 	ActionDenied = Packet("ActionDenied", Packet.String),
-	ActionStarted = Packet("ActionStarted", Packet.Instance, Packet.String, Packet.Any),
-	ActionHit = Packet("ActionHit", Packet.Instance, Packet.Instance, Packet.NumberF32),
+	ActionCompleted = Packet("ActionCompleted", Packet.Instance, Packet.String),
 	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String),
 	InterruptAction = Packet("InterruptAction", Packet.String),
-	ActionRequest = Packet("ActionRequest", Packet.String, Packet.Any),
 
 	-- Sounds
 	PlaySound = Packet("PlaySound", Packet.String, Packet.Any),
@@ -68,6 +69,6 @@ return {
 	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.NumberF64, Packet.String, Packet.Any),
 
 	-- Network
-	NetworkPing = Packet("NetworkPong", Packet.NumberF32),
+	NetworkPing = Packet("NetworkPing", Packet.NumberF32),
 	NetworkPong = Packet("NetworkPong", Packet.NumberF32),
 }

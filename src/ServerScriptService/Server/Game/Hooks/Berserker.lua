@@ -4,21 +4,38 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
-local Helpers = Ensemble.HookHelpers
+local CombatEvents = require(Server.Combat.CombatEvents)
 
 return {
 	HookName = "Berserker",
-	Description = "Deal 50% more damage when below 30% health",
+	Description = "Deal 15% more damage when below 30% health",
 
 	OnActivate = function(Entity)
-		return Helpers.ModifyDamageDealt(Entity, function(Damage: number)
-			local HealthPercent = Helpers.GetHealthPercent(Entity)
-
-			if HealthPercent < 0.3 then
-				return Damage * 1.5
+		local Connection = Ensemble.Events.Subscribe(CombatEvents.AttackHit, function(EventData)
+			if EventData.Entity ~= Entity then
+				return
 			end
 
-			return Damage
+			local StatComponent = Entity:GetComponent("Stats")
+			if not StatComponent then
+				return
+			end
+
+			local CurrentHealth = StatComponent:GetStat("Health") :: number
+			local MaxHealth = StatComponent:GetStat("MaxHealth") :: number
+
+			if CurrentHealth / MaxHealth <= 0.30 then
+				local BonusDamage = EventData.Damage * 0.15
+				local DamageComponent = EventData.Target:GetComponent("Damage")
+
+				if DamageComponent then
+					DamageComponent:DealDamage(BonusDamage, Entity.Player, Vector3.zero)
+				end
+			end
 		end)
+
+		return function()
+			Connection:Disconnect()
+		end
 	end,
 }

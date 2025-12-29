@@ -29,7 +29,7 @@ local CONFLICTING_STATES = {
 	[StateTypes.STUNNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING },
 	[StateTypes.RAGDOLLED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.STUNNED },
 	[StateTypes.ATTACKING] = { StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING, StateTypes.JOGGING },
-	[StateTypes.BLOCKING] = { StateTypes.ATTACKING, StateTypes.DODGING },
+	--[StateTypes.BLOCKING] = { StateTypes.ATTACKING, StateTypes.DODGING },
 	[StateTypes.DODGING] = { StateTypes.ATTACKING, StateTypes.BLOCKING },
 	[StateTypes.DOWNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING },
 }
@@ -53,12 +53,12 @@ local ANIMATION_REACTIONS = {
 		Priority = Enum.AnimationPriority.Action4,
 		Looped = false,
 	},
-	[StateTypes.BLOCKING] = {
-		AnimationName = "Block",
-		FadeTime = 0.15,
-		Priority = Enum.AnimationPriority.Action,
-		Looped = true,
-	},
+	-- [StateTypes.BLOCKING] = {
+	-- 	AnimationName = "Block",
+	-- 	FadeTime = 0.15,
+	-- 	Priority = Enum.AnimationPriority.Action,
+	-- 	Looped = true,
+	-- },
 }
 
 local VFX_REACTIONS = {

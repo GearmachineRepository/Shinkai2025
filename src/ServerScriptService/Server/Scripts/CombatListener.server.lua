@@ -9,22 +9,18 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local EnsembleTypes = require(Server.Ensemble.Types)
 local Packets = require(Shared.Networking.Packets)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
-local ActionRegistry = require(Server.Combat.ActionRegistry)
-local CooldownSystem = require(Server.Game.Systems.CooldownSystem)
+
+local Combat = require(Server.Combat)
+local ActionExecutor = Combat.ActionExecutor
+local ActionRegistry = Combat.ActionRegistry
+local InputResolver = Combat.InputResolver
+local CombatEvents = Combat.CombatEvents
 
 local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
 local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
 
 local PreloadAmount = AnimationTimingCache.PreloadDatabase(AnimationDatabase)
-warn("Preloaded (" .. PreloadAmount .. ") Animations")
-
-local UNPREDICTABLE_COOLDOWN_ID = "Unpredictable"
-local UNPREDICTABLE_MAX_CHARGES = 2
-local UNPREDICTABLE_COOLDOWN_DURATION = 30
-
-local EntityCooldowns: { [any]: CooldownSystem.CooldownController } = {}
-local EntityFeintCharges: { [any]: number } = {}
+print("[CombatListener] Preloaded " .. PreloadAmount .. " animations")
 
 local function GetEntityFromPlayer(Player: Player): EnsembleTypes.Entity?
 	local Character = Player.Character
@@ -32,157 +28,224 @@ local function GetEntityFromPlayer(Player: Player): EnsembleTypes.Entity?
 		return nil
 	end
 
-	local Entity = Ensemble.GetEntity(Character)
-	if not Entity then
+	return Ensemble.GetEntity(Character)
+end
+
+local function GetToolInputData(Entity: EnsembleTypes.Entity): { [string]: any }?
+	local ToolComponent = Entity:GetComponent("Tool")
+	if not ToolComponent then
 		return nil
 	end
 
-	return Entity
-end
-
-local function GetCooldownController(Entity: EnsembleTypes.Entity): CooldownSystem.CooldownController
-	if not EntityCooldowns[Entity] then
-		EntityCooldowns[Entity] = CooldownSystem.new()
+	local EquippedTool = ToolComponent:GetEquippedTool()
+	if not EquippedTool or not EquippedTool.ToolId then
+		return nil
 	end
-	return EntityCooldowns[Entity]
+
+	return { ItemId = EquippedTool.ToolId }
 end
 
-local function GetFeintCharges(Entity: EnsembleTypes.Entity): number
-	return EntityFeintCharges[Entity] or 0
+local function NotifyActionApproved(Player: Player, RawInput: string)
+	Packets.ActionApproved:FireClient(Player, RawInput)
 end
 
-local function ConsumeFeintCharge(Entity: EnsembleTypes.Entity)
-	local CurrentCharges = GetFeintCharges(Entity)
-	EntityFeintCharges[Entity] = CurrentCharges + 1
+local function NotifyActionDenied(Player: Player, Reason: string)
+	Packets.ActionDenied:FireClient(Player, Reason)
 end
 
-local function ResetFeintCharges(Entity: EnsembleTypes.Entity)
-	EntityFeintCharges[Entity] = 0
+local function NotifyActionCompleted(Entity: EnsembleTypes.Entity, ActionName: string)
+	if Entity.Player and Entity.Character then
+		Packets.ActionCompleted:FireClient(Entity.Player, Entity.Character, ActionName)
+	end
 end
 
-local function CanUseUnpredictable(Entity: EnsembleTypes.Entity): boolean
-	local HookComponent = Entity:GetComponent("Hooks")
-	if not HookComponent or not HookComponent:HasHook("Unpredictable") then
+local function NotifyActionInterrupted(Entity: EnsembleTypes.Entity, Reason: string)
+	if Entity.Player and Entity.Character then
+		Packets.ActionInterrupted:FireClient(Entity.Player, Entity.Character, Reason)
+	end
+end
+
+local function HandleWindowCommand(Entity: EnsembleTypes.Entity, WindowType: string): boolean
+	local ActiveContext = ActionExecutor.GetActiveContext(Entity)
+	if not ActiveContext then
 		return false
 	end
 
-	local Cooldowns = GetCooldownController(Entity)
-	if Cooldowns:IsOnCooldown(UNPREDICTABLE_COOLDOWN_ID) then
+	if ActiveContext.Metadata.ActionName ~= "Block" then
 		return false
 	end
+
+	if ActiveContext.CustomData.ActiveWindow then
+		return false
+	end
+
+	local WindowModule = if WindowType == "PerfectGuard"
+		then require(Server.Combat.Actions.PerfectGuard)
+		else require(Server.Combat.Actions.Counter)
+
+	local RealCooldownId = WindowType
+	local RealCooldown = WindowModule.Cooldown or 10
+
+	if ActionExecutor.IsOnCooldown(Entity, RealCooldownId, RealCooldown) then
+		return false
+	end
+
+	local SpamCooldownId = WindowType .. "Failure"
+	local SpamCooldown = WindowModule.SpamCooldown or 5
+
+	if ActionExecutor.IsOnCooldown(Entity, SpamCooldownId, SpamCooldown) then
+		return false
+	end
+
+	ActionExecutor.StartCooldown(Entity, SpamCooldownId, SpamCooldown)
+
+	local WindowDuration = WindowModule.WindowDuration or 0.3
+
+	ActiveContext.CustomData.ActiveWindow = WindowType
+	ActiveContext.CustomData.WindowStartTime = workspace:GetServerTimeNow()
+	Entity.States:SetState(WindowType .. "Window", true)
+
+	Ensemble.Events.Publish(CombatEvents.ParryWindowOpened, {
+		Entity = Entity,
+		WindowType = WindowType,
+		Duration = WindowDuration,
+	})
+
+	task.delay(WindowDuration, function()
+		if ActiveContext.CustomData.ActiveWindow == WindowType then
+			ActiveContext.CustomData.ActiveWindow = nil
+			Entity.States:SetState(WindowType .. "Window", false)
+
+			Ensemble.Events.Publish(CombatEvents.ParryWindowClosed, {
+				Entity = Entity,
+				WindowType = WindowType,
+				DidTrigger = false,
+			})
+		end
+	end)
 
 	return true
 end
 
-local function TryUnpredictableFeint(Entity: EnsembleTypes.Entity): boolean
-	if not CanUseUnpredictable(Entity) then
-		return false
+local function HandleActionRequest(Player: Player, RawInput: string, InputData: { [string]: any }?)
+	local Entity = GetEntityFromPlayer(Player)
+	if not Entity then
+		NotifyActionDenied(Player, "NoEntity")
+		return
 	end
 
-	local Interrupted = ActionExecutor.Interrupt(Entity, "Feint")
-	if not Interrupted then
-		return false
+	local ResolvedAction = InputResolver.Resolve(Entity, RawInput)
+	if not ResolvedAction then
+		NotifyActionDenied(Player, "NoValidAction")
+		return
 	end
 
-	ConsumeFeintCharge(Entity)
+	if ResolvedAction == "PerfectGuard" or ResolvedAction == "Counter" then
+		local Success = HandleWindowCommand(Entity, ResolvedAction)
+		if Success then
+			NotifyActionApproved(Player, RawInput)
+		else
+			NotifyActionDenied(Player, "WindowFailed")
+		end
+		return
+	end
 
-	local CurrentCharges = GetFeintCharges(Entity)
-	if CurrentCharges >= UNPREDICTABLE_MAX_CHARGES then
-		local Cooldowns = GetCooldownController(Entity)
-		local StartTime = workspace:GetServerTimeNow()
+	local FinalInputData = InputData or {}
 
-		Cooldowns:Start(UNPREDICTABLE_COOLDOWN_ID, UNPREDICTABLE_COOLDOWN_DURATION)
-		ResetFeintCharges(Entity)
+	local Definition = ActionRegistry.Get(ResolvedAction)
+	if Definition and Definition.ActionType == "Attack" then
+		local ToolData = GetToolInputData(Entity)
+		if not ToolData then
+			NotifyActionDenied(Player, "NoTool")
+			return
+		end
 
-		if Entity.Player then
-			Packets.StartCooldown:FireClient(
-				Entity.Player,
-				UNPREDICTABLE_COOLDOWN_ID,
-				StartTime,
-				UNPREDICTABLE_COOLDOWN_DURATION
-			)
+		for Key, Value in ToolData do
+			FinalInputData[Key] = Value
 		end
 	end
 
-	return true
+	local Success, Reason = ActionExecutor.Execute(Entity, ResolvedAction, RawInput, FinalInputData)
+
+	if Success then
+		NotifyActionApproved(Player, RawInput)
+	else
+		NotifyActionDenied(Player, Reason or "Failed")
+	end
+end
+
+local function HandleInterruptRequest(Player: Player, Reason: string)
+	local Entity = GetEntityFromPlayer(Player)
+	if not Entity then
+		NotifyActionDenied(Player, "NoEntity")
+		return
+	end
+
+	local Interrupted = ActionExecutor.Interrupt(Entity, Reason)
+	if not Interrupted then
+		NotifyActionDenied(Player, "InterruptFailed")
+		return
+	end
+
+	NotifyActionInterrupted(Entity, Reason)
+end
+
+local function HandleReleaseAction(Player: Player, RawInput: string)
+	local Entity = GetEntityFromPlayer(Player)
+	if not Entity then
+		return
+	end
+
+	local ActiveContext = ActionExecutor.GetActiveContext(Entity)
+	if not ActiveContext then
+		return
+	end
+
+	if ActiveContext.RawInput ~= RawInput then
+		return
+	end
+
+	ActionExecutor.Interrupt(Entity, "Released")
 end
 
 local function CleanupEntity(Entity: EnsembleTypes.Entity)
-	if EntityCooldowns[Entity] then
-		EntityCooldowns[Entity]:Destroy()
-		EntityCooldowns[Entity] = nil
-	end
-	EntityFeintCharges[Entity] = nil
+	ActionExecutor.CleanupEntity(Entity)
 end
 
 local function Initialize()
 	local ActionsFolder = Server.Combat.Actions
-	ActionRegistry.LoadFolder(ActionsFolder)
+	local LoadedCount = ActionRegistry.LoadFolder(ActionsFolder)
+	print("[CombatListener] Loaded " .. LoadedCount .. " actions: " .. table.concat(ActionRegistry.GetAllNames(), ", "))
 
 	Ensemble.Events.Subscribe("EntityDestroyed", function(Data: any)
 		if Data.Entity then
 			CleanupEntity(Data.Entity)
 		end
 	end)
+
+	Ensemble.Events.Subscribe(CombatEvents.ActionCompleted, function(Data: any)
+		if Data.Entity and Data.ActionName then
+			NotifyActionCompleted(Data.Entity, Data.ActionName)
+		end
+	end)
+
+	Ensemble.Events.Subscribe(CombatEvents.ActionInterrupted, function(Data: any)
+		if Data.Entity and Data.Reason then
+			NotifyActionInterrupted(Data.Entity, Data.Reason)
+		end
+	end)
 end
 
-Packets.PerformAction.OnServerEvent:Connect(function(Player: Player, ActionName: string, InputData: any?)
-	local Entity = GetEntityFromPlayer(Player)
-	if not Entity then
-		Packets.ActionDenied:FireClient(Player, "No entity")
-		return
-	end
+Packets.PerformAction.OnServerEvent:Connect(function(Player: Player, RawInput: string, InputData: any?)
+	HandleActionRequest(Player, RawInput, InputData)
+end)
 
-	local FinalInputData = InputData or {}
-
-	local ToolComponent = Entity:GetComponent("Tool")
-	if ToolComponent then
-		local EquippedTool = ToolComponent:GetEquippedTool()
-		if EquippedTool and EquippedTool.ToolId then
-			FinalInputData.ItemId = EquippedTool.ToolId
-		else
-			return
-		end
-	else
-		return
-	end
-
-	local Success, Reason = ActionExecutor.Execute(Entity, ActionName, FinalInputData)
-
-	if Success then
-		Packets.ActionApproved:FireClient(Player, ActionName)
-		return
-	end
-
-	if ActionName == "Feint" then
-		if TryUnpredictableFeint(Entity) then
-			Packets.ActionApproved:FireClient(Player, ActionName)
-			return
-		end
-	end
-
-	Packets.ActionDenied:FireClient(Player, Reason or "Failed")
+Packets.ReleaseAction.OnServerEvent:Connect(function(Player: Player, RawInput: string)
+	HandleReleaseAction(Player, RawInput)
 end)
 
 Packets.InterruptAction.OnServerEvent:Connect(function(Player: Player, Reason: string)
-	local Character = Player.Character
-	if not Character then
-		Packets.ActionDenied:FireClient(Player, "No character")
-		return
-	end
-
-	local Entity = Ensemble.GetEntity(Character)
-	if not Entity then
-		Packets.ActionDenied:FireClient(Player, "No entity")
-		return
-	end
-
-	local Interrupted = ActionExecutor.Interrupt(Entity, "Feint")
-	if not Interrupted then
-		return
-	end
-
-	Packets.ActionInterrupted:FireClient(Player, Character, Reason)
+	HandleInterruptRequest(Player, Reason)
 end)
 
 Initialize()

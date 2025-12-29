@@ -122,7 +122,7 @@ local Sets: { [string]: AnimationSet } = {
 			}
 		},
 
-		Block = { AnimationId = "Blocking" },
+		Block = { AnimationId = "Block" },
 		BlockHit = { AnimationId = "BlockHit" },
 
 		Sounds = {
@@ -191,7 +191,7 @@ local Sets: { [string]: AnimationSet } = {
 			}
 		},
 
-		Block = { AnimationId = "rbxassetid://191919" },
+		Block = { AnimationId = "Block" },
 
 		Sounds = {
 			Swing = "FistSwing",
@@ -259,7 +259,7 @@ local Sets: { [string]: AnimationSet } = {
 			}
 		},
 
-		Block = { AnimationId = "MuayThaiBlock" },
+		Block = { AnimationId = "Block" },
 
 		Sounds = {
 			Swing = "MuayThaiSwing",

@@ -14,31 +14,39 @@ type InputState = {
 type KeybindEntry = {
 	ActionName: string,
 	CanLoop: boolean,
+	IsHoldAction: boolean?,
 }
 
-local InputStates: { [Enum.KeyCode | Enum.UserInputType]: InputState } = {}
-local Keybinds: { [Enum.KeyCode | Enum.UserInputType]: KeybindEntry } = {}
+type Keybinds = { [Enum.KeyCode | Enum.UserInputType]: KeybindEntry }
+type InputStates = { [Enum.KeyCode | Enum.UserInputType]: InputState }
+
+local InputStates: InputStates = {}
+local Keybinds: Keybinds = {}
 
 local ActionCallbacks: { (ActionName: string) -> () } = {}
+local ReleaseCallbacks: { (ActionName: string) -> () } = {}
 
 local InputBuffer = {}
 
-local DEFAULT_KEYBINDS = {
-	[Enum.UserInputType.MouseButton1] = { ActionName = "M1", CanLoop = true },
-	[Enum.UserInputType.MouseButton2] = { ActionName = "M2", CanLoop = true },
-	[Enum.KeyCode.F] = { ActionName = "Block", CanLoop = true },
-	[Enum.KeyCode.Q] = { ActionName = "Dash", CanLoop = true },
-	[Enum.KeyCode.R] = { ActionName = "Feint", CanLoop = true },
-	[Enum.KeyCode.C] = { ActionName = "Skill1", CanLoop = false },
-	[Enum.KeyCode.E] = { ActionName = "Skill2", CanLoop = false },
-	[Enum.KeyCode.U] = { ActionName = "Skill3", CanLoop = false },
-	[Enum.KeyCode.T] = { ActionName = "Skill4", CanLoop = false },
-	[Enum.KeyCode.Y] = { ActionName = "Skill5", CanLoop = false },
-	[Enum.KeyCode.B] = { ActionName = "Skill6", CanLoop = false },
+local DEFAULT_KEYBINDS : Keybinds = {
+	[Enum.UserInputType.MouseButton1] = { ActionName = "M1", CanLoop = true, IsHoldAction = false },
+	[Enum.UserInputType.MouseButton2] = { ActionName = "M2", CanLoop = false, IsHoldAction = false },
+	[Enum.KeyCode.F] = { ActionName = "Block", CanLoop = false, IsHoldAction = true },
+	[Enum.KeyCode.Q] = { ActionName = "Dodge", CanLoop = true, IsHoldAction = false },
+	[Enum.KeyCode.C] = { ActionName = "Skill1", CanLoop = false, IsHoldAction = false },
+	[Enum.KeyCode.E] = { ActionName = "Skill2", CanLoop = false, IsHoldAction = false },
+	[Enum.KeyCode.U] = { ActionName = "Skill3", CanLoop = false, IsHoldAction = false },
+	[Enum.KeyCode.T] = { ActionName = "Skill4", CanLoop = false, IsHoldAction = false },
+	[Enum.KeyCode.Y] = { ActionName = "Skill5", CanLoop = false, IsHoldAction = false },
+	[Enum.KeyCode.B] = { ActionName = "Skill6", CanLoop = false, IsHoldAction = false },
 }
 
 function InputBuffer.OnAction(Callback: (ActionName: string) -> ())
 	table.insert(ActionCallbacks, Callback)
+end
+
+function InputBuffer.OnRelease(Callback: (ActionName: string) -> ())
+	table.insert(ReleaseCallbacks, Callback)
 end
 
 function InputBuffer.LoadKeybinds(KeybindTable: { [Enum.KeyCode | Enum.UserInputType]: KeybindEntry })
@@ -111,8 +119,24 @@ function InputBuffer.ClearAllBuffers()
 	end
 end
 
+function InputBuffer.IsHeld(ActionName: string): boolean
+	for Input, Entry in Keybinds do
+		if Entry.ActionName == ActionName then
+			local State = InputStates[Input]
+			return State and State.IsHeld or false
+		end
+	end
+	return false
+end
+
 local function FireAction(ActionName: string)
 	for _, Callback in ActionCallbacks do
+		task.spawn(Callback, ActionName)
+	end
+end
+
+local function FireRelease(ActionName: string)
+	for _, Callback in ReleaseCallbacks do
 		task.spawn(Callback, ActionName)
 	end
 end
@@ -148,10 +172,19 @@ local function OnInputEnded(InputObject: InputObject, GameProcessed: boolean)
 		then InputObject.UserInputType
 		else InputObject.KeyCode
 
+	local Entry = Keybinds[InputType]
 	local State = InputStates[InputType]
 
-	if State then
+	if not Entry or not State then
+		return
+	end
+
+	if State.IsHeld then
 		State.IsHeld = false
+
+		if Entry.IsHoldAction then
+			FireRelease(Entry.ActionName)
+		end
 	end
 end
 
