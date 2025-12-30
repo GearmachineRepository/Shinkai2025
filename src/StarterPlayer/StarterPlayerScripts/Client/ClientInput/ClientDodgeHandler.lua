@@ -3,10 +3,11 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local DashBalance = require(Shared.Configurations.Balance.DashBalance)
+local AnimationService = require(Shared.Services.AnimationService)
+local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
 
 local Player = Players.LocalPlayer
 
@@ -15,7 +16,7 @@ local ClientDodgeHandler = {}
 type DodgeState = {
 	IsActive: boolean,
 	BodyVelocity: BodyVelocity?,
-	AnimationTrack: AnimationTrack?,
+	AnimationKey: string?,
 	Connection: RBXScriptConnection?,
 	StartTime: number,
 	LastSteerDirection: Vector3,
@@ -29,18 +30,11 @@ local DODGE_DURATION = DashBalance.Duration
 
 local DODGE_MAX_FORCE = Vector3.new(DashBalance.MaxForce, 0, DashBalance.MaxForce)
 
-local DodgeAnimations = {
-	Forward = nil :: Animation?,
-	Back = nil :: Animation?,
-	Left = nil :: Animation?,
-	Right = nil :: Animation?,
-}
-
-local LoadedTracks = {
-	Forward = nil :: AnimationTrack?,
-	Back = nil :: AnimationTrack?,
-	Left = nil :: AnimationTrack?,
-	Right = nil :: AnimationTrack?,
+local DIRECTION_TO_ANIMATION: { [string]: string } = {
+	Forward = "DashForward",
+	Back = "DashBack",
+	Left = "DashLeft",
+	Right = "DashRight",
 }
 
 local function GetCharacter(): Model?
@@ -63,16 +57,8 @@ local function GetRootPart(): BasePart?
 	return Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function GetAnimator(): Animator?
-	local Humanoid = GetHumanoid()
-	if not Humanoid then
-		return nil
-	end
-	return Humanoid:FindFirstChildOfClass("Animator")
-end
-
 local function GetFlatCameraBasis(): (Vector3, Vector3)
-	local CurrentCamera = Workspace.CurrentCamera
+	local CurrentCamera = workspace.CurrentCamera
 	if not CurrentCamera then
 		return Vector3.new(0, 0, -1), Vector3.new(1, 0, 0)
 	end
@@ -123,47 +109,18 @@ local function GetCardinalFromMove(FlatForward: Vector3, FlatRight: Vector3, Fla
 	end
 end
 
-local function LoadDodgeAnimations()
-	local Animator = GetAnimator()
-	if not Animator then
-		return
+local function GetAnimationKeyForDirection(DirectionName: string): string?
+	local AnimationKey = DIRECTION_TO_ANIMATION[DirectionName]
+	if not AnimationKey then
+		return nil
 	end
 
-	local AnimationsFolder = ReplicatedStorage:FindFirstChild("Animations")
-	if not AnimationsFolder then
-		return
+	local AnimationId = AnimationDatabase[AnimationKey]
+	if not AnimationId then
+		return nil
 	end
 
-	local DodgeFolder = AnimationsFolder:FindFirstChild("Dodge")
-	if not DodgeFolder then
-		return
-	end
-
-	local Directions = { "Forward", "Back", "Left", "Right" }
-	for _, DirectionName in Directions do
-		local AnimationInstance = DodgeFolder:FindFirstChild(DirectionName) :: Animation?
-		if AnimationInstance and AnimationInstance:IsA("Animation") then
-			DodgeAnimations[DirectionName] = AnimationInstance
-			LoadedTracks[DirectionName] = Animator:LoadAnimation(AnimationInstance)
-		end
-	end
-end
-
-local function GetDodgeTrack(DirectionName: string): AnimationTrack?
-	local Track = LoadedTracks[DirectionName]
-	if Track then
-		return Track
-	end
-
-	local Animator = GetAnimator()
-	local AnimationInstance = DodgeAnimations[DirectionName]
-	if Animator and AnimationInstance then
-		Track = Animator:LoadAnimation(AnimationInstance)
-		LoadedTracks[DirectionName] = Track
-		return Track
-	end
-
-	return nil
+	return AnimationKey
 end
 
 local function CreateBodyVelocity(InitialDirection: Vector3): BodyVelocity?
@@ -196,7 +153,6 @@ local function UpdateDodgeVelocity()
 		return
 	end
 
-	local _FlatForward, _FlatRight = GetFlatCameraBasis()
 	local FlatMove = GetFlatMoveDirection()
 
 	if FlatMove.Magnitude < 0.1 then
@@ -233,13 +189,25 @@ local function StartDodgeLoop()
 	end)
 end
 
+local function PreloadDodgeAnimations()
+	local AnimationsToPreload: { [string]: string } = {}
+	for _, AnimationKey in DIRECTION_TO_ANIMATION do
+		local AnimationId = AnimationDatabase[AnimationKey]
+		if AnimationId then
+			AnimationsToPreload[AnimationKey] = AnimationId
+		end
+	end
+
+	AnimationService.Preload(Player, AnimationsToPreload)
+end
+
 function ClientDodgeHandler.Init()
-	LoadDodgeAnimations()
+	PreloadDodgeAnimations()
 
 	Player.CharacterAdded:Connect(function()
 		ClientDodgeHandler.Rollback()
 		task.wait(0.5)
-		LoadDodgeAnimations()
+		PreloadDodgeAnimations()
 	end)
 end
 
@@ -261,21 +229,21 @@ function ClientDodgeHandler.StartDodge(Steerable: boolean?): boolean
 	end
 
 	local DirectionName, CardinalDirection = GetCardinalFromMove(FlatForward, FlatRight, FlatMove)
-	local Track = GetDodgeTrack(DirectionName)
+	local AnimationKey = GetAnimationKeyForDirection(DirectionName)
 
 	local BodyVelocityInstance = CreateBodyVelocity(CardinalDirection)
 	if not BodyVelocityInstance then
 		return false
 	end
 
-	if Track then
-		Track:Play(0.1)
+	if AnimationKey then
+		AnimationService.Play(Player, AnimationKey)
 	end
 
 	ActiveDodge = {
 		IsActive = true,
 		BodyVelocity = BodyVelocityInstance,
-		AnimationTrack = Track,
+		AnimationKey = AnimationKey,
 		Connection = nil,
 		StartTime = os.clock(),
 		LastSteerDirection = CardinalDirection,
@@ -319,8 +287,8 @@ function ClientDodgeHandler.Rollback()
 		CurrentDodge.Connection = nil
 	end
 
-	if CurrentDodge.AnimationTrack then
-		CurrentDodge.AnimationTrack:Stop(0.1)
+	if CurrentDodge.AnimationKey then
+		AnimationService.Stop(Player, CurrentDodge.AnimationKey, 0.15)
 	end
 
 	if CurrentDodge.BodyVelocity and CurrentDodge.BodyVelocity.Parent then

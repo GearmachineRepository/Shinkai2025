@@ -10,7 +10,15 @@ local FootstepMaterialMap = require(Shared.Footsteps.FootstepMaterialMap)
 
 local Player = Players.LocalPlayer
 
-local FootstepController = {}
+local FootstepController = {} :: {
+	CharacterMaid: Maid.MaidSelf,
+	CurrentCharacter: Model?,
+	GetMaterialName: (self: any, Character: Model) -> string?,
+	OnFootplant: (self: any, Character: Model) -> (),
+	SetupAnimationTracking: (self: any, Animator: Animator, Character: Model?) -> (),
+	SetupCharacter: (self: any, Character: Model?) -> (),
+	OnReplicatedFootplant: (self: any, SenderUserId: number, MaterialId: number) -> (),
+}
 
 FootstepController.CharacterMaid = Maid.new()
 FootstepController.CurrentCharacter = nil :: Model?
@@ -40,13 +48,19 @@ function FootstepController:OnFootplant(Character: Model)
 	Packets.Footplanted:Fire(MaterialId)
 end
 
-function FootstepController:SetupAnimationTracking(Animator: Animator, Character: Model)
+function FootstepController:SetupAnimationTracking(Animator: Animator, Character: Model?)
+	if not Character then return end
+
 	local ActiveTrackMaids: { [AnimationTrack]: Maid.MaidSelf } = {}
 
 	local AnimationPlayedConnection = Animator.AnimationPlayed:Connect(function(Track: AnimationTrack)
 		local TrackMaid = Maid.new()
 
 		local MarkerConnection = Track:GetMarkerReachedSignal("Footplant"):Connect(function()
+			if Character:GetAttribute("Dodging") and not string.find(Track.Name, "Dash") then
+				return
+			end
+
 			self:OnFootplant(Character)
 		end)
 
@@ -66,16 +80,18 @@ function FootstepController:SetupAnimationTracking(Animator: Animator, Character
 
 	self.CharacterMaid:GiveTask(AnimationPlayedConnection)
 	self.CharacterMaid:GiveTask(function()
-		for _, TrackMaid in ActiveTrackMaids do
+		for _, TrackMaid in pairs(ActiveTrackMaids) do
 			TrackMaid:DoCleaning()
 		end
 		table.clear(ActiveTrackMaids)
-	end)
+	end :: any)
 end
 
-function FootstepController:SetupCharacter(Character: Model)
+function FootstepController:SetupCharacter(Character: Model?)
 	self.CharacterMaid:DoCleaning()
 	self.CurrentCharacter = Character
+
+	if not Character then return end
 
 	FootstepEngine.InitializeCharacter(Character)
 
@@ -117,7 +133,7 @@ Packets.FootplantedReplicate.OnClientEvent:Connect(function(SenderUserId: number
 	FootstepController:OnReplicatedFootplant(SenderUserId, MaterialId)
 end)
 
-Player.CharacterAdded:Connect(function(Character: Model)
+Player.CharacterAdded:Connect(function(Character: Model?)
 	FootstepController:SetupCharacter(Character)
 end)
 

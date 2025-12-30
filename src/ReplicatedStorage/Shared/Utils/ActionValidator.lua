@@ -2,42 +2,35 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local StatTypes = require(ReplicatedStorage.Shared.Configurations.Enums.StatTypes)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 local ActionValidator = {}
 
 ActionValidator.Blocking = {
-	LightAttack = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.BLOCKING, StatTypes.GUARD_BROKEN },
-	HeavyAttack = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StatTypes.GUARD_BROKEN },
-	Feint = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StatTypes.GUARD_BROKEN },
-	Block = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StatTypes.GUARD_BROKEN },
-	Dodge = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StatTypes.GUARD_BROKEN },
-	PerfectGuard = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StatTypes.GUARD_BROKEN },
-	Counter = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StatTypes.GUARD_BROKEN },
+	M1 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.DODGING },
+	M2 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING },
 
-	Hitbox = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.BLOCKING, StatTypes.GUARD_BROKEN },
+	Feint = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
+	DodgeCancel = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
 
-	M1 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.BLOCKING, StatTypes.GUARD_BROKEN },
-	M2 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.GUARD_BROKEN },
+	Block = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.DODGING },
+	Dodge = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.DODGING },
+	Skill = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.DODGING },
 
-	Jog = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StatTypes.GUARD_BROKEN },
-	Run = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StatTypes.GUARD_BROKEN },
+	Jog = { StateTypes.ATTACKING, StateTypes.DOWNED, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StateTypes.DODGING },
+	Run = { StateTypes.ATTACKING, StateTypes.DOWNED, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StateTypes.DODGING },
 }
 
 ActionValidator.Required = {
-	PerfectGuard = { StateTypes.BLOCKING },
-	Counter = { StateTypes.BLOCKING },
 	Parry = { StateTypes.BLOCKING },
+	DodgeCancel = { StateTypes.DODGING },
 }
 
 function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, string?)
-	if not States or not ActionName then return false, "No State or ActionName" end
-
 	local BlockingStates = ActionValidator.Blocking[ActionName]
 	if BlockingStates then
 		for _, StateName in BlockingStates do
-			if States and States:GetState(StateName) then
+			if States:GetState(StateName) then
 				return false, StateName
 			end
 		end
@@ -46,7 +39,7 @@ function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, 
 	local RequiredStates = ActionValidator.Required[ActionName]
 	if RequiredStates then
 		for _, StateName in RequiredStates do
-			if States and not States:GetState(StateName) then
+			if not States:GetState(StateName) then
 				return false, "Missing" .. StateName
 			end
 		end
@@ -75,50 +68,6 @@ function ActionValidator.CanPerformClient(Character: Model, ActionName: string):
 	end
 
 	return true, nil
-end
-
-function ActionValidator.AddBlockingState(ActionName: string, StateName: string)
-	if not ActionValidator.Blocking[ActionName] then
-		ActionValidator.Blocking[ActionName] = {}
-	end
-
-	if not table.find(ActionValidator.Blocking[ActionName], StateName) then
-		table.insert(ActionValidator.Blocking[ActionName], StateName)
-	end
-end
-
-function ActionValidator.RemoveBlockingState(ActionName: string, StateName: string)
-	local BlockingStates = ActionValidator.Blocking[ActionName]
-	if not BlockingStates then
-		return
-	end
-
-	local Index = table.find(BlockingStates, StateName)
-	if Index then
-		table.remove(BlockingStates, Index)
-	end
-end
-
-function ActionValidator.AddRequiredState(ActionName: string, StateName: string)
-	if not ActionValidator.Required[ActionName] then
-		ActionValidator.Required[ActionName] = {}
-	end
-
-	if not table.find(ActionValidator.Required[ActionName], StateName) then
-		table.insert(ActionValidator.Required[ActionName], StateName)
-	end
-end
-
-function ActionValidator.RemoveRequiredState(ActionName: string, StateName: string)
-	local RequiredStates = ActionValidator.Required[ActionName]
-	if not RequiredStates then
-		return
-	end
-
-	local Index = table.find(RequiredStates, StateName)
-	if Index then
-		table.remove(RequiredStates, Index)
-	end
 end
 
 return ActionValidator

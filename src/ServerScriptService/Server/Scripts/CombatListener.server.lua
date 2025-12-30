@@ -152,6 +152,20 @@ local function HandleReleaseAction(Player: Player, RawInput: string)
 	Combat.Interrupt(Entity, "Released")
 end
 
+Ensemble.Events.Subscribe("ActionCompleted", function(Data: any)
+	if Data.Entity and Data.ActionName then
+		if Data.Entity.Player and Data.Entity.Character then
+			Packets.ActionCompleted:FireClient(Data.Entity.Player, Data.Entity.Character, Data.ActionName)
+		end
+	end
+end)
+
+Ensemble.Events.Subscribe("ActionInterrupted", function(Data: any)
+	if Data.Entity and Data.Reason then
+		NotifyActionInterrupted(Data.Entity, Data.Reason)
+	end
+end)
+
 Packets.PerformAction.OnServerEvent:Connect(HandleActionRequest)
 Packets.InterruptAction.OnServerEvent:Connect(HandleInterruptRequest)
 Packets.ReleaseAction.OnServerEvent:Connect(HandleReleaseAction)

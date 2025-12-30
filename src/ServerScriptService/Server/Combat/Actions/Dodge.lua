@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 
 local DodgeBalance = require(Shared.Configurations.Balance.DashBalance)
 local ActionValidator = require(Shared.Utils.ActionValidator)
@@ -28,6 +29,7 @@ local DEFAULT_COOLDOWN = DodgeBalance.CooldownSeconds
 local DEFAULT_STAMINA_COST = DodgeBalance.StaminaCost
 local DEFAULT_IFRAMES_DURATION = DodgeBalance.IFrameWindow
 local DEFAULT_DURATION = DodgeBalance.Duration
+local DEFAULT_ANIMATION = "DashForward"
 
 Dodge.DefaultMetadata = {
 	ActionName = "Dodge",
@@ -36,8 +38,17 @@ Dodge.DefaultMetadata = {
 	StaminaCost = DEFAULT_STAMINA_COST,
 	IFramesDuration = DEFAULT_IFRAMES_DURATION,
 	Duration = DEFAULT_DURATION,
-	AnimationId = "DodgeRoll",
+	AnimationId = DEFAULT_ANIMATION,
 }
+
+local function GetDodgeDuration(AnimationKey: string?): number
+	local AnimationName = AnimationKey or DEFAULT_ANIMATION
+	local AnimationLength = AnimationTimingCache.GetLength(AnimationName)
+	if AnimationLength then
+		return AnimationLength
+	end
+	return DEFAULT_DURATION
+end
 
 function Dodge.CanExecute(Context: ActionContext): (boolean, string?)
 	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "Dodge")
@@ -83,7 +94,8 @@ end
 
 function Dodge.OnExecute(Context: ActionContext)
 	local IFramesDuration = Context.Metadata.IFramesDuration or DEFAULT_IFRAMES_DURATION
-	local TotalDuration = Context.Metadata.Duration or DEFAULT_DURATION
+	local AnimationId = Context.Metadata.AnimationId
+	local TotalDuration = GetDodgeDuration(AnimationId)
 
 	Context.Entity.States:SetState("Invulnerable", true)
 

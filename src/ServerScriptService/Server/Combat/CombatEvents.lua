@@ -43,6 +43,7 @@ local CombatEvents = {
 	DodgeSuccessful = "DodgeSuccessful",
 	DodgeIFramesStarted = "DodgeIFramesStarted",
 	DodgeIFramesEnded = "DodgeIFramesEnded",
+	DodgeCancelExecuted = "DodgeCancelExecuted",
 
 	ClashOccurred = "ClashOccurred",
 

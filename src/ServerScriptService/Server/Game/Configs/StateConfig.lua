@@ -35,6 +35,12 @@ local Config: StateConfig = {
 			Conflicts = {},
 		},
 
+		[StateTypes.CLASHING] = {
+			Default = false,
+			Replication = "All",
+			Conflicts = {},
+		},
+
 		[StateTypes.GUARD_BROKEN] = {
 			Default = false,
 			Replication = "All",

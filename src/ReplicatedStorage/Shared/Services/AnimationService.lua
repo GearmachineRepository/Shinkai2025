@@ -23,21 +23,56 @@ type CharacterState = {
 	Animations: AnimationCache,
 }
 
+type AnimationReference = {
+	AnimationId: string,
+	AnimationName: string?,
+}
+
 local CharacterStates: { [Humanoid]: CharacterState } = {}
 
-local function ResolveAnimationId(AnimationKey: string): string?
-	if string.find(AnimationKey, "rbxassetid://") == 1 then
-		return AnimationKey
+local function NormalizeAnimationId(AnimationId: string): string?
+	if string.find(AnimationId, "rbxassetid://") == 1 then
+		return AnimationId
 	end
 
-	if tonumber(AnimationKey) then
-		return "rbxassetid://" .. AnimationKey
+	local AnimationNumber = tonumber(AnimationId)
+	if AnimationNumber ~= nil then
+		return "rbxassetid://" .. tostring(AnimationNumber)
 	end
 
-	for _AnimationName, AnimationId in pairs(AnimationDatabase) do
-		if _AnimationName == AnimationKey then
-			return AnimationId
-		end
+	return nil
+end
+
+local function BuildAnimationLookup(Database: { [string]: string }): ({ [string]: string }, { [string]: string })
+	local NameToId: { [string]: string } = {}
+	local IdToName: { [string]: string } = {}
+
+	for AnimationName, AnimationId in pairs(Database) do
+		local NormalizedId = NormalizeAnimationId(AnimationId) or AnimationId
+		NameToId[AnimationName] = NormalizedId
+		IdToName[NormalizedId] = AnimationName
+	end
+
+	return NameToId, IdToName
+end
+
+local NameToIdLookup, IdToNameLookup = BuildAnimationLookup(AnimationDatabase)
+
+local function ResolveAnimationReference(AnimationKey: string): AnimationReference?
+	local NormalizedFromKey = NormalizeAnimationId(AnimationKey)
+	if NormalizedFromKey ~= nil then
+		return {
+			AnimationId = NormalizedFromKey,
+			AnimationName = IdToNameLookup[NormalizedFromKey],
+		}
+	end
+
+	local DatabaseId = NameToIdLookup[AnimationKey]
+	if DatabaseId ~= nil then
+		return {
+			AnimationId = DatabaseId,
+			AnimationName = AnimationKey,
+		}
 	end
 
 	return nil
@@ -100,26 +135,26 @@ local function ApplyOptions(Track: AnimationTrack, Options: PlayOptions?)
 	end
 end
 
-local function GetOrLoadTrack(Humanoid: Humanoid, AnimationId: string): AnimationTrack?
+local function GetOrLoadTrack(Humanoid: Humanoid, Reference: AnimationReference): AnimationTrack?
 	local State = GetOrCreateState(Humanoid)
 
-	local CachedTrack = State.Tracks[AnimationId]
+	local CachedTrack = State.Tracks[Reference.AnimationId]
 	if CachedTrack then
 		return CachedTrack
 	end
 
-	local AnimationObject = State.Animations[AnimationId]
+	local AnimationObject = State.Animations[Reference.AnimationId]
 	if not AnimationObject then
 		local AnimationInstance = Instance.new("Animation")
-		AnimationInstance.AnimationId = AnimationId
+		AnimationInstance.AnimationId = Reference.AnimationId
+		AnimationInstance.Name = Reference.AnimationName or Reference.AnimationId
 
-		State.Animations[AnimationId] = AnimationInstance
-
+		State.Animations[Reference.AnimationId] = AnimationInstance
 		AnimationObject = AnimationInstance
 	end
 
 	local NewTrack = State.Animator:LoadAnimation(AnimationObject)
-	State.Tracks[AnimationId] = NewTrack
+	State.Tracks[Reference.AnimationId] = NewTrack
 	return NewTrack
 end
 
@@ -132,9 +167,9 @@ function AnimationService.Preload(Player: Player, Animations: { [string]: string
 	end
 
 	for _, AnimationKey in pairs(Animations) do
-		local ResolvedId = ResolveAnimationId(AnimationKey)
-		if ResolvedId then
-			GetOrLoadTrack(Humanoid, ResolvedId)
+		local Reference = ResolveAnimationReference(AnimationKey)
+		if Reference then
+			GetOrLoadTrack(Humanoid, Reference)
 		end
 	end
 end
@@ -145,13 +180,13 @@ function AnimationService.Play(Player: Player, AnimationKey: string, Options: Pl
 		return nil
 	end
 
-	local ResolvedId = ResolveAnimationId(AnimationKey)
-	if not ResolvedId then
+	local Reference = ResolveAnimationReference(AnimationKey)
+	if not Reference then
 		warn("Failed to resolve animation:", AnimationKey)
 		return nil
 	end
 
-	local Track = GetOrLoadTrack(Humanoid, ResolvedId)
+	local Track = GetOrLoadTrack(Humanoid, Reference)
 	if not Track then
 		return nil
 	end
@@ -173,12 +208,12 @@ function AnimationService.Stop(Player: Player, AnimationKey: string, FadeTime: n
 		return
 	end
 
-	local ResolvedId = ResolveAnimationId(AnimationKey)
-	if not ResolvedId then
+	local Reference = ResolveAnimationReference(AnimationKey)
+	if not Reference then
 		return
 	end
 
-	local Track = State.Tracks[ResolvedId]
+	local Track = State.Tracks[Reference.AnimationId]
 	if Track then
 		Track:Stop(FadeTime or DEFAULT_FADE_TIME)
 	end

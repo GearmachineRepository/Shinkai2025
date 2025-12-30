@@ -43,6 +43,7 @@ local FORCE_WALK_STATES = {
 	StateTypes.STUNNED,
 	StateTypes.GUARD_BROKEN,
 	StateTypes.EXHAUSTED,
+	StateTypes.DODGING,
 }
 
 local STATE_ANIMATIONS = {
@@ -92,6 +93,9 @@ local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?) } 
 	end,
 	[CombatEvents.FeintExecuted] = function(EventData)
 		return "FeintSmoke", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.DodgeStarted] = function(EventData)
+		return "DodgeVfx", EventData.Entity and EventData.Entity.Character, nil
 	end,
 	-- [CombatEvents.StunApplied] = function(EventData)
 	-- 	return "StunStars", EventData.Entity and EventData.Entity.Character, nil

@@ -10,7 +10,7 @@ local Packets = require(Shared.Networking.Packets)
 local ActionValidator = require(Shared.Utils.ActionValidator)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
-
+local DashBalance = require(Shared.Configurations.Balance.DashBalance)
 local ClientDodgeHandler = require(script.Parent.ClientDodgeHandler)
 
 local Player = Players.LocalPlayer
@@ -32,9 +32,72 @@ local LocalState = {
 	LastStaminaSync = 0,
 }
 
+type LocalCooldownState = {
+	DodgeEndTime: number,
+}
+
+local LocalCooldown: LocalCooldownState = {
+	DodgeEndTime = 0,
+}
+
 local PENDING_ACTION_TIMEOUT = 1.0
 local STAMINA_SYNC_INTERVAL = 0.5
 local STEERABLE_DODGE = true
+
+local function GetCooldownEndTimeFromAttribute(Character: Model): number?
+	local DodgeCooldownEndTime = Character:GetAttribute("DodgeCooldownEndTime") :: number?
+	if DodgeCooldownEndTime then
+		return DodgeCooldownEndTime
+	end
+
+	local DodgeCooldownEnd = Character:GetAttribute("DodgeCooldownEnd") :: number?
+	if DodgeCooldownEnd then
+		return DodgeCooldownEnd
+	end
+
+	local DodgeCooldownUntil = Character:GetAttribute("DodgeCooldownUntil") :: number?
+	if DodgeCooldownUntil then
+		return DodgeCooldownUntil
+	end
+
+	local DodgeCooldown = Character:GetAttribute("DodgeCooldown") :: number?
+	if DodgeCooldown then
+		local CurrentTime = os.clock()
+		if DodgeCooldown > CurrentTime then
+			return DodgeCooldown
+		end
+		if DodgeCooldown > 0 then
+			return CurrentTime + DodgeCooldown
+		end
+	end
+
+	return nil
+end
+
+local function GetLocalDodgeCooldownEndTime(Character: Model): number
+	local AttributeEndTime = GetCooldownEndTimeFromAttribute(Character)
+	if AttributeEndTime then
+		return math.max(LocalCooldown.DodgeEndTime, AttributeEndTime)
+	end
+
+	return LocalCooldown.DodgeEndTime
+end
+
+local function IsDodgeOnCooldown(Character: Model): boolean
+	local CurrentTime = os.clock()
+	return CurrentTime < GetLocalDodgeCooldownEndTime(Character)
+end
+
+local function StartLocalDodgeCooldown(Character: Model)
+	local CurrentTime = os.clock()
+
+	local CooldownSecondsAttribute = Character:GetAttribute("DodgeCooldownSeconds") :: number?
+	local CooldownSeconds = CooldownSecondsAttribute or (DashBalance.CooldownSeconds :: number?) or 0
+
+	if CooldownSeconds > 0 then
+		LocalCooldown.DodgeEndTime = math.max(LocalCooldown.DodgeEndTime, CurrentTime + CooldownSeconds)
+	end
+end
 
 local function GetCharacter(): Model?
 	return Player.Character
@@ -222,6 +285,12 @@ local function CanPerformAction(RawInput: string): (boolean, number?)
 		return false, nil
 	end
 
+	if ResolvedAction == "Dodge" then
+		if IsDodgeOnCooldown(Character) then
+			return false, nil
+		end
+	end
+
 	local StaminaCost = GetStaminaCost(Character, ResolvedAction)
 	if StaminaCost and StaminaCost > 0 and GetLocalStamina() < StaminaCost then
 		return false, nil
@@ -330,6 +399,13 @@ Packets.ActionApproved.OnClientEvent:Connect(function(ActionName: string)
 		ClearPendingAction()
 	end
 
+	if ActionName == "Dodge" then
+		local Character = GetCharacter()
+		if Character then
+			StartLocalDodgeCooldown(Character)
+		end
+	end
+
 	TryExecuteBufferedAction()
 end)
 
@@ -353,7 +429,7 @@ Packets.ActionInterrupted.OnClientEvent:Connect(function(_Character: Instance, R
 	LocalState.IsAttacking = false
 
 	if LocalState.IsDodging then
-		if Reason == "Feint" or Reason == "Hit" or Reason == "Stunned" then
+		if Reason == "Feint" or Reason == "Hit" or Reason == "Stunned" or Reason == "DodgeCancel" then
 			ClientDodgeHandler.Rollback()
 		else
 			ClientDodgeHandler.StopDodge()
@@ -397,7 +473,7 @@ local function OnCharacterAdded(Character: Model)
 	Character:GetAttributeChangedSignal("Dodging"):Connect(function()
 		local ServerDodging = Character:GetAttribute("Dodging") :: boolean? or false
 		if not ServerDodging and LocalState.IsDodging then
-			ClientDodgeHandler.StopDodge()
+			ClientDodgeHandler.Rollback()
 			LocalState.IsDodging = false
 		end
 	end)
