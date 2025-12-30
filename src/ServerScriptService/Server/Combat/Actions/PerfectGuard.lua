@@ -28,6 +28,7 @@ PerfectGuard.Cooldown = CombatBalance.PerfectBlock.COOLDOWN_SECONDS
 PerfectGuard.SpamCooldown = CombatBalance.PerfectBlock.SPAM_COOLDOWN_SECONDS
 PerfectGuard.StaggerDuration = CombatBalance.PerfectBlock.STAGGER_DURATION
 PerfectGuard.MaxAngle = CombatBalance.PerfectBlock.MAX_ANGLE
+PerfectGuard.StaggerPauseDivisor = 1.5
 
 local function OnTrigger(Context: ActionContext, Attacker: Entity)
 	local AttackerContext = ActionExecutor.GetActiveContext(Attacker)
@@ -35,11 +36,10 @@ local function OnTrigger(Context: ActionContext, Attacker: Entity)
 
 	if AttackerAnimationId  then
 		if Attacker.Player then
-			Packets.PauseAnimation:FireClient(Attacker.Player, AttackerAnimationId, PerfectGuard.StaggerDuration)
+			Packets.PauseAnimation:FireClient(Attacker.Player, AttackerAnimationId, PerfectGuard.StaggerDuration/PerfectGuard.StaggerPauseDivisor)
 		else
-			EntityAnimator.Stop(Attacker.Character, AttackerAnimationId, PerfectGuard.StaggerDuration)
+			EntityAnimator.Pause(Attacker.Character, AttackerAnimationId, PerfectGuard.StaggerDuration/PerfectGuard.StaggerPauseDivisor)
 		end
-
 
 		task.delay(PerfectGuard.StaggerDuration, function()
 			if Attacker.Player then

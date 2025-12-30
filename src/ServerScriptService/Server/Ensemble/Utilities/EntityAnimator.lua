@@ -139,7 +139,7 @@ function EntityAnimator.StopAll(Character: Model, FadeTime: number?)
 	end
 end
 
-function EntityAnimator.Pause(Character: Model, AnimationNameOrId: string)
+function EntityAnimator.Pause(Character: Model, AnimationNameOrId: string, Duration: number)
 	local ResolvedAnimationId = ResolveAnimationId(AnimationNameOrId)
 	if not ResolvedAnimationId then
 		return
@@ -150,9 +150,26 @@ function EntityAnimator.Pause(Character: Model, AnimationNameOrId: string)
 		return
 	end
 
-	local Track = Cache[ResolvedAnimationId]
-	if Track then
-		Track:AdjustSpeed(0)
+	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	if not Humanoid then
+		return
+	end
+
+	local Animator = Humanoid:FindFirstChildOfClass("Animator")
+	if not Animator then
+		return
+	end
+
+	for _, Track in Animator:GetPlayingAnimationTracks() do
+		if Track.Animation and Track.Animation.Name == AnimationNameOrId then
+			Track:AdjustSpeed(0)
+			task.delay(Duration, function()
+				if Track.IsPlaying then
+					Track:AdjustSpeed(1)
+				end
+			end)
+			break
+		end
 	end
 end
 

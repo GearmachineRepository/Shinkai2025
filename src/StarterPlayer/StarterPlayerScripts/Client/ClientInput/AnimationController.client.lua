@@ -53,7 +53,7 @@ Packets.PauseAnimation.OnClientEvent:Connect(function(AnimationId: string, Durat
 	end
 
 	for _, Track in Animator:GetPlayingAnimationTracks() do
-		if Track.Animation and Track.Animation.AnimationId == AnimationId then
+		if Track.Animation and Track.Animation.Name == AnimationId then
 			Track:AdjustSpeed(0)
 			task.delay(Duration, function()
 				if Track.IsPlaying then
