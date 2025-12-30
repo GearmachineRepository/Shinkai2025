@@ -6,13 +6,16 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
 local SoundPlayer = require(Shared.General.SoundPlayer)
 
-Packets.PlaySoundReplicate.OnClientEvent:Connect(function(SenderUserId: number, SoundName: string)
-	local SenderPlayer = Players:GetPlayerByUserId(SenderUserId)
-	if not SenderPlayer then
-		return
+Packets.PlaySoundReplicate.OnClientEvent:Connect(function(SenderUser: number | Instance, SoundName: string)
+	local SenderCharacter = SenderUser :: Model
+
+	if typeof(SenderUser) == "number" then
+		local SenderPlayer = Players:GetPlayerByUserId(SenderUser)
+		if not SenderPlayer then
+			SenderCharacter = SenderPlayer.Character
+		end
 	end
 
-	local SenderCharacter = SenderPlayer.Character
 	if not SenderCharacter then
 		return
 	end

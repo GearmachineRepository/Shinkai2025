@@ -5,73 +5,60 @@ local CombatEvents = {
 	ActionStarted = "ActionStarted",
 	ActionCompleted = "ActionCompleted",
 	ActionInterrupted = "ActionInterrupted",
-	ActionCancelled = "ActionCancelled",
 
 	AttackStarted = "AttackStarted",
 	AttackHit = "AttackHit",
-	AttackMissed = "AttackMissed",
 	AttackBlocked = "AttackBlocked",
 	AttackParried = "AttackParried",
+	AttackMissed = "AttackMissed",
 
-	FeintExecuted = "FeintExecuted",
-	FeintFailed = "FeintFailed",
+	HitWindowOpened = "HitWindowOpened",
+	HitWindowClosed = "HitWindowClosed",
 
 	BlockStarted = "BlockStarted",
 	BlockEnded = "BlockEnded",
 	BlockHit = "BlockHit",
-	GuardBroken = "GuardBroken",
+	BlockMissed = "BlockMissed",
 
-	ParryAttempted = "ParryAttempted",
+	GuardBroken = "GuardBroken",
+	GuardBreakRecovered = "GuardBreakRecovered",
+
+	WindowOpened = "WindowOpened",
+	WindowClosed = "WindowClosed",
+	WindowTriggered = "WindowTriggered",
+
 	ParrySuccess = "ParrySuccess",
 	ParryFailed = "ParryFailed",
-	ParryWindowOpened = "ParryWindowOpened",
-	ParryWindowClosed = "ParryWindowClosed",
-
-	PerfectGuardAttempted = "PerfectGuardAttempted",
+	PerfectGuardInitiated = "PerfectGuardInitiated",
 	PerfectGuardSuccess = "PerfectGuardSuccess",
-	PerfectGuardFailed = "PerfectGuardFailed",
 
-	CounterAttempted = "CounterAttempted",
+	CounterInitiated = "CounterInitiated",
 	CounterExecuted = "CounterExecuted",
 	CounterHit = "CounterHit",
-	CounterFailed = "CounterFailed",
+
+	FeintExecuted = "FeintExecuted",
 
 	DodgeStarted = "DodgeStarted",
 	DodgeCompleted = "DodgeCompleted",
 	DodgeSuccessful = "DodgeSuccessful",
+	DodgeIFramesStarted = "DodgeIFramesStarted",
+	DodgeIFramesEnded = "DodgeIFramesEnded",
 
 	ClashOccurred = "ClashOccurred",
 
-	ComboAdvanced = "ComboAdvanced",
-	ComboReset = "ComboReset",
-	ComboFinished = "ComboFinished",
-
-	HitWindowOpened = "HitWindowOpened",
-	HitWindowClosed = "HitWindowClosed",
-	HitRegistered = "HitRegistered",
-
 	DamageDealt = "DamageDealt",
-	DamageTaken = "DamageTaken",
 	DamageBlocked = "DamageBlocked",
-	DamageReduced = "DamageReduced",
-
-	PostureDamageDealt = "PostureDamageDealt",
-	PostureDamageTaken = "PostureDamageTaken",
-	PostureBroken = "PostureBroken",
-	PostureRecovered = "PostureRecovered",
+	DamageTaken = "DamageTaken",
+	DamageDodged = "DamageDodged",
 
 	StunApplied = "StunApplied",
-	StunEnded = "StunEnded",
-	HitStunApplied = "HitStunApplied",
+	StunRecovered = "StunRecovered",
 
 	StaminaConsumed = "StaminaConsumed",
 	StaminaRefunded = "StaminaRefunded",
 
-	CooldownStarted = "CooldownStarted",
-	CooldownEnded = "CooldownEnded",
-
-	CombatEntered = "CombatEntered",
-	CombatExited = "CombatExited",
+	ComboAdvanced = "ComboAdvanced",
+	ComboReset = "ComboReset",
 }
 
 return CombatEvents

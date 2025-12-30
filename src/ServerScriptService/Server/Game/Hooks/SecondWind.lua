@@ -18,7 +18,7 @@ return {
 
 			local StaminaComponent = Entity:GetComponent("Stamina")
 			if StaminaComponent then
-				StaminaComponent:RestoreStaminaExternal(10)
+				StaminaComponent:RestoreStamina(10)
 			end
 		end)
 

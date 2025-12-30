@@ -6,9 +6,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(Server.Combat.CombatTypes)
-local CombatEvents = require(Server.Combat.CombatEvents)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+
 local ActionValidator = require(Shared.Utils.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 

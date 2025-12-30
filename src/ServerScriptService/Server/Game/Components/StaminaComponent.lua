@@ -149,7 +149,7 @@ function StaminaComponent.ConsumeStamina(self: Self, Amount: number): boolean
 	return true
 end
 
-function StaminaComponent.RestoreStaminaExternal(self: Self, Amount: number)
+function StaminaComponent.RestoreStamina(self: Self, Amount: number)
 	if Amount <= 0 then
 		return
 	end

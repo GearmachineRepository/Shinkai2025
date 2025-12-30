@@ -51,7 +51,7 @@ return {
 	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberF64),
 	ClearCooldown = Packet("ClearCooldown", Packet.String),
 
-	-- Combat Actions (Consolidated)
+	-- Combat Actions
 	PerformAction = Packet("PerformAction", Packet.String, Packet.Any),
 	ReleaseAction = Packet("ReleaseAction", Packet.String),
 	ActionApproved = Packet("ActionApproved", Packet.String),
@@ -61,7 +61,7 @@ return {
 	InterruptAction = Packet("InterruptAction", Packet.String),
 
 	-- Sounds
-	PlaySound = Packet("PlaySound", Packet.String, Packet.Any),
+	PlaySound = Packet("PlaySound", Packet.Any, Packet.Any),
 	PlaySoundReplicate = Packet("PlaySoundReplicate", Packet.Any, Packet.String, Packet.Any),
 
 	-- VFX

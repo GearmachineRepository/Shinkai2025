@@ -17,6 +17,8 @@ export type AttackData = {
 	StaminaCost: number,
 	HitStun: number,
 	PostureDamage: number?,
+	Flag: string?,
+	Flags: { string }?,
 }
 
 export type ActionMetadata = {
@@ -34,6 +36,10 @@ export type ActionMetadata = {
 	HitboxSize: Vector3?,
 	HitboxOffset: Vector3?,
 
+	DamageReduction: number?,
+	StaminaDrainOnHit: number?,
+	StaminaDrainScalar: number?,
+
 	Feintable: boolean?,
 	FeintEndlag: number?,
 	FeintCooldown: number?,
@@ -46,7 +52,17 @@ export type ActionMetadata = {
 	FallbackHitEnd: number?,
 	FallbackLength: number?,
 
+	Flag: string?,
+	Flags: { string }?,
+
 	[string]: any,
+}
+
+export type WindowData = {
+	WindowType: string,
+	StartTime: number,
+	Duration: number,
+	ExpiryThread: thread?,
 }
 
 export type ActionContext = {
@@ -59,6 +75,8 @@ export type ActionContext = {
 	InterruptReason: string?,
 	InterruptedContext: ActionContext?,
 	CustomData: { [string]: any },
+	ActiveWindow: WindowData?,
+	PendingThreads: { thread }?,
 }
 
 export type ActionDefinition = {
@@ -71,10 +89,21 @@ export type ActionDefinition = {
 	CanExecute: ((Context: ActionContext) -> (boolean, string?))?,
 	OnStart: ((Context: ActionContext) -> ())?,
 	OnExecute: (Context: ActionContext) -> (),
-	OnHit: ((Context: ActionContext, Target: Entity, HitIndex: number) -> ())?,
+	OnHit: ((Context: ActionContext, Target: Entity, HitPosition: Vector3?, HitIndex: number?) -> ())?,
 	OnInterrupt: ((Context: ActionContext) -> ())?,
 	OnComplete: ((Context: ActionContext) -> ())?,
 	OnCleanup: ((Context: ActionContext) -> ())?,
+}
+
+export type WindowDefinition = {
+	WindowType: string,
+	Duration: number,
+	Cooldown: number,
+	SpamCooldown: number,
+	StateName: string,
+	MaxAngle: number?,
+	OnTrigger: (Context: ActionContext, Attacker: Entity) -> (),
+	OnExpire: ((Context: ActionContext) -> ())?,
 }
 
 export type HitResult = {
@@ -85,16 +114,6 @@ export type HitResult = {
 	WasBlocked: boolean,
 	WasParried: boolean,
 	HitPosition: Vector3?,
-}
-
-export type CombatEvent = {
-	Entity: Entity,
-	ActionName: string?,
-	Context: ActionContext?,
-	Target: Entity?,
-	HitResult: HitResult?,
-	Reason: string?,
-	[string]: any,
 }
 
 return nil

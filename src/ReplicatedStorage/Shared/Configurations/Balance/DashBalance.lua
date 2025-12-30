@@ -3,15 +3,13 @@
 local DashBalance = {
 	StaminaCost = 15,
 	CooldownSeconds = 2,
-	DashDurationSeconds = 0.45,
-	PostDashStopSeconds = 0.45,
+	IFrameWindow = 0.25,
+	Duration = 0.45,
 
-	Client = {
-		Power = 50,
-		AnimationDuration = 0.45,
-		TweenDuration = 1.1,
-		MaxForce = 100000,
-	},
+	Speed = 25,
+	AnimationDuration = 0.45,
+	TweenDuration = 1.1,
+	MaxForce = 50000,
 }
 
 return DashBalance

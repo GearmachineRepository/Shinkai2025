@@ -5,7 +5,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local CombatEvents = require(Server.Combat.CombatEvents)
-local StunManager = require(Server.Combat.StunManager)
+local StunManager = require(Server.Combat.Utility.StunManager)
 
 return {
 	HookName = "CounterStrike",

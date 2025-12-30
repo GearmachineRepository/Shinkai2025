@@ -6,18 +6,17 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatBalance = require(ReplicatedStorage.Shared.Configurations.Balance.CombatBalance)
-local ActionValidator = require(ReplicatedStorage.Shared.Utils.ActionValidator)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 local Ensemble = require(Server.Ensemble)
-local CombatTypes = require(script.Parent.CombatTypes)
-local CombatEvents = require(script.Parent.CombatEvents)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.ActionExecutor)
-local Block = require(script.Parent.Actions.Block)
-local StunManager = require(script.Parent.StunManager)
-local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
+local StunManager = require(script.Parent.Parent.Utility.StunManager)
+local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
+local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
-local AttackFlags = require(script.Parent.AttackFlags)
 
 type Entity = CombatTypes.Entity
 type ActionContext = CombatTypes.ActionContext
@@ -43,6 +42,28 @@ local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacte
 	)
 
 	return TargetPivot:PointToWorldSpace(ClampedLocalPoint)
+end
+
+local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
+	ActionExecutor.Interrupt(ContextA.Entity, "Clash")
+	ActionExecutor.Interrupt(ContextB.Entity, "Clash")
+
+	ContextA.Entity.States:SetState("Clashing", true)
+	ContextB.Entity.States:SetState("Clashing", true)
+
+	Ensemble.Events.Publish(CombatEvents.ClashOccurred, {
+		EntityA = ContextA.Entity,
+		EntityB = ContextB.Entity,
+	})
+
+	task.delay(0.3, function()
+		if ContextA.Entity.States then
+			ContextA.Entity.States:SetState("Clashing", false)
+		end
+		if ContextB.Entity.States then
+			ContextB.Entity.States:SetState("Clashing", false)
+		end
+	end)
 end
 
 function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, Vector3?) -> ())
@@ -193,28 +214,6 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 	end
 end
 
-local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
-	ActionExecutor.Interrupt(ContextA.Entity, "Clash")
-	ActionExecutor.Interrupt(ContextB.Entity, "Clash")
-
-	ContextA.Entity.States:SetState("Clashing", true)
-	ContextB.Entity.States:SetState("Clashing", true)
-
-	Ensemble.Events.Publish(CombatEvents.ClashOccurred, {
-		EntityA = ContextA.Entity,
-		EntityB = ContextB.Entity,
-	})
-
-	task.delay(0.3, function()
-		if ContextA.Entity.States then
-			ContextA.Entity.States:SetState("Clashing", false)
-		end
-		if ContextB.Entity.States then
-			ContextB.Entity.States:SetState("Clashing", false)
-		end
-	end)
-end
-
 function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, HitPosition: Vector3?): boolean
 	local TargetContext = ActionExecutor.GetActiveContext(Target)
 	local Metadata = AttackerContext.Metadata
@@ -239,19 +238,22 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 	end
 
 	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
-		Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags, HitPosition)
+		local Block = require(script.Parent.Parent.Actions.Block)
+		local WasBlocked = Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags, HitPosition)
 
-		Ensemble.Events.Publish(CombatEvents.AttackBlocked, {
-			Attacker = AttackerContext.Entity,
-			Target = Target,
-			Damage = Damage,
-			Flags = Flags,
-			HitPosition = HitPosition,
-			AttackerContext = AttackerContext,
-			TargetContext = TargetContext,
-		})
+		if WasBlocked then
+			Ensemble.Events.Publish(CombatEvents.AttackBlocked, {
+				Attacker = AttackerContext.Entity,
+				Target = Target,
+				Damage = Damage,
+				Flags = Flags,
+				HitPosition = HitPosition,
+				AttackerContext = AttackerContext,
+				TargetContext = TargetContext,
+			})
 
-		return true
+			return true
+		end
 	end
 
 	AttackBase.ApplyDamage(AttackerContext, Target, HitPosition)
@@ -270,107 +272,82 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 end
 
 function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosition: Vector3?)
-	local Metadata = Context.Metadata
-	local Damage = Metadata.Damage or 10
+	local Damage = Context.Metadata.Damage or 10
 
 	local DamageComponent = Target:GetComponent("Damage")
-	if not DamageComponent then
-		return
+	if DamageComponent then
+		DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character)
 	end
-
-	local RootPart = Context.Entity.Character and Context.Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	local KnockbackDirection = if RootPart then RootPart.CFrame.LookVector else Vector3.zero
-
-	DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character, KnockbackDirection, HitPosition)
 
 	Ensemble.Events.Publish(CombatEvents.DamageDealt, {
 		Entity = Context.Entity,
 		Target = Target,
 		Damage = Damage,
-		ActionName = Metadata.ActionName,
+		HitPosition = HitPosition,
+		ActionName = Context.Metadata.ActionName,
 		Context = Context,
 	})
 end
 
 function AttackBase.ApplyHitStun(Context: ActionContext, Target: Entity)
-	local Metadata = Context.Metadata
-	local HitStun = Metadata.HitStun or 0.25
+	local HitStun = Context.Metadata.HitStun or 0
 
-	local TargetContext = ActionExecutor.GetActiveContext(Target)
-	if TargetContext and TargetContext.Metadata.ActionType == "Attack" then
-		ActionExecutor.Interrupt(Target, "HitStun")
+	if HitStun > 0 then
+		StunManager.ApplyStun(Target, HitStun, Context.Metadata.ActionName)
+	end
+end
+
+function AttackBase.ConsumeStamina(Context: ActionContext)
+	local StaminaCost = Context.Metadata.StaminaCost or 0
+	if StaminaCost <= 0 then
+		return
 	end
 
-	StunManager.ApplyStun(Target, HitStun, "AttackBase")
+	local StaminaComponent = Context.Entity:GetComponent("Stamina")
+	if StaminaComponent then
+		StaminaComponent:ConsumeStamina(StaminaCost)
+		Context.CustomData.StaminaConsumed = StaminaCost
+
+		Ensemble.Events.Publish(CombatEvents.StaminaConsumed, {
+			Entity = Context.Entity,
+			Amount = StaminaCost,
+			ActionName = Context.Metadata.ActionName,
+		})
+	end
 end
 
 function AttackBase.HandleStaminaRefund(Context: ActionContext)
-	local Metadata = Context.Metadata
-	local StaminaCost = Metadata.StaminaCost or 0
-	local RefundRate = Metadata.StaminaCostHitReduction or 0.15
-
-	if not Context.CustomData.HasHit or StaminaCost <= 0 then
+	if not Context.CustomData.HasHit then
 		return
 	end
 
-	local StaminaComponent = Context.Entity:GetComponent("Stamina")
-	if not StaminaComponent then
+	local StaminaConsumed = Context.CustomData.StaminaConsumed or 0
+	local RefundPercent = Context.Metadata.StaminaCostHitReduction or 0
+
+	if StaminaConsumed <= 0 or RefundPercent <= 0 then
 		return
 	end
 
-	local RefundAmount = StaminaCost * RefundRate
-	StaminaComponent:RestoreStaminaExternal(RefundAmount)
-
-	Ensemble.Events.Publish(CombatEvents.StaminaRefunded, {
-		Entity = Context.Entity,
-		Amount = RefundAmount,
-		Reason = "HitRefund",
-		Context = Context,
-	})
-end
-
-function AttackBase.ConsumeStamina(Context: ActionContext): boolean
-	local Metadata = Context.Metadata
-	local StaminaCost = Metadata.StaminaCost or 0
-
-	if StaminaCost <= 0 then
-		return true
-	end
+	local RefundAmount = StaminaConsumed * RefundPercent
 
 	local StaminaComponent = Context.Entity:GetComponent("Stamina")
-	if not StaminaComponent then
-		return false
+	if StaminaComponent then
+		StaminaComponent:RestoreStamina(RefundAmount)
+
+		Ensemble.Events.Publish(CombatEvents.StaminaRefunded, {
+			Entity = Context.Entity,
+			Amount = RefundAmount,
+			ActionName = Context.Metadata.ActionName,
+		})
 	end
-
-	StaminaComponent:ConsumeStamina(StaminaCost)
-
-	Ensemble.Events.Publish(CombatEvents.StaminaConsumed, {
-		Entity = Context.Entity,
-		Amount = StaminaCost,
-		ActionName = Metadata.ActionName,
-		Context = Context,
-	})
-
-	return true
 end
 
 function AttackBase.CleanupAttack(Context: ActionContext)
-	Context.CustomData.CanFeint = false
-	Context.CustomData.HitWindowOpen = false
-
-	local Player = Context.Entity.Player
-	local AnimationId = Context.Metadata.AnimationId
-
-	if Player and AnimationId then
-		Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
-	end
-
 	if Context.CustomData.ActiveHitbox then
+		Context.CustomData.ActiveHitbox:Stop()
 		Context.CustomData.ActiveHitbox:Destroy()
 		Context.CustomData.ActiveHitbox = nil
 	end
-
-	Context.Entity.States:SetState("Attacking", false)
 end
 
 return AttackBase

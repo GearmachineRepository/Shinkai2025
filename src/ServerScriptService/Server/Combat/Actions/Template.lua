@@ -25,6 +25,23 @@
 	- "Defensive" - Protective actions (Block, PerfectGuard, Parry)
 	- "Movement" - Movement-based actions (Dodge, Dash)
 	- "Utility" - Support actions (Feint, Taunt)
+
+	THREAD SCHEDULING:
+	Use ActionExecutor.ScheduleThread() instead of task.delay() for automatic cleanup:
+
+	ActionExecutor.ScheduleThread(Context, Duration, function()
+		-- This callback is automatically cancelled if action is interrupted
+	end)
+
+	For threads that MUST run even after interrupt (like state cleanup):
+	ActionExecutor.ScheduleThread(Context, Duration, Callback, true)
+
+	WINDOW SYSTEM:
+	To open a defensive window during an action:
+	ActionExecutor.OpenWindow(Entity, "PerfectGuard")
+
+	To check for window triggers when hit:
+	if ActionExecutor.TriggerWindow(Context, Attacker) then return end
 ]]
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -33,9 +50,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(Server.Combat.CombatTypes)
-local CombatEvents = require(Server.Combat.CombatEvents)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+
 local ActionValidator = require(Shared.Utils.ActionValidator)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
@@ -72,7 +90,7 @@ function ActionTemplate.BuildMetadata(_Entity: Entity, _InputData: { [string]: a
 end
 
 function ActionTemplate.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "M1")
+	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "ActionTemplate")
 	if not CanPerform then
 		return false, Reason
 	end
@@ -86,7 +104,7 @@ function ActionTemplate.CanExecute(Context: ActionContext): (boolean, string?)
 	end
 
 	local ActionCooldown = Context.Metadata.ActionCooldown or 0
-	if ActionCooldown > 0 and ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown) then
+	if ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown) then
 		return false, "OnCooldown"
 	end
 
@@ -97,6 +115,8 @@ function ActionTemplate.OnStart(Context: ActionContext)
 	Context.CustomData.HitWindowOpen = false
 	Context.CustomData.HasHit = false
 	Context.CustomData.CanFeint = Context.Metadata.Feintable
+
+	Context.Entity.States:SetState("Attacking", true)
 
 	local ActionCooldown = Context.Metadata.ActionCooldown or 0
 	if ActionCooldown > 0 then
@@ -112,27 +132,29 @@ function ActionTemplate.OnExecute(Context: ActionContext)
 		Packets.PlayAnimation:FireClient(Player, AnimationId)
 	end
 
-	Context.Entity.States:SetState("Attacking", true)
+	Ensemble.Events.Publish(CombatEvents.AttackStarted, {
+		Entity = Context.Entity,
+		ActionName = "ActionTemplate",
+		Context = Context,
+	})
 
-	task.wait(0.5)
+	task.wait(1.0)
 end
 
-function ActionTemplate.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
-	if not Context.CustomData.HitWindowOpen then
+function ActionTemplate.OnHit(Context: ActionContext, Target: Entity, HitPosition: Vector3?, _HitIndex: number?)
+	if not Context.CustomData.HitWindowOpen or Context.CustomData.HasHit then
 		return
 	end
 
+	Context.CustomData.HasHit = true
+
 	local Damage = Context.Metadata.Damage or 10
-	local DamageComponent = Target:GetComponent("Damage")
-	if DamageComponent then
-		DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character, Vector3.zero)
-	end
 
 	Ensemble.Events.Publish(CombatEvents.AttackHit, {
 		Entity = Context.Entity,
 		Target = Target,
-		ActionName = Context.Metadata.ActionName,
 		Damage = Damage,
+		HitPosition = HitPosition,
 		Context = Context,
 	})
 end
@@ -140,16 +162,18 @@ end
 function ActionTemplate.OnComplete(Context: ActionContext)
 	Ensemble.Events.Publish(CombatEvents.ActionCompleted, {
 		Entity = Context.Entity,
-		ActionName = Context.Metadata.ActionName,
+		ActionName = "ActionTemplate",
 		Context = Context,
 	})
 end
 
 function ActionTemplate.OnInterrupt(Context: ActionContext)
 	if Context.InterruptReason == "Feint" then
+		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
+
 		Ensemble.Events.Publish(CombatEvents.FeintExecuted, {
 			Entity = Context.Entity,
-			ActionName = Context.Metadata.ActionName,
+			ActionName = "ActionTemplate",
 			Context = Context,
 		})
 
@@ -162,13 +186,6 @@ end
 
 function ActionTemplate.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Attacking", false)
-
-	local Player = Context.Entity.Player
-	local AnimationId = Context.Metadata.AnimationId
-
-	if Player and AnimationId then
-		Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
-	end
 end
 
 return ActionTemplate

@@ -10,7 +10,6 @@
 
 	Combat.Init({
 		ActionsFolder = Server.Combat.Actions,
-		AnimationDatabase = AnimationDatabase,
 	})
 	```
 
@@ -36,25 +35,40 @@
 	   The InputResolver checks entity states to determine which actions
 	   are available. Actions also perform their own validation in CanExecute.
 
+	5. WINDOW SYSTEM
+	   Actions can open timed windows (PerfectGuard, Counter) that trigger
+	   special behavior when hit. Managed centrally by ActionExecutor.
+
+	6. THREAD MANAGEMENT
+	   Use ActionExecutor.ScheduleThread() for delayed callbacks that
+	   automatically clean up when actions are interrupted.
+
 	EXTENDING THE FRAMEWORK:
 
 	1. Add new actions by creating modules in the Actions folder
 	2. Add new input bindings via InputResolver.AddBinding()
 	3. Subscribe to combat events for passive/hook effects
 	4. Use AttackBase for shared attack logic
+	5. Register new windows via ActionExecutor.RegisterWindow()
 ]]
 
-local ActionRegistry = require(script.ActionRegistry)
-local ActionExecutor = require(script.ActionExecutor)
-local InputResolver = require(script.InputResolver)
+local ActionRegistry = require(script.Core.ActionRegistry)
+local ActionExecutor = require(script.Core.ActionExecutor)
+local InputResolver = require(script.Core.InputResolver)
+local AttackBase = require(script.Core.AttackBase)
 local CombatTypes = require(script.CombatTypes)
 local CombatEvents = require(script.CombatEvents)
-local AttackBase = require(script.AttackBase)
+
+local PerfectGuard = require(script.Actions.PerfectGuard)
+local Counter = require(script.Actions.Counter)
+
+local AnimationTimingCache = require(script.Utility.AnimationTimingCache)
 
 export type Entity = CombatTypes.Entity
 export type ActionContext = CombatTypes.ActionContext
 export type ActionMetadata = CombatTypes.ActionMetadata
 export type ActionDefinition = CombatTypes.ActionDefinition
+export type WindowDefinition = CombatTypes.WindowDefinition
 export type InputBinding = InputResolver.InputBinding
 
 local Combat = {}
@@ -62,19 +76,21 @@ local Combat = {}
 Combat.ActionRegistry = ActionRegistry
 Combat.ActionExecutor = ActionExecutor
 Combat.InputResolver = InputResolver
+Combat.AttackBase = AttackBase
 Combat.CombatTypes = CombatTypes
 Combat.CombatEvents = CombatEvents
-Combat.AttackBase = AttackBase
 
 export type InitConfig = {
 	ActionsFolder: Instance?,
-	AnimationDatabase: { [string]: any }?,
+	AnimationDatabase: {[string]: any}?,
 	CustomBindings: { InputResolver.InputBinding }?,
 }
 
 function Combat.Init(Config: InitConfig?)
-	local FinalConfig = Config
-    if not FinalConfig then return end
+	PerfectGuard.Register()
+	Counter.Register()
+
+	local FinalConfig = Config or {} :: InitConfig
 
 	if FinalConfig.ActionsFolder then
 		local LoadedCount = ActionRegistry.LoadFolder(FinalConfig.ActionsFolder)
@@ -85,6 +101,10 @@ function Combat.Init(Config: InitConfig?)
 		for _, Binding in FinalConfig.CustomBindings do
 			InputResolver.AddBinding(Binding)
 		end
+	end
+
+	if FinalConfig.AnimationDatabase then
+		AnimationTimingCache.PreloadDatabase(FinalConfig.AnimationDatabase)
 	end
 
 	print("[Combat] Framework initialized")
@@ -118,6 +138,14 @@ end
 
 function Combat.RegisterAction(Definition: ActionDefinition)
 	ActionRegistry.Register(Definition)
+end
+
+function Combat.RegisterWindow(Definition: WindowDefinition)
+	ActionExecutor.RegisterWindow(Definition)
+end
+
+function Combat.OpenWindow(Entity: Entity, WindowType: string): boolean
+	return ActionExecutor.OpenWindow(Entity, WindowType)
 end
 
 function Combat.AddInputBinding(Binding: InputResolver.InputBinding, ConfigName: string?)

@@ -1,9 +1,8 @@
 --!strict
 
-local CombatTypes = require(script.Parent.CombatTypes)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
 
 type ActionDefinition = CombatTypes.ActionDefinition
-type ActionMetadata = CombatTypes.ActionMetadata
 
 local ActionRegistry = {}
 

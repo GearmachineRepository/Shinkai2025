@@ -6,20 +6,20 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(Server.Combat.CombatTypes)
-local CombatEvents = require(Server.Combat.CombatEvents)
-local ActionValidator = require(Shared.Utils.ActionValidator)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
+local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
+local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
+
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local MovementModifiers = require(Server.Combat.MovementModifiers)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local AttackFlags = require(Server.Combat.AttackFlags)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
-local PerfectGuard = require(script.Parent.PerfectGuard)
-local Counter = require(script.Parent.Counter)
 
 type Entity = CombatTypes.Entity
 type ActionContext = CombatTypes.ActionContext
@@ -36,6 +36,159 @@ Block.DefaultMetadata = {
 	DamageReduction = CombatBalance.Blocking.DAMAGE_REDUCTION,
 	StaminaDrainOnHit = CombatBalance.Blocking.STAMINA_DRAIN_ON_HIT,
 }
+
+local function PlayAnimation(Context: ActionContext, AnimationId: string?)
+	if not AnimationId then
+		return
+	end
+
+	local Player = Context.Entity.Player
+	if Player then
+		Packets.PlayAnimation:FireClient(Player, AnimationId)
+	end
+end
+
+local function StopAnimation(Context: ActionContext, AnimationId: string?, FadeTime: number?)
+	if not AnimationId then
+		return
+	end
+
+	local Player = Context.Entity.Player
+	if Player then
+		Packets.StopAnimation:FireClient(Player, AnimationId, FadeTime or 0.15)
+	end
+end
+
+local function ApplyGuardBreakState(Context: ActionContext)
+	local Entity = Context.Entity
+	Entity.States:SetState(StateTypes.GUARD_BROKEN, true)
+
+	local Duration = CombatBalance.Blocking.GUARD_BREAK_DURATION or 1.5
+
+	task.delay(Duration, function()
+		if Entity.States then
+			Entity.States:SetState(StateTypes.GUARD_BROKEN, false)
+
+			Ensemble.Events.Publish(CombatEvents.GuardBreakRecovered, {
+				Entity = Entity,
+			})
+		end
+	end)
+end
+
+local function HandleGuardBreakAttack(Context: ActionContext, Attacker: Entity, IncomingDamage: number): boolean
+	local DamageComponent = Context.Entity:GetComponent("Damage")
+	if DamageComponent then
+		DamageComponent:DealDamage(IncomingDamage, Attacker.Player or Attacker.Character)
+	end
+
+	ApplyGuardBreakState(Context)
+
+	Ensemble.Events.Publish(CombatEvents.GuardBroken, {
+		Entity = Context.Entity,
+		Attacker = Attacker,
+		IncomingDamage = IncomingDamage,
+		Reason = "GuardBreakAttack",
+		Context = Context,
+	})
+
+	ActionExecutor.Interrupt(Context.Entity, "GuardBreak")
+	return true
+end
+
+local function HandleStaminaDepletedGuardBreak(Context: ActionContext, Attacker: Entity, IncomingDamage: number)
+	ApplyGuardBreakState(Context)
+
+	Ensemble.Events.Publish(CombatEvents.GuardBroken, {
+		Entity = Context.Entity,
+		Attacker = Attacker,
+		IncomingDamage = IncomingDamage,
+		Reason = "StaminaDepleted",
+		Context = Context,
+	})
+
+	StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
+	StopAnimation(Context, "BlockHit", 0.1)
+
+	ActionExecutor.Interrupt(Context.Entity, "GuardBreak")
+end
+
+local function PlayBlockHitEffects(Context: ActionContext)
+	local Player = Context.Entity.Player
+
+	if Player then
+		Packets.PlayAnimation:FireClient(Player, "BlockHit")
+	end
+end
+
+local function ApplyBlockHitState(Context: ActionContext)
+	local Entity = Context.Entity
+	Entity.States:SetState(StateTypes.BLOCK_HIT, true)
+
+	local Duration = CombatBalance.Blocking.BLOCK_HIT_DURATION or 0.3
+
+	task.delay(Duration, function()
+		if Entity.States then
+			Entity.States:SetState(StateTypes.BLOCK_HIT, false)
+		end
+	end)
+end
+
+local function CalculateBlockReduction(Context: ActionContext, IncomingDamage: number): (number, number)
+	local DamageReduction = Context.Metadata.DamageReduction or CombatBalance.Blocking.DAMAGE_REDUCTION
+	local StaminaScalar = Context.Metadata.StaminaDrainScalar or CombatBalance.Blocking.STAMINA_DRAIN_SCALAR or 1.0
+
+	local ReducedDamage = IncomingDamage * (1 - DamageReduction)
+	local StaminaDrain = IncomingDamage * StaminaScalar
+
+	return ReducedDamage, StaminaDrain
+end
+
+local function ConsumeBlockStamina(Context: ActionContext, Attacker: Entity, StaminaDrain: number, IncomingDamage: number): boolean
+	local StaminaComponent = Context.Entity:GetComponent("Stamina")
+	if not StaminaComponent then
+		return true
+	end
+
+	local CurrentStamina = StaminaComponent:GetStamina()
+
+	if CurrentStamina <= StaminaDrain then
+		StaminaComponent:SetStamina(0)
+		HandleStaminaDepletedGuardBreak(Context, Attacker, IncomingDamage)
+		return false
+	end
+
+	StaminaComponent:ConsumeStamina(StaminaDrain)
+	return true
+end
+
+local function HandleBlockedHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, HitPosition: Vector3?)
+	PlayBlockHitEffects(Context)
+	ApplyBlockHitState(Context)
+
+	local ReducedDamage, StaminaDrain = CalculateBlockReduction(Context, IncomingDamage)
+
+	if not ConsumeBlockStamina(Context, Attacker, StaminaDrain, IncomingDamage) then
+		return
+	end
+
+	Ensemble.Events.Publish(CombatEvents.BlockHit, {
+		Entity = Context.Entity,
+		Attacker = Attacker,
+		IncomingDamage = IncomingDamage,
+		ReducedDamage = ReducedDamage,
+		StaminaDrain = StaminaDrain,
+		HitPosition = HitPosition,
+		Context = Context,
+	})
+
+	Ensemble.Events.Publish(CombatEvents.DamageBlocked, {
+		Entity = Context.Entity,
+		Attacker = Attacker,
+		BlockedAmount = IncomingDamage,
+		Context = Context,
+	})
+end
 
 function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
 	local ItemId = InputData and InputData.ItemId
@@ -60,7 +213,7 @@ function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 
 	local AnimationSet = AnimationSets.Get(AnimationSetName)
 	if not AnimationSet then
-		AnimationSet = AnimationSets["Fists"]
+		AnimationSet = AnimationSets.Get("Fists")
 	end
 
 	local BlockData = AnimationSet and AnimationSet.Block
@@ -69,8 +222,10 @@ function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 	local Metadata: ActionMetadata = {
 		ActionName = "Block",
 		ActionType = "Defensive",
+		AnimationSet = AnimationSetName,
 		DamageReduction = CombatBalance.Blocking.DAMAGE_REDUCTION,
 		StaminaDrainOnHit = CombatBalance.Blocking.STAMINA_DRAIN_ON_HIT,
+		StaminaDrainScalar = CombatBalance.Blocking.STAMINA_DRAIN_SCALAR,
 		AnimationId = AnimationId,
 	}
 
@@ -99,12 +254,7 @@ function Block.OnStart(Context: ActionContext)
 end
 
 function Block.OnExecute(Context: ActionContext)
-	local Player = Context.Entity.Player
-	local AnimationId = Context.Metadata.AnimationId
-
-	if Player and AnimationId then
-		Packets.PlayAnimation:FireClient(Player, AnimationId)
-	end
+	PlayAnimation(Context, Context.Metadata.AnimationId)
 
 	while not Context.Interrupted do
 		task.wait(0.1)
@@ -115,148 +265,43 @@ function Block.OnExecute(Context: ActionContext)
 	end
 end
 
-function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?, HitPosition: Vector3?)
-	local Player = Context.Entity.Player
-	local AnimationId = Context.Metadata.AnimationId
-	local ActiveWindow = Context.CustomData.ActiveWindow
-	local IsGuardBreak = AttackFlags.HasFlag(Flags, AttackFlags.GUARD_BREAK)
+local function IsBlockAngleValid(Context: ActionContext, Attacker: Entity): boolean
+	local MaxAngle = CombatBalance.Blocking.BLOCK_ANGLE or 180
+	local HalfAngle = MaxAngle / 2
 
-	if ActiveWindow == "PerfectGuard" then
-		Context.CustomData.ActiveWindow = nil
-		Context.CustomData.WindowTriggered = true
-		Context.Entity.States:SetState("PerfectGuardWindow", false)
-
-		PerfectGuard.Trigger(Context, Attacker)
-
-		if Player and AnimationId then
-			Packets.StopAnimation:FireClient(Player, AnimationId, 0.1)
-		end
-
-		ActionExecutor.Interrupt(Context.Entity, "PerfectGuard")
-		return
+	if not Context.Entity.Character or not Attacker.Character then
+		return true
 	end
 
-	if ActiveWindow == "Counter" then
-		Context.CustomData.ActiveWindow = nil
-		Context.CustomData.WindowTriggered = true
-		Context.Entity.States:SetState("CounterWindow", false)
+	return AngleValidator.IsWithinAngle(Context.Entity.Character, Attacker.Character, HalfAngle)
+end
 
-		Counter.Trigger(Context, Attacker)
-
-		if Player and AnimationId then
-			Packets.StopAnimation:FireClient(Player, AnimationId, 0.1)
-		end
-
-		ActionExecutor.Interrupt(Context.Entity, "Counter")
-		return
-	end
-
-	if IsGuardBreak then
-		local DamageComponent = Context.Entity:GetComponent("Damage")
-		if DamageComponent then
-			-- local AttackerRoot = Attacker.Character and Attacker.Character:FindFirstChild("HumanoidRootPart")
-			-- local KnockbackDirection = if AttackerRoot then AttackerRoot.CFrame.LookVector else Vector3.zero
-			DamageComponent:DealDamage(IncomingDamage, Attacker.Player or Attacker.Character) --, KnockbackDirection
-		end
-
-		Context.Entity.States:SetState(StateTypes.GUARD_BROKEN, true)
-
-		Ensemble.Events.Publish(CombatEvents.GuardBroken, {
+function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?, HitPosition: Vector3?): boolean
+	if not IsBlockAngleValid(Context, Attacker) then
+		Ensemble.Events.Publish(CombatEvents.BlockMissed, {
 			Entity = Context.Entity,
 			Attacker = Attacker,
 			IncomingDamage = IncomingDamage,
-			Reason = "GuardBreakAttack",
+			Reason = "AttackFromBehind",
 			Context = Context,
 		})
-
-		task.delay(CombatBalance.Blocking.GUARD_BREAK_DURATION or 1.5, function()
-			if Context.Entity.States then
-				Context.Entity.States:SetState(StateTypes.GUARD_BROKEN, false)
-			end
-		end)
-
-		ActionExecutor.Interrupt(Context.Entity, "GuardBreak")
-		return
+		return false
 	end
 
-	if Player then
-		Packets.PlayAnimation:FireClient(Player, "BlockHit")
+	if ActionExecutor.TriggerWindow(Context, Attacker) then
+		StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
+		return true
 	end
 
-	Context.Entity.States:SetState(StateTypes.BLOCK_HIT, true)
+	local IsGuardBreak = AttackFlags.HasFlag(Flags, AttackFlags.GUARD_BREAK)
 
-	Packets.PlayVfxReplicate:Fire(
-		Attacker.Player or Attacker.Character,
-		"BlockHit",
-		{
-			Target = Context.Entity.Character,
-			HitPosition = HitPosition,
-		}
-	)
-
-	task.delay(CombatBalance.Blocking.BLOCK_HIT_DURATION or 0.3, function()
-		if Context.Entity.States then
-			Context.Entity.States:SetState(StateTypes.BLOCK_HIT, false)
-		end
-	end)
-
-	local DamageReduction = Context.Metadata.DamageReduction or CombatBalance.Blocking.DAMAGE_REDUCTION
-	local StaminaScalar = Context.Metadata.StaminaDrainScalar or CombatBalance.Blocking.STAMINA_DRAIN_SCALAR or 1.0
-
-	local ReducedDamage = IncomingDamage * (1 - DamageReduction)
-	local StaminaDrain = IncomingDamage * StaminaScalar
-
-	local StaminaComponent = Context.Entity:GetComponent("Stamina")
-	if StaminaComponent then
-		local CurrentStamina = StaminaComponent:GetStamina()
-
-		if CurrentStamina <= StaminaDrain then
-			StaminaComponent:SetStamina(0)
-
-			Context.Entity.States:SetState(StateTypes.GUARD_BROKEN, true)
-
-			Ensemble.Events.Publish(CombatEvents.GuardBroken, {
-				Entity = Context.Entity,
-				Attacker = Attacker,
-				IncomingDamage = IncomingDamage,
-				Reason = "StaminaDepleted",
-				Context = Context,
-			})
-
-			task.delay(CombatBalance.Blocking.GUARD_BREAK_DURATION or 1.5, function()
-				if Context.Entity.States then
-					Context.Entity.States:SetState(StateTypes.GUARD_BROKEN, false)
-				end
-			end)
-
-			ActionExecutor.Interrupt(Context.Entity, "GuardBreak")
-
-			if Player and AnimationId then
-				Packets.StopAnimation:FireClient(Player, AnimationId, 0.1)
-				Packets.StopAnimation:FireClient(Player, "BlockHit", 0.1)
-			end
-
-			return
-		end
-
-		StaminaComponent:ConsumeStamina(StaminaDrain)
+	if IsGuardBreak then
+		HandleGuardBreakAttack(Context, Attacker, IncomingDamage)
+		return true
 	end
 
-	Ensemble.Events.Publish(CombatEvents.BlockHit, {
-		Entity = Context.Entity,
-		Attacker = Attacker,
-		IncomingDamage = IncomingDamage,
-		ReducedDamage = ReducedDamage,
-		StaminaDrain = StaminaDrain,
-		Context = Context,
-	})
-
-	Ensemble.Events.Publish(CombatEvents.DamageBlocked, {
-		Entity = Context.Entity,
-		Attacker = Attacker,
-		BlockedAmount = IncomingDamage,
-		Context = Context,
-	})
+	HandleBlockedHit(Context, Attacker, IncomingDamage, HitPosition)
+	return true
 end
 
 function Block.OnInterrupt(Context: ActionContext)
@@ -270,13 +315,7 @@ end
 function Block.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Blocking", false)
 	MovementModifiers.ClearModifier(Context.Entity, "Blocking")
-
-	local Player = Context.Entity.Player
-	local AnimationId = Context.Metadata.AnimationId
-
-	if Player and AnimationId then
-		Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
-	end
+	StopAnimation(Context, Context.Metadata.AnimationId)
 end
 
 return Block

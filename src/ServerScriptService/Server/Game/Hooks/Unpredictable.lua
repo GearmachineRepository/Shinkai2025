@@ -14,7 +14,7 @@ return {
 		local ChargesUsed = 0
 		local CooldownActive = false
 
-		local FeintConnection = Ensemble.Events.Subscribe(CombatEvents.FeintFailed, function(EventData)
+		local FeintConnection = Ensemble.Events.Subscribe(CombatEvents.FeintExecuted, function(EventData)
 			if EventData.Entity ~= Entity then
 				return
 			end

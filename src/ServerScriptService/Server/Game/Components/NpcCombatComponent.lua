@@ -6,7 +6,7 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
+local ActionExecutor = require(Server.Combat.Core.ActionExecutor)
 
 local NpcCombatComponent = {}
 NpcCombatComponent.__index = NpcCombatComponent

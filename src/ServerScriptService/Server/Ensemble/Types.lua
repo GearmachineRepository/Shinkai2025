@@ -2,7 +2,7 @@
 
 local Types = {}
 
-Types.EngineName = "Ensemble"
+Types.EngineName = "[Ensemble]"
 
 export type CleanupTask = RBXScriptConnection | Instance | (() -> ()) | { Destroy: (any) -> () } | { Disconnect: (any) -> () }
 

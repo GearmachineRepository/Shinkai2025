@@ -1,6 +1,6 @@
 --!strict
 
-local CombatTypes = require(script.Parent.CombatTypes)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
 
 type Entity = CombatTypes.Entity
 
@@ -10,10 +10,6 @@ export type InputBinding = {
 	BlockingStates: { string }?,
 	Priority: number,
 	Action: string,
-}
-
-export type InputConfig = {
-	Bindings: { InputBinding },
 }
 
 local InputResolver = {}
@@ -35,13 +31,13 @@ local DEFAULT_BINDINGS: { InputBinding } = {
 		Priority = 100,
 		Action = "Counter",
 	},
-	-- {
-	-- 	Input = "M2",
-	-- 	RequiredStates = { "Attacking" },
-	-- 	BlockingStates = { "Stunned", "Downed", "Ragdolled" },
-	-- 	Priority = 90,
-	-- 	Action = "Feint",
-	-- },
+	{
+		Input = "M2",
+		RequiredStates = { "Attacking" },
+		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted"},
+		Priority = 100,
+		Action = "Feint",
+	},
 	{
 		Input = "M1",
 		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted", "Attacking", "Blocking" },
@@ -109,36 +105,62 @@ function InputResolver.SetDefaultBindings(Bindings: { InputBinding })
 	InputConfigs["Default"] = SortBindingsByPriority(Bindings)
 end
 
-function InputResolver.Resolve(Entity: Entity, RawInput: string, ConfigName: string?): string?
-	local Config = ConfigName and InputConfigs[ConfigName] or InputConfigs["Default"]
-	if not Config then
-		Config = SortBindingsByPriority(DEFAULT_BINDINGS)
-		InputConfigs["Default"] = Config
+function InputResolver.AddBinding(Binding: InputBinding, ConfigName: string?)
+	local TargetConfig = ConfigName or "Default"
+
+	if not InputConfigs[TargetConfig] then
+		InputConfigs[TargetConfig] = SortBindingsByPriority(table.clone(DEFAULT_BINDINGS))
 	end
 
-	for _, Binding in Config do
+	table.insert(InputConfigs[TargetConfig], Binding)
+	InputConfigs[TargetConfig] = SortBindingsByPriority(InputConfigs[TargetConfig])
+end
+
+function InputResolver.RemoveBinding(ActionName: string, ConfigName: string?)
+	local TargetConfig = ConfigName or "Default"
+	local Bindings = InputConfigs[TargetConfig]
+
+	if not Bindings then
+		return
+	end
+
+	for Index = #Bindings, 1, -1 do
+		if Bindings[Index].Action == ActionName then
+			table.remove(Bindings, Index)
+		end
+	end
+end
+
+function InputResolver.Resolve(Entity: Entity, RawInput: string, ConfigName: string?): string?
+	local TargetConfig = ConfigName or "Default"
+	local Bindings = InputConfigs[TargetConfig]
+
+	if not Bindings then
+		Bindings = SortBindingsByPriority(table.clone(DEFAULT_BINDINGS))
+		InputConfigs[TargetConfig] = Bindings
+	end
+
+	for _, Binding in Bindings do
 		if Binding.Input ~= RawInput then
 			continue
 		end
 
-		local StateCheckPassed = CheckStates(Entity, Binding.RequiredStates, Binding.BlockingStates)
-
-		if StateCheckPassed then
-			return Binding.Action
+		if not CheckStates(Entity, Binding.RequiredStates, Binding.BlockingStates) then
+			continue
 		end
+
+		return Binding.Action
 	end
 
 	return nil
 end
 
 function InputResolver.GetBindingsForInput(RawInput: string, ConfigName: string?): { InputBinding }
-	local Config = ConfigName and InputConfigs[ConfigName] or InputConfigs["Default"]
-	if not Config then
-		return {}
-	end
+	local TargetConfig = ConfigName or "Default"
+	local Bindings = InputConfigs[TargetConfig] or DEFAULT_BINDINGS
 
 	local Matches = {}
-	for _, Binding in Config do
+	for _, Binding in Bindings do
 		if Binding.Input == RawInput then
 			table.insert(Matches, Binding)
 		end
@@ -146,36 +168,5 @@ function InputResolver.GetBindingsForInput(RawInput: string, ConfigName: string?
 
 	return Matches
 end
-
-function InputResolver.AddBinding(Binding: InputBinding, ConfigName: string?)
-	local TargetConfig = ConfigName or "Default"
-	if not InputConfigs[TargetConfig] then
-		InputConfigs[TargetConfig] = {}
-	end
-
-	table.insert(InputConfigs[TargetConfig], Binding)
-	InputConfigs[TargetConfig] = SortBindingsByPriority(InputConfigs[TargetConfig])
-end
-
-function InputResolver.RemoveBinding(Action: string, ConfigName: string?)
-	local TargetConfig = ConfigName or "Default"
-	local Config = InputConfigs[TargetConfig]
-	if not Config then
-		return
-	end
-
-	for Index = #Config, 1, -1 do
-		if Config[Index].Action == Action then
-			table.remove(Config, Index)
-		end
-	end
-end
-
-function InputResolver.GetAllBindings(ConfigName: string?): { InputBinding }
-	local Config = ConfigName and InputConfigs[ConfigName] or InputConfigs["Default"]
-	return Config or {}
-end
-
-InputResolver.SetDefaultBindings(DEFAULT_BINDINGS)
 
 return InputResolver

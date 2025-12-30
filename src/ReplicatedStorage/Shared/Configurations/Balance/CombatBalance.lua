@@ -9,6 +9,7 @@ local CombatBalance = {
 		CAN_HOLD_INDEFINITELY = true,
 		MOVEMENT_SPEED_MULTIPLIER = 0.5,
 		BLOCK_HIT_DURATION = 0.3,
+		BLOCK_ANGLE = 180,
 	},
 
 	Attacking = {
@@ -21,12 +22,13 @@ local CombatBalance = {
 	},
 
 	PerfectBlock = {
-		WINDOW_SECONDS = 5,
+		WINDOW_SECONDS = 0.325,
 		COOLDOWN_SECONDS = 15,
 		SPAM_COOLDOWN_SECONDS = 7,
 		NEGATES_ALL_DAMAGE = true,
 		STAGGER_ATTACKER = true,
 		STAGGER_DURATION = 1.25,
+		MAX_ANGLE = 120,
 	},
 
 	Counter = {
@@ -36,6 +38,7 @@ local CombatBalance = {
 		NEGATES_ALL_DAMAGE = true,
 		STAGGER_ATTACKER = true,
 		STAGGER_DURATION = 0.8,
+		MAX_ANGLE = 120,
 	},
 
 	Parry = {

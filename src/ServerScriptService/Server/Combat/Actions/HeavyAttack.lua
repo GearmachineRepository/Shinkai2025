@@ -6,13 +6,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(Server.Combat.CombatTypes)
-local CombatEvents = require(Server.Combat.CombatEvents)
-local AttackBase = require(Server.Combat.AttackBase)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local AttackBase = require(script.Parent.Parent.Core.AttackBase)
+local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
+
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -26,8 +29,31 @@ HeavyAttack.ActionType = "Attack"
 
 local COOLDOWN_ID = "HeavyAttack"
 
-function HeavyAttack.BuildMetadata(_Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
-	local ItemId = InputData and InputData.ItemId
+local function GetEquippedItemId(Entity: Entity, InputData: { [string]: any }?): string?
+	if InputData and InputData.ItemId then
+		return InputData.ItemId
+	end
+
+	local ToolComponent = Entity:GetComponent("Tool")
+	if ToolComponent then
+		local EquippedTool = ToolComponent:GetEquippedTool()
+		if EquippedTool and EquippedTool.ToolId then
+			return EquippedTool.ToolId
+		end
+	end
+
+	return nil
+end
+
+local function ApplyStatModifiers(BaseValue: number, Multiplier: number?): number
+	if Multiplier then
+		return BaseValue * Multiplier
+	end
+	return BaseValue
+end
+
+function HeavyAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
+	local ItemId = GetEquippedItemId(Entity, InputData)
 	if not ItemId then
 		return nil
 	end
@@ -50,17 +76,6 @@ function HeavyAttack.BuildMetadata(_Entity: Entity, InputData: { [string]: any }
 	end
 
 	local StatModifiers = ItemData.StatModifiers
-	local FinalDamage = AttackData.Damage
-	local FinalStaminaCost = AttackData.StaminaCost
-
-	if StatModifiers then
-		if StatModifiers.DamageMultiplier then
-			FinalDamage = FinalDamage * StatModifiers.DamageMultiplier
-		end
-		if StatModifiers.StaminaCostMultiplier then
-			FinalStaminaCost = FinalStaminaCost * StatModifiers.StaminaCostMultiplier
-		end
-	end
 
 	local Metadata: ActionMetadata = {
 		ActionName = "HeavyAttack",
@@ -68,13 +83,13 @@ function HeavyAttack.BuildMetadata(_Entity: Entity, InputData: { [string]: any }
 		AnimationSet = AnimationSetName,
 		AnimationId = AttackData.AnimationId,
 
-		Damage = FinalDamage,
-		StaminaCost = FinalStaminaCost,
+		Damage = ApplyStatModifiers(AttackData.Damage, StatModifiers and StatModifiers.DamageMultiplier),
+		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, StatModifiers and StatModifiers.StaminaCostMultiplier),
 		HitStun = AttackData.HitStun,
 		--PostureDamage = AttackData.PostureDamage,
 
-		HitboxSize = AttackData.Hitbox.Size,
-		HitboxOffset = AttackData.Hitbox.Offset,
+		HitboxSize = AttackData.Hitbox and AttackData.Hitbox.Size,
+		HitboxOffset = AttackData.Hitbox and AttackData.Hitbox.Offset,
 
 		Feintable = SetMetadata.Feintable,
 		FeintEndlag = SetMetadata.FeintEndlag,
@@ -82,9 +97,9 @@ function HeavyAttack.BuildMetadata(_Entity: Entity, InputData: { [string]: any }
 		ActionCooldown = SetMetadata.HeavyAttackCooldown,
 		StaminaCostHitReduction = SetMetadata.StaminaCostHitReduction,
 
-		FallbackHitStart = SetMetadata.FallbackTimings.HitStart,
-		FallbackHitEnd = SetMetadata.FallbackTimings.HitEnd,
-		FallbackLength = SetMetadata.FallbackTimings.Length,
+		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart,
+		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd,
+		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length,
 
 		Flag = AttackData.Flag,
 		Flags = AttackData.Flags,
@@ -94,7 +109,7 @@ function HeavyAttack.BuildMetadata(_Entity: Entity, InputData: { [string]: any }
 end
 
 function HeavyAttack.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "M2")
+	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "HeavyAttack")
 	if not CanPerform then
 		return false, Reason
 	end
@@ -130,8 +145,13 @@ function HeavyAttack.OnStart(Context: ActionContext)
 		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown)
 	end
 
-	AttackBase.SetupHitbox(Context, function(Target: Entity)
-		HeavyAttack.OnHit(Context, Target, 1)
+	local Multiplier = Context.Metadata.MovementSpeedMultiplier
+		or CombatBalance.Attacking.DEFAULT_MOVEMENT_SPEED_MULTIPLIER
+		or 0.65
+	MovementModifiers.SetModifier(Context.Entity, "Attacking", Multiplier)
+
+	AttackBase.SetupHitbox(Context, function(Target: Entity, HitPosition: Vector3?)
+		HeavyAttack.OnHit(Context, Target, HitPosition, 1)
 	end)
 end
 
@@ -152,16 +172,18 @@ function HeavyAttack.OnExecute(Context: ActionContext)
 	})
 end
 
-function HeavyAttack.OnHit(Context: ActionContext, Target: Entity, _HitIndex: number)
+function HeavyAttack.OnHit(Context: ActionContext, Target: Entity, HitPosition: Vector3?, _HitIndex: number?)
 	if not Context.CustomData.HitWindowOpen then
 		return
 	end
 
-	AttackBase.ProcessHit(Context, Target)
+	AttackBase.ProcessHit(Context, Target, HitPosition)
 end
 
 function HeavyAttack.OnInterrupt(Context: ActionContext)
 	if Context.InterruptReason == "Feint" then
+		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
+
 		Ensemble.Events.Publish(CombatEvents.FeintExecuted, {
 			Entity = Context.Entity,
 			ActionName = "HeavyAttack",
@@ -176,6 +198,7 @@ function HeavyAttack.OnInterrupt(Context: ActionContext)
 end
 
 function HeavyAttack.OnCleanup(Context: ActionContext)
+	MovementModifiers.ClearModifier(Context.Entity, "Attacking")
 	AttackBase.CleanupAttack(Context)
 end
 

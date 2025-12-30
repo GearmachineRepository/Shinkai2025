@@ -6,14 +6,12 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local Packets = require(ReplicatedStorage.Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
 local NetworkService = require(Server.Game.Services.NetworkService)
 
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 
 local DamageComponent = {}
 DamageComponent.__index = DamageComponent
@@ -57,7 +55,7 @@ local function GetCompDelaySeconds(TargetPlayer: Player?): number
 	return math.min(RawDelaySeconds, MAX_COMP_SECONDS)
 end
 
-function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?, HitPosition: Vector3?)
+function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
 	if self.Entity.States:GetState(StateTypes.INVULNERABLE) then
 		return
 	end
@@ -72,10 +70,6 @@ function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: 
 		})
 	end
 
-	if self.Entity.States:GetState(StateTypes.BLOCKING) then
-		ModifiedDamage = ModifiedDamage * (1 - CombatBalance.Blocking.DAMAGE_REDUCTION)
-	end
-
 	local CurrentHealth = (self.Entity.Humanoid.Health :: number) - ModifiedDamage
 	self.Entity.Humanoid.Health = math.max(0, CurrentHealth)
 	self.Entity.Stats:SetStat("Health", self.Entity.Humanoid.Health)
@@ -87,24 +81,6 @@ function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: 
 	CurrentOnHitCount += 1
 	self.Entity.Character:SetAttribute(OnHitCountAttributeName, CurrentOnHitCount)
 	self.Entity.States:SetState(StateTypes.ONHIT, true)
-
-	local HitType = if self.Entity.States:GetState(StateTypes.BLOCKING) then "BlockHit" else "Hit"
-
-	local SourceUser: number? = nil
-	if Source and Source:IsA("Player") then
-		SourceUser = Source.UserId
-	else
-		SourceUser = Source
-	end
-
-	Packets.PlayVfxReplicate:Fire(
-		SourceUser,
-		HitType,
-		{
-			Target = self.Entity.Character,
-			HitPosition = HitPosition,
-		}
-	)
 
 	task.delay(ON_HIT_HOLD_SECONDS, function()
 		if not self.Entity.Character or not self.Entity.Character.Parent then

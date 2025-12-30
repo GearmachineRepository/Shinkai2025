@@ -6,14 +6,15 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(Server.Combat.CombatTypes)
-local CombatEvents = require(Server.Combat.CombatEvents)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local StunManager = require(script.Parent.Parent.Utility.StunManager)
+local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
+
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
-local AnimationTimingCache = require(Server.Combat.AnimationTimingCache)
-local StunManager = require(Server.Combat.StunManager)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
@@ -23,12 +24,13 @@ type ActionContext = CombatTypes.ActionContext
 local Counter = {}
 
 Counter.ActionName = "Counter"
-Counter.WindowDuration = CombatBalance.Counter.WINDOW_SECONDS
-Counter.SpamCooldown = CombatBalance.Counter.SPAM_COOLDOWN_SECONDS
+Counter.WindowType = "Counter"
+Counter.Duration = CombatBalance.Counter.WINDOW_SECONDS
 Counter.Cooldown = CombatBalance.Counter.COOLDOWN_SECONDS
+Counter.SpamCooldown = CombatBalance.Counter.SPAM_COOLDOWN_SECONDS
+Counter.StaggerDuration = CombatBalance.Counter.STAGGER_DURATION
+Counter.MaxAngle = CombatBalance.Counter.MAX_ANGLE
 
-local COOLDOWN_ID = "Counter"
--- local DEFAULT_KNOCKBACK_FORCE = 50
 local DAMAGE_MULTIPLIER = 0.8
 
 local function GetCounterData(Entity: Entity): { [string]: any }?
@@ -66,7 +68,7 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		return nil
 	end
 
-	if not AnimationSet.Metadata then return end
+	local SetMetadata = AnimationSets.GetMetadata(AnimationSetName)
 
 	return {
 		AnimationId = LastM1Data.AnimationId,
@@ -74,26 +76,17 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		HitStun = LastM1Data.HitStun or 0.4,
 		HitboxSize = LastM1Data.Hitbox and LastM1Data.Hitbox.Size or Vector3.new(6, 5, 7),
 		HitboxOffset = LastM1Data.Hitbox and LastM1Data.Hitbox.Offset or Vector3.new(0, 0, -4),
-		FallbackHitStart = AnimationSet.Metadata.FallbackTimings and AnimationSet.Metadata.FallbackTimings.HitStart or 0.2,
-		FallbackHitEnd = AnimationSet.Metadata.FallbackTimings and AnimationSet.Metadata.FallbackTimings.HitEnd or 0.5,
-		FallbackLength = AnimationSet.Metadata.FallbackTimings and AnimationSet.Metadata.FallbackTimings.Length or 1.0,
+		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart or 0.2,
+		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd or 0.5,
+		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length or 1.0,
 	}
 end
 
-function Counter.Trigger(BlockContext: ActionContext, Attacker: Entity)
-	local Entity = BlockContext.Entity
+local function ExecuteCounterAttack(Entity: Entity, Attacker: Entity)
 	local CounterData = GetCounterData(Entity)
-
 	if not CounterData then
 		return
 	end
-
-	ActionExecutor.StartCooldown(Entity, COOLDOWN_ID, Counter.Cooldown)
-
-	Ensemble.Events.Publish(CombatEvents.CounterExecuted, {
-		Entity = Entity,
-		Attacker = Attacker,
-	})
 
 	Entity.States:SetState("Attacking", true)
 
@@ -111,27 +104,13 @@ function Counter.Trigger(BlockContext: ActionContext, Attacker: Entity)
 		task.wait(HitStartTime)
 
 		local Damage = CounterData.Damage
-		-- local KnockbackForce = DEFAULT_KNOCKBACK_FORCE
 
 		local DamageComponent = Attacker:GetComponent("Damage")
 		if DamageComponent then
-			-- local RootPart = Entity.Character and Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			-- local KnockbackDirection = if RootPart then RootPart.CFrame.LookVector else Vector3.zero
-
-			-- DamageComponent:DealDamage(Damage, Entity.Player, KnockbackDirection)
-
-			-- local TargetRootPart = Attacker.Character and Attacker.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
-			-- if TargetRootPart then
-			-- 	local KnockbackVelocity = KnockbackDirection * KnockbackForce + Vector3.new(0, KnockbackForce * 0.3, 0)
-			-- 	TargetRootPart.AssemblyLinearVelocity = KnockbackVelocity
-			-- end
 			DamageComponent:DealDamage(Damage, Entity.Player or Entity.Character)
 		end
 
-		local AttackerStates = Attacker.States
-		if AttackerStates then
-			StunManager.ApplyStun(Attacker, CounterData.HitStun, "Counter")
-		end
+		StunManager.ApplyStun(Attacker, CounterData.HitStun, "Counter")
 
 		Ensemble.Events.Publish(CombatEvents.CounterHit, {
 			Entity = Entity,
@@ -150,6 +129,37 @@ function Counter.Trigger(BlockContext: ActionContext, Attacker: Entity)
 
 		Entity.States:SetState("Attacking", false)
 	end)
+end
+
+local function OnTrigger(Context: ActionContext, Attacker: Entity)
+	Ensemble.Events.Publish(CombatEvents.CounterExecuted, {
+		Entity = Context.Entity,
+		Attacker = Attacker,
+	})
+
+	ExecuteCounterAttack(Context.Entity, Attacker)
+
+	ActionExecutor.Interrupt(Context.Entity, "Counter")
+end
+
+local function OnExpire(Context: ActionContext)
+	Ensemble.Events.Publish(CombatEvents.ParryFailed, {
+		Entity = Context.Entity,
+		ParryType = "Counter",
+	})
+end
+
+function Counter.Register()
+	ActionExecutor.RegisterWindow({
+		WindowType = Counter.WindowType,
+		Duration = Counter.Duration,
+		Cooldown = Counter.Cooldown,
+		SpamCooldown = Counter.SpamCooldown,
+		StateName = "CounterWindow",
+		MaxAngle = Counter.MaxAngle,
+		OnTrigger = OnTrigger,
+		OnExpire = OnExpire,
+	})
 end
 
 return Counter

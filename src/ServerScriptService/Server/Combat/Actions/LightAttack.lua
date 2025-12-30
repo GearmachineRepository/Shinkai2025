@@ -6,15 +6,16 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(Server.Combat.CombatTypes)
-local CombatEvents = require(Server.Combat.CombatEvents)
-local AttackBase = require(Server.Combat.AttackBase)
-local ActionExecutor = require(Server.Combat.ActionExecutor)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local AttackBase = require(script.Parent.Parent.Core.AttackBase)
+local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
+
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local MovementModifiers = require(Server.Combat.MovementModifiers)
+local ActionValidator = require(Shared.Utils.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -26,8 +27,31 @@ local LightAttack = {}
 LightAttack.ActionName = "LightAttack"
 LightAttack.ActionType = "Attack"
 
+local function GetEquippedItemId(Entity: Entity, InputData: { [string]: any }?): string?
+	if InputData and InputData.ItemId then
+		return InputData.ItemId
+	end
+
+	local ToolComponent = Entity:GetComponent("Tool")
+	if ToolComponent then
+		local EquippedTool = ToolComponent:GetEquippedTool()
+		if EquippedTool and EquippedTool.ToolId then
+			return EquippedTool.ToolId
+		end
+	end
+
+	return nil
+end
+
+local function ApplyStatModifiers(BaseValue: number, Multiplier: number?): number
+	if Multiplier then
+		return BaseValue * Multiplier
+	end
+	return BaseValue
+end
+
 function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
-	local ItemId = InputData and InputData.ItemId
+	local ItemId = GetEquippedItemId(Entity, InputData)
 	if not ItemId then
 		return nil
 	end
@@ -51,17 +75,6 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 	end
 
 	local StatModifiers = ItemData.StatModifiers
-	local FinalDamage = AttackData.Damage
-	local FinalStaminaCost = AttackData.StaminaCost
-
-	if StatModifiers then
-		if StatModifiers.DamageMultiplier then
-			FinalDamage = FinalDamage * StatModifiers.DamageMultiplier
-		end
-		if StatModifiers.StaminaCostMultiplier then
-			FinalStaminaCost = FinalStaminaCost * StatModifiers.StaminaCostMultiplier
-		end
-	end
 
 	local Metadata: ActionMetadata = {
 		ActionName = "LightAttack",
@@ -70,13 +83,13 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		AnimationId = AttackData.AnimationId,
 		ComboIndex = ComboIndex,
 
-		Damage = FinalDamage,
-		StaminaCost = FinalStaminaCost,
+		Damage = ApplyStatModifiers(AttackData.Damage, StatModifiers and StatModifiers.DamageMultiplier),
+		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, StatModifiers and StatModifiers.StaminaCostMultiplier),
 		HitStun = AttackData.HitStun,
 		--PostureDamage = AttackData.PostureDamage,
 
-		HitboxSize = AttackData.Hitbox.Size,
-		HitboxOffset = AttackData.Hitbox.Offset,
+		HitboxSize = AttackData.Hitbox and AttackData.Hitbox.Size,
+		HitboxOffset = AttackData.Hitbox and AttackData.Hitbox.Offset,
 
 		Feintable = SetMetadata.Feintable,
 		FeintEndlag = SetMetadata.FeintEndlag,
@@ -85,16 +98,16 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		ComboResetTime = SetMetadata.ComboResetTime,
 		StaminaCostHitReduction = SetMetadata.StaminaCostHitReduction,
 
-		FallbackHitStart = SetMetadata.FallbackTimings.HitStart,
-		FallbackHitEnd = SetMetadata.FallbackTimings.HitEnd,
-		FallbackLength = SetMetadata.FallbackTimings.Length,
+		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart,
+		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd,
+		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length,
 	}
 
 	return Metadata
 end
 
 function LightAttack.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "M1")
+	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
 	if not CanPerform then
 		return false, Reason
 	end
