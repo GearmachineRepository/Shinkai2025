@@ -6,15 +6,18 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local ActionValidator = require(Shared.Utils.ActionValidator)
-local Ensemble = require(Server.Ensemble)
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.ActionExecutor)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
+local Block = require(script.Parent.Parent.Actions.Block)
+
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local ActionValidator = require(Shared.Utils.ActionValidator)
+local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
 
@@ -45,11 +48,11 @@ local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacte
 end
 
 local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
-	ActionExecutor.Interrupt(ContextA.Entity, "Clash")
-	ActionExecutor.Interrupt(ContextB.Entity, "Clash")
-
 	ContextA.Entity.States:SetState("Clashing", true)
 	ContextB.Entity.States:SetState("Clashing", true)
+
+	ContextA.CustomData.ClashNegated = true
+	ContextB.CustomData.ClashNegated = true
 
 	Ensemble.Events.Publish(CombatEvents.ClashOccurred, {
 		EntityA = ContextA.Entity,
@@ -134,6 +137,7 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 	OnAnimationEnd: (() -> ())?,
 })
 	local Player = Context.Entity.Player
+	local Character = Context.Entity.Character
 
 	local Metadata = Context.Metadata
 	local AnimationId = Metadata.AnimationId
@@ -151,6 +155,8 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 
 	if Player then
 		Packets.PlayAnimation:FireClient(Player, AnimationId)
+	elseif Character then
+		EntityAnimator.Play(Character, AnimationId)
 	end
 
 	local StartTimestamp = os.clock()
@@ -224,6 +230,33 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 		return false
 	end
 
+	if AttackerContext.CustomData.ClashNegated then
+		return true
+	end
+
+	local TargetIsDodging = Target.States:GetState("Dodging")
+	local TargetIsInvulnerable = Target.States:GetState("Invulnerable")
+
+	if TargetIsInvulnerable then
+		Ensemble.Events.Publish(CombatEvents.DamageDodged, {
+			Entity = Target,
+			Attacker = AttackerContext.Entity,
+			Damage = Damage,
+			HitPosition = HitPosition,
+		})
+		return true
+	end
+
+	if TargetIsDodging then
+		ActionExecutor.Interrupt(Target, "Hit")
+
+		Ensemble.Events.Publish(CombatEvents.DodgeCancelExecuted, {
+			Entity = Target,
+			SourceAction = "Hit",
+			Attacker = AttackerContext.Entity,
+		})
+	end
+
 	if TargetContext and TargetContext.Metadata.ActionType == "Attack" then
 		if TargetContext.CustomData.HitWindowOpen then
 			local TargetHitTime = TargetContext.CustomData.HitWindowOpenTime or 0
@@ -238,7 +271,6 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 	end
 
 	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
-		local Block = require(script.Parent.Parent.Actions.Block)
 		local WasBlocked = Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags, HitPosition)
 
 		if WasBlocked then

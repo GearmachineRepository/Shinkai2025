@@ -3,7 +3,7 @@
 local DashBalance = {
 	StaminaCost = 8,
 	CooldownSeconds = 2,
-	IFrameWindow = 0.25,
+	IFrameWindow = 0.225,
 	Duration = 0.45,
 
 	Speed = 25,

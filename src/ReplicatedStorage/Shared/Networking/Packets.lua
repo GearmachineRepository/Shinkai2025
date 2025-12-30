@@ -6,6 +6,7 @@ return {
 	-- Animations
 	PlayAnimation = Packet("PlayAnimation", Packet.String, Packet.Any),
 	StopAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
+	PauseAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
 
 	-- Equipment
 	EquipItem = Packet("EquipItem", Packet.NumberU16, Packet.String),

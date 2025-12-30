@@ -12,6 +12,8 @@ local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AttackBase = require(script.Parent.Parent.Core.AttackBase)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
+local Packets = require(Shared.Networking.Packets)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -182,13 +184,18 @@ end
 
 function HeavyAttack.OnInterrupt(Context: ActionContext)
 	if Context.InterruptReason == "Feint" then
-		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
+		local AnimationId = Context.Metadata.AnimationId
+		if not AnimationId then return  end
 
-		Ensemble.Events.Publish(CombatEvents.FeintExecuted, {
-			Entity = Context.Entity,
-			ActionName = "HeavyAttack",
-			Context = Context,
-		})
+		local Player = Context.Entity.Player
+		local Character = Context.Entity.Character
+		if Player then
+			Packets.StopAnimation:FireClient(Player, AnimationId, 0.25)
+		elseif Character then
+			EntityAnimator.Stop(Character, AnimationId, 0.25)
+		end
+
+		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
 
 		local FeintEndlag = Context.Metadata.FeintEndlag or 0
 		if FeintEndlag > 0 then

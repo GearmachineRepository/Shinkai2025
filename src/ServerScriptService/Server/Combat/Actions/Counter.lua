@@ -12,6 +12,7 @@ local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
@@ -91,10 +92,15 @@ local function ExecuteCounterAttack(Entity: Entity, Attacker: Entity)
 	Entity.States:SetState("Attacking", true)
 
 	local Player = Entity.Player
+	local Character = Entity.Character
 	local AnimationId = CounterData.AnimationId
 
-	if Player and AnimationId then
-		Packets.PlayAnimation:FireClient(Player, AnimationId)
+	if AnimationId then
+		if Player then
+			Packets.PlayAnimation:FireClient(Player, AnimationId)
+		elseif Character then
+			EntityAnimator.Play(Character, AnimationId)
+		end
 	end
 
 	local AnimationLength = AnimationTimingCache.GetLength(AnimationId) or CounterData.FallbackLength

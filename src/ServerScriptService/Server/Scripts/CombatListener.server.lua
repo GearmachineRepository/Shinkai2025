@@ -18,6 +18,66 @@ Combat.Init({
 
 type Entity = Combat.Entity
 
+-----------begin feint logic
+local REQUIRE_UNPREDICTABLE_FOR_FEINT = true
+local UNPREDICTABLE_MAX_CHARGES = 2
+local UNPREDICTABLE_COOLDOWN_SECONDS = 30
+local UNPREDICTABLE_COOLDOWN_ID = "Unpredictable"
+
+local EntityFeintCharges: { [Entity]: number } = {}
+local EntityFeintCooldowns: { [Entity]: number } = {}
+
+local function HasUnpredictable(Entity: Entity): boolean
+	local HookComponent = Entity:GetComponent("Hooks")
+	return HookComponent ~= nil and HookComponent:HasHook("Unpredictable")
+end
+
+local function IsFeintOnCooldown(Entity: Entity): boolean
+	local CooldownEnd = EntityFeintCooldowns[Entity]
+	if not CooldownEnd then
+		return false
+	end
+	return workspace:GetServerTimeNow() < CooldownEnd
+end
+
+local function ConsumeFeintCharge(Entity: Entity)
+	local CurrentCharges = EntityFeintCharges[Entity] or 0
+	CurrentCharges += 1
+	EntityFeintCharges[Entity] = CurrentCharges
+
+	if CurrentCharges >= UNPREDICTABLE_MAX_CHARGES then
+		local CooldownEnd = workspace:GetServerTimeNow() + UNPREDICTABLE_COOLDOWN_SECONDS
+		EntityFeintCooldowns[Entity] = CooldownEnd
+		EntityFeintCharges[Entity] = 0
+
+		if Entity.Player then
+			Packets.StartCooldown:FireClient(
+				Entity.Player,
+				UNPREDICTABLE_COOLDOWN_ID,
+				workspace:GetServerTimeNow(),
+				UNPREDICTABLE_COOLDOWN_SECONDS
+			)
+		end
+	end
+end
+
+local function CanEntityFeint(Entity: Entity): boolean
+	if not REQUIRE_UNPREDICTABLE_FOR_FEINT then
+		return true
+	end
+
+	if not HasUnpredictable(Entity) then
+		return false
+	end
+
+	if IsFeintOnCooldown(Entity) then
+		return false
+	end
+
+	return true
+end
+---------- end feint logic
+
 local function GetEntityFromPlayer(Player: Player): Entity?
 	local Character = Player.Character
 	if not Character then
@@ -69,6 +129,21 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 	if not ResolvedAction then
 		NotifyActionDenied(Player, "NoValidAction")
 		return
+	end
+
+	-- GAME-SPECIFIC: Gate feinting behind Unpredictable hook
+	if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
+		if not HasUnpredictable(Entity) then
+			NotifyActionDenied(Player, "RequiresUnpredictable")
+			return
+		end
+	end
+
+	if ResolvedAction == "Feint" then
+		if not CanEntityFeint(Entity) then
+			NotifyActionDenied(Player, "FeintUnavailable")
+			return
+		end
 	end
 
 	if ResolvedAction == "PerfectGuard" or ResolvedAction == "Counter" then
@@ -163,6 +238,12 @@ end)
 Ensemble.Events.Subscribe("ActionInterrupted", function(Data: any)
 	if Data.Entity and Data.Reason then
 		NotifyActionInterrupted(Data.Entity, Data.Reason)
+	end
+end)
+
+Ensemble.Events.Subscribe("FeintExecuted", function(Data: any)
+	if Data.Entity and REQUIRE_UNPREDICTABLE_FOR_FEINT then
+		ConsumeFeintCharge(Data.Entity)
 	end
 end)
 

@@ -13,6 +13,7 @@ local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers
 local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -43,8 +44,11 @@ local function PlayAnimation(Context: ActionContext, AnimationId: string?)
 	end
 
 	local Player = Context.Entity.Player
+	local Character = Context.Entity.Character
 	if Player then
 		Packets.PlayAnimation:FireClient(Player, AnimationId)
+	elseif Character then
+		EntityAnimator.Play(Character, AnimationId)
 	end
 end
 
@@ -54,8 +58,11 @@ local function StopAnimation(Context: ActionContext, AnimationId: string?, FadeT
 	end
 
 	local Player = Context.Entity.Player
+	local Character = Context.Entity.Character
 	if Player then
 		Packets.StopAnimation:FireClient(Player, AnimationId, FadeTime or 0.15)
+	elseif Character then
+		EntityAnimator.Stop(Character, AnimationId)
 	end
 end
 
@@ -115,9 +122,12 @@ end
 
 local function PlayBlockHitEffects(Context: ActionContext)
 	local Player = Context.Entity.Player
+	local Character = Context.Entity.Character
 
 	if Player then
 		Packets.PlayAnimation:FireClient(Player, "BlockHit")
+	elseif Character then
+		EntityAnimator.Play(Character, "BlockHit")
 	end
 end
 
@@ -316,6 +326,7 @@ function Block.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Blocking", false)
 	MovementModifiers.ClearModifier(Context.Entity, "Blocking")
 	StopAnimation(Context, Context.Metadata.AnimationId)
+	StopAnimation(Context, "BlockHit", 0.1)
 end
 
 return Block

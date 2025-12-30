@@ -11,6 +11,8 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
+local Packets = require(Shared.Networking.Packets)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 local Ensemble = require(Server.Ensemble)
 
@@ -28,19 +30,33 @@ PerfectGuard.StaggerDuration = CombatBalance.PerfectBlock.STAGGER_DURATION
 PerfectGuard.MaxAngle = CombatBalance.PerfectBlock.MAX_ANGLE
 
 local function OnTrigger(Context: ActionContext, Attacker: Entity)
+	local AttackerContext = ActionExecutor.GetActiveContext(Attacker)
+	local AttackerAnimationId = AttackerContext and AttackerContext.Metadata.AnimationId
+
+	if AttackerAnimationId  then
+		if Attacker.Player then
+			Packets.PauseAnimation:FireClient(Attacker.Player, AttackerAnimationId, PerfectGuard.StaggerDuration)
+		else
+			EntityAnimator.Stop(Attacker.Character, AttackerAnimationId, PerfectGuard.StaggerDuration)
+		end
+
+
+		task.delay(PerfectGuard.StaggerDuration, function()
+			if Attacker.Player then
+				Packets.StopAnimation:FireClient(Attacker.Player, AttackerAnimationId, 0.15)
+			elseif Attacker.Character then
+				EntityAnimator.Stop(Attacker.Character, AttackerAnimationId, 0.15)
+			end
+		end)
+	end
+
 	Ensemble.Events.Publish(CombatEvents.ParrySuccess, {
 		Entity = Context.Entity,
 		Attacker = Attacker,
 		ParryType = "PerfectGuard",
 	})
 
-	Ensemble.Events.Publish(CombatEvents.PerfectGuardSuccess, {
-		Entity = Context.Entity,
-		Target = Attacker,
-	})
-
 	StunManager.ApplyStun(Attacker, PerfectGuard.StaggerDuration, "PerfectGuard")
-
 	ActionExecutor.Interrupt(Context.Entity, "PerfectGuard")
 end
 

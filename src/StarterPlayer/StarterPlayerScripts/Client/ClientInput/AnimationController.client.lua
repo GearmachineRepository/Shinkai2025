@@ -40,3 +40,27 @@ Packets.StopAnimation.OnClientEvent:Connect(function(AnimationId: string, FadeTi
         AnimationService.StopAll(Player, FadeTime)
     end
 end)
+
+Packets.PauseAnimation.OnClientEvent:Connect(function(AnimationId: string, Duration: number)
+	local Humanoid = Player.Character and Player.Character:FindFirstChildOfClass("Humanoid")
+	if not Humanoid then
+		return
+	end
+
+	local Animator = Humanoid:FindFirstChildOfClass("Animator")
+	if not Animator then
+		return
+	end
+
+	for _, Track in Animator:GetPlayingAnimationTracks() do
+		if Track.Animation and Track.Animation.AnimationId == AnimationId then
+			Track:AdjustSpeed(0)
+			task.delay(Duration, function()
+				if Track.IsPlaying then
+					Track:AdjustSpeed(1)
+				end
+			end)
+			break
+		end
+	end
+end)

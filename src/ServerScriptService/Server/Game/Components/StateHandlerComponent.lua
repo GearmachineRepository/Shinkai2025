@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 local CombatEvents = require(Server.Combat.CombatEvents)
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local Packets = require(Shared.Networking.Packets)
@@ -190,14 +191,20 @@ local function SetupStateAnimations(Entity: Types.Entity, ComponentMaid: Types.M
 	for StateName, AnimationData in STATE_ANIMATIONS do
 		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
 			local Player = Entity.Player
-			if not Player then
-				return
-			end
+			local Character = Entity.Character
 
-			if Enabled then
-				Packets.PlayAnimation:FireClient(Player, AnimationData.AnimationName)
-			else
-				Packets.StopAnimation:FireClient(Player, AnimationData.AnimationName, AnimationData.FadeTime or 0.1)
+			if Player then
+				if Enabled then
+					Packets.PlayAnimation:FireClient(Player, AnimationData.AnimationName)
+				else
+					Packets.StopAnimation:FireClient(Player, AnimationData.AnimationName, AnimationData.FadeTime or 0.1)
+				end
+			elseif Character then
+				if Enabled then
+					EntityAnimator.Play(Character, AnimationData.AnimationName)
+				else
+					EntityAnimator.Stop(Character, AnimationData.AnimationName, AnimationData.FadeTime or 0.1)
+				end
 			end
 		end)
 

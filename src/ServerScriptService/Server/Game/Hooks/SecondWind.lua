@@ -11,7 +11,7 @@ return {
 	Description = "Successful dodges restore 10 stamina",
 
 	OnActivate = function(Entity)
-		local Connection = Ensemble.Events.Subscribe(CombatEvents.DodgeSuccessful, function(EventData)
+		local Connection = Ensemble.Events.Subscribe(CombatEvents.DamageDodged, function(EventData)
 			if EventData.Entity ~= Entity then
 				return
 			end

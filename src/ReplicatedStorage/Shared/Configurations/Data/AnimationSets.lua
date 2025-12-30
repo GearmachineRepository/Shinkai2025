@@ -127,6 +127,8 @@ local Sets: { [string]: AnimationSet } = {
 
 		Block = { AnimationId = "Block" },
 		BlockHit = { AnimationId = "BlockHit" },
+		Idle = {AnimationId = "KarateIdle" },
+		Walk = {AnimationId = "KarateWalk" },
 
 		Sounds = {
 			Swing = "KarateSwing",
@@ -195,6 +197,9 @@ local Sets: { [string]: AnimationSet } = {
 		},
 
 		Block = { AnimationId = "Block" },
+		BlockHit = { AnimationId = "BlockHit" },
+		Idle = {AnimationId = "FistsIdle" },
+		Walk = {AnimationId = "FistsWalk" },
 
 		Sounds = {
 			Swing = "FistSwing",
@@ -263,6 +268,9 @@ local Sets: { [string]: AnimationSet } = {
 		},
 
 		Block = { AnimationId = "Block" },
+		BlockHit = { AnimationId = "BlockHit" },
+		Idle = {AnimationId = "MuayThaiIdle" },
+		Walk = {AnimationId = "MuayThaiWalk" },
 
 		Sounds = {
 			Swing = "MuayThaiSwing",

@@ -54,6 +54,7 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local ActionValidator = require(Shared.Utils.ActionValidator)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
@@ -126,10 +127,16 @@ end
 
 function ActionTemplate.OnExecute(Context: ActionContext)
 	local Player = Context.Entity.Player
+	local Character = Context.Entity.Character
+
 	local AnimationId = Context.Metadata.AnimationId
 
-	if Player and AnimationId then
-		Packets.PlayAnimation:FireClient(Player, AnimationId)
+	if AnimationId then
+		if Player then
+			Packets.PlayAnimation:FireClient(Player, AnimationId)
+		elseif Character then
+			EntityAnimator.Play(Character, AnimationId)
+		end
 	end
 
 	Ensemble.Events.Publish(CombatEvents.AttackStarted, {
@@ -170,12 +177,6 @@ end
 function ActionTemplate.OnInterrupt(Context: ActionContext)
 	if Context.InterruptReason == "Feint" then
 		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
-
-		Ensemble.Events.Publish(CombatEvents.FeintExecuted, {
-			Entity = Context.Entity,
-			ActionName = "ActionTemplate",
-			Context = Context,
-		})
 
 		local FeintEndlag = Context.Metadata.FeintEndlag or 0
 		if FeintEndlag > 0 then

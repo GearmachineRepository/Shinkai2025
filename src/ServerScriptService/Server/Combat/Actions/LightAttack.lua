@@ -12,6 +12,8 @@ local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AttackBase = require(script.Parent.Parent.Core.AttackBase)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
+local Packets = require(Shared.Networking.Packets)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -26,6 +28,11 @@ local LightAttack = {}
 
 LightAttack.ActionName = "LightAttack"
 LightAttack.ActionType = "Attack"
+
+local PRESERVE_ANIMATION_INTERRUPTS = {
+	PerfectGuard = true,
+	Counter = true,
+}
 
 local function GetEquippedItemId(Entity: Entity, InputData: { [string]: any }?): string?
 	if InputData and InputData.ItemId then
@@ -188,13 +195,21 @@ function LightAttack.OnComplete(Context: ActionContext)
 end
 
 function LightAttack.OnInterrupt(Context: ActionContext)
-	if Context.InterruptReason == "Feint" then
-		Ensemble.Events.Publish(CombatEvents.FeintExecuted, {
-			Entity = Context.Entity,
-			ActionName = "LightAttack",
-			Context = Context,
-		})
+	local AnimationId = Context.Metadata.AnimationId
+	local ShouldStopAnimation = not PRESERVE_ANIMATION_INTERRUPTS[Context.InterruptReason]
+	if not AnimationId then return end
 
+	if ShouldStopAnimation then
+		local Player = Context.Entity.Player
+		local Character = Context.Entity.Character
+		if Player then
+			Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
+		elseif Character then
+			EntityAnimator.Stop(Character, AnimationId, 0.15)
+		end
+	end
+
+	if Context.InterruptReason == "Feint" then
 		local FeintEndlag = Context.Metadata.FeintEndlag or 0
 		if FeintEndlag > 0 then
 			task.wait(FeintEndlag)
