@@ -31,6 +31,7 @@ local DEFAULT_COOLDOWN = DodgeBalance.CooldownSeconds
 local DEFAULT_STAMINA_COST = DodgeBalance.StaminaCost
 local DEFAULT_IFRAMES_DURATION = DodgeBalance.IFrameWindow
 local DEFAULT_DURATION = DodgeBalance.Duration
+local DODGE_RECOVERY_PERCENT = DodgeBalance.DodgeRecoveryPecentage
 local DEFAULT_ANIMATION = "DashForward"
 
 Dodge.DefaultMetadata = {
@@ -112,26 +113,28 @@ function Dodge.OnStart(Context: ActionContext)
 end
 
 function Dodge.OnExecute(Context: ActionContext)
-	local IFramesDuration = Context.Metadata.IFramesDuration or DEFAULT_IFRAMES_DURATION
-	local AnimationId = Context.Metadata.AnimationId
-	local TotalDuration = GetDodgeDuration(AnimationId)
+    local IFramesDuration = Context.Metadata.IFramesDuration or DEFAULT_IFRAMES_DURATION
+    local AnimationId = Context.Metadata.AnimationId
+    local TotalDuration = GetDodgeDuration(AnimationId)
+    local RecoveryTime = TotalDuration * DODGE_RECOVERY_PERCENT
 
-	Context.Entity.States:SetState("Invulnerable", true)
+    Context.Entity.States:SetState("Invulnerable", true)
 
-	Ensemble.Events.Publish(CombatEvents.DodgeIFramesStarted, {
-		Entity = Context.Entity,
-		Duration = IFramesDuration,
-	})
+    Ensemble.Events.Publish(CombatEvents.DodgeIFramesStarted, {
+        Entity = Context.Entity,
+        Duration = IFramesDuration,
+    })
 
-	ActionExecutor.ScheduleThread(Context, IFramesDuration, function()
-		Context.Entity.States:SetState("Invulnerable", false)
+    ActionExecutor.ScheduleThread(Context, IFramesDuration, function()
+        Context.Entity.States:SetState("Invulnerable", false)
 
-		Ensemble.Events.Publish(CombatEvents.DodgeIFramesEnded, {
-			Entity = Context.Entity,
-		})
-	end, true)
+        Ensemble.Events.Publish(CombatEvents.DodgeIFramesEnded, {
+            Entity = Context.Entity,
+        })
+    end, true)
 
-	task.wait(TotalDuration)
+	--Reducing dodge time for testing purposes
+    task.wait(RecoveryTime)
 end
 
 function Dodge.OnComplete(Context: ActionContext)

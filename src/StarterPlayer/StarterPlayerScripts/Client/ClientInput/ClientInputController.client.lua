@@ -300,14 +300,15 @@ local function CanPerformAction(RawInput: string): (boolean, number?)
 end
 
 local function TryExecuteAction(RawInput: string)
-	SyncLocalState()
+    SyncLocalState()
 
-	local CanPerform, StaminaCost = CanPerformAction(RawInput)
-	if not CanPerform then
-		return
-	end
+    local CanPerform, StaminaCost = CanPerformAction(RawInput)
+    if not CanPerform then
+        InputBuffer.BufferAction(RawInput)
+        return
+    end
 
-	local ResolvedAction = ResolveActionName(RawInput)
+    local ResolvedAction = ResolveActionName(RawInput)
 
 	if StaminaCost and StaminaCost > 0 then
 		DeductLocalStamina(StaminaCost)

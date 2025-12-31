@@ -6,7 +6,9 @@ local DashBalance = {
 	IFrameWindow = 0.225,
 	Duration = 0.25,
 
-	Speed = 65,
+	DodgeRecoveryPecentage = 0.3,
+
+	Speed = 86,
 	MaxForce = 50000,
 
 	DodgeCancelCooldown = 1.0,

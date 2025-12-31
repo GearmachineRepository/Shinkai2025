@@ -16,7 +16,7 @@ local StaminaBalance = {
 	},
 
 	Sprint = {
-		COOLDOWN_SECONDS = 0.5,
+		COOLDOWN_SECONDS = 0.25,
 		MIN_STAMINA_BUFFER = 0,
 		RAMP_DURATION_SECONDS = 0.25,
 	},
