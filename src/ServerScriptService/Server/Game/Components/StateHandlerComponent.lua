@@ -33,7 +33,7 @@ local CONFLICTING_STATES = {
 	[StateTypes.STUNNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING },
 	[StateTypes.RAGDOLLED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.STUNNED },
 	[StateTypes.ATTACKING] = { StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING, StateTypes.JOGGING },
-	[StateTypes.DODGING] = { StateTypes.ATTACKING, StateTypes.BLOCKING },
+	[StateTypes.DODGING] = { StateTypes.ATTACKING },
 	[StateTypes.DOWNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING },
 }
 

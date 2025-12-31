@@ -23,6 +23,8 @@ type WindowDefinition = CombatTypes.WindowDefinition
 local ActionExecutor = {}
 
 local ActiveContexts: { [Entity]: ActionContext } = {}
+local ParallelContexts: { [any]: ActionContext } = {}
+
 local EntityComboCounts: { [Entity]: { [string]: number } } = {}
 local EntityComboTimers: { [Entity]: { [string]: number } } = {}
 local EntityCooldowns: { [Entity]: { [string]: number } } = {}
@@ -558,6 +560,164 @@ function ActionExecutor.ResetCombo(Entity: Entity, ActionName: string)
 	if Entity.Character then
 		Entity.Character:SetAttribute(ActionName .. "ComboCount", 1)
 	end
+end
+
+-----------------[[Parallel action support]]------------------------------
+
+function ActionExecutor.ExecuteParallel(
+    Entity: Entity,
+    ActionName: string,
+	RawInput: string?,
+    InputData: { [string]: any }?
+): (boolean, string?)
+    local Definition = ActionRegistry.Get(ActionName)
+    if not Definition then
+        return false, "UnknownAction"
+    end
+
+    if ParallelContexts[Entity] then
+        return false, "ParallelActionActive"
+    end
+
+    local FinalInputData = InputData or {}
+    local Metadata: ActionMetadata
+
+    if Definition.BuildMetadata then
+        local BuiltMetadata = Definition.BuildMetadata(Entity, FinalInputData)
+        if not BuiltMetadata then
+            return false, "FailedToBuildMetadata"
+        end
+        Metadata = BuiltMetadata
+    elseif Definition.DefaultMetadata then
+        Metadata = table.clone(Definition.DefaultMetadata)
+    else
+        Metadata = {
+            ActionName = ActionName,
+            ActionType = Definition.ActionType,
+        }
+    end
+
+    local Context: ActionContext = {
+        Entity = Entity,
+        RawInput = RawInput,
+        InputData = FinalInputData,
+        Metadata = Metadata,
+        StartTime = workspace:GetServerTimeNow(),
+        Interrupted = false,
+        InterruptReason = nil,
+        InterruptedContext = nil,
+        CustomData = {},
+        ActiveWindow = nil,
+        PendingThreads = {},
+    }
+
+    if Definition.CanExecute then
+        local CanExecute, Reason = Definition.CanExecute(Context)
+        if not CanExecute then
+            return false, Reason or "CannotExecute"
+        end
+    end
+
+    ParallelContexts[Entity] = Context
+
+    if Definition.OnStart then
+        Definition.OnStart(Context)
+    end
+
+    PublishEvent(CombatEvents.ActionStarted, {
+        Entity = Entity,
+        ActionName = ActionName,
+        ActionType = Definition.ActionType,
+        Context = Context,
+        IsParallel = true,
+    })
+
+    task.spawn(function()
+        Definition.OnExecute(Context)
+
+        if not Context.Interrupted then
+            ActionExecutor.CompleteParallel(Entity)
+        end
+    end)
+
+    return true, nil
+end
+
+function ActionExecutor.CompleteParallel(Entity: Entity)
+    local Context = ParallelContexts[Entity]
+    if not Context or Context.Interrupted then
+        return
+    end
+
+    local ActionName = Context.Metadata.ActionName
+    local Definition = ActionRegistry.Get(ActionName)
+
+    if Definition and Definition.OnComplete then
+        Definition.OnComplete(Context)
+    end
+
+    PublishEvent(CombatEvents.ActionCompleted, {
+        Entity = Entity,
+        ActionName = ActionName,
+        Context = Context,
+        IsParallel = true,
+    })
+
+    ActionExecutor.CleanupParallel(Entity)
+end
+
+function ActionExecutor.InterruptParallel(Entity: Entity, Reason: string?): boolean
+    local Context = ParallelContexts[Entity]
+    if not Context or Context.Interrupted then
+        return false
+    end
+
+    Context.Interrupted = true
+    Context.InterruptReason = Reason or "Unknown"
+
+    local ActionName = Context.Metadata.ActionName
+    local Definition = ActionRegistry.Get(ActionName)
+
+    if Definition and Definition.OnInterrupt then
+        Definition.OnInterrupt(Context)
+    end
+
+    PublishEvent(CombatEvents.ActionInterrupted, {
+        Entity = Entity,
+        ActionName = ActionName,
+        Reason = Reason,
+        Context = Context,
+        IsParallel = true,
+    })
+
+    ActionExecutor.CleanupParallel(Entity)
+    return true
+end
+
+function ActionExecutor.CleanupParallel(Entity: Entity)
+    local Context = ParallelContexts[Entity]
+    if not Context then
+        return
+    end
+
+    ActionExecutor.CancelAllThreads(Context)
+
+    local ActionName = Context.Metadata.ActionName
+    local Definition = ActionRegistry.Get(ActionName)
+
+    if Definition and Definition.OnCleanup then
+        Definition.OnCleanup(Context)
+    end
+
+    ParallelContexts[Entity] = nil
+end
+
+function ActionExecutor.GetParallelContext(Entity: Entity): ActionContext?
+    return ParallelContexts[Entity]
+end
+
+function ActionExecutor.IsParallelExecuting(Entity: Entity): boolean
+    return ParallelContexts[Entity] ~= nil
 end
 
 function ActionExecutor.CleanupEntity(Entity: Entity)

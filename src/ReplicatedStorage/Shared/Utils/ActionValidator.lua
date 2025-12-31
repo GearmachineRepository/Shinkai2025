@@ -63,7 +63,6 @@ ActionValidator.Blocking = {
 		StateTypes.RAGDOLLED,
 		StateTypes.EXHAUSTED,
 		StateTypes.ATTACKING,
-		StateTypes.DODGING,
 		StateTypes.GUARD_BROKEN,
 	},
 	Dodge = {

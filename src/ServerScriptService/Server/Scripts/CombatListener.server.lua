@@ -131,7 +131,23 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 		return
 	end
 
-	-- GAME-SPECIFIC: Gate feinting behind Unpredictable hook
+	local FinalInputData = InputData or {}
+
+	-- Allow dodging to run parallel to blocking
+    if ResolvedAction == "Dodge" then
+        local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
+        if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
+            local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
+            if Success then
+                NotifyActionApproved(Player, RawInput)
+            else
+                NotifyActionDenied(Player, Reason or "Failed")
+            end
+            return
+        end
+    end
+
+	-- Gate feinting behind Unpredictable hook
 	if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
 		if not HasUnpredictable(Entity) then
 			NotifyActionDenied(Player, "RequiresUnpredictable")
@@ -161,8 +177,6 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 		end
 		return
 	end
-
-	local FinalInputData = InputData or {}
 
 	local Definition = Combat.ActionRegistry.Get(ResolvedAction)
 	if Definition and Definition.ActionType == "Attack" then

@@ -91,7 +91,7 @@ local Config: StateConfig = {
 		[StateTypes.DODGING] = {
 			Default = false,
 			Replication = "All",
-			Conflicts = { StateTypes.ATTACKING, StateTypes.BLOCKING },
+			Conflicts = { StateTypes.ATTACKING },
 		},
 
 		[StateTypes.RAGDOLLED] = {
