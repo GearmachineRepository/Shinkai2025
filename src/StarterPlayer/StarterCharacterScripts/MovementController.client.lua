@@ -13,7 +13,7 @@ local Player = Players.LocalPlayer
 local Character = script.Parent
 local Humanoid = Character:WaitForChild("Humanoid")
 
-local DOUBLE_TAP_WINDOW_SECONDS = 0.5
+local DOUBLE_TAP_WINDOW_SECONDS = 0.3
 local STOP_MOVING_THRESHOLD = 0.1
 local STOP_MOVING_GRACE_SECONDS = 0.15
 

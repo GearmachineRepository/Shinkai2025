@@ -285,6 +285,11 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 				TargetContext = TargetContext,
 			})
 
+			-- Apply knockback through block if flag is present
+			if AttackFlags.HasFlag(Flags, AttackFlags.KNOCKBACK_THROUGH_BLOCK) then
+				AttackBase.ApplyKnockback(AttackerContext, Target)
+			end
+
 			return true
 		end
 	end

@@ -110,6 +110,9 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart,
 		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd,
 		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length,
+
+		Flag = AttackData.Flag,
+		Flags = AttackData.Flags,
 	}
 
 	return Metadata

@@ -8,6 +8,7 @@ AttackFlags.UNPARRYABLE = "Unparryable"
 AttackFlags.HEAVY = "Heavy"
 AttackFlags.LAUNCHER = "Launcher"
 AttackFlags.SWEEP = "Sweep"
+AttackFlags.KNOCKBACK_THROUGH_BLOCK = "KnockbackThroughBlock"
 
 function AttackFlags.HasFlag(Flags: { string }?, Flag: string): boolean
 	if not Flags then
