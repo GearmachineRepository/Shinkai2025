@@ -18,7 +18,7 @@ local StaminaBalance = {
 	Sprint = {
 		COOLDOWN_SECONDS = 0.25,
 		MIN_STAMINA_BUFFER = 0,
-		RAMP_DURATION_SECONDS = 0.25,
+		RAMP_DURATION_SECONDS = 0.00,
 	},
 
 	StutterStep = {

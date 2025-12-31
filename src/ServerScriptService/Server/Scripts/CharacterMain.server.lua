@@ -130,6 +130,9 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 
 	Humanoid.Died:Once(function()
 		task.wait(3)
+		if not Player.Parent then
+			return
+		end
 		SpawnCharacter(Player, PlayerData)
 	end)
 
@@ -172,7 +175,9 @@ Players.PlayerRemoving:Connect(function(Player: Player)
 		PlayerMaids[Player] = nil
 	end
 
-	if Player.Character then
-		Ensemble.DestroyEntity(Player.Character)
+	local Character = Player.Character
+	if Character then
+		Ensemble.DestroyEntity(Character)
+		Character:Destroy()
 	end
 end)
