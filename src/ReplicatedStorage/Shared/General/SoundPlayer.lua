@@ -6,7 +6,11 @@ local Sounds = Assets:WaitForChild("Sounds")
 
 local SoundPlayer = {}
 
-function SoundPlayer.Play(Character: Model, SoundReference: string | Sound)
+type Configurations = {
+	Volume: number?,
+}
+
+function SoundPlayer.Play(Character: Model, SoundReference: string | Sound, Configurations: Configurations?)
 	local TemplateSound = nil :: Sound?
 
 	if typeof(SoundReference) == "string" then
@@ -29,6 +33,11 @@ function SoundPlayer.Play(Character: Model, SoundReference: string | Sound)
 	SoundClone.Parent = HumanoidRootPart
 	SoundClone.RollOffMode = Enum.RollOffMode.InverseTapered
 	SoundClone.PlaybackSpeed += math.random()/10
+
+	if Configurations then
+		SoundClone.Volume = Configurations.Volume or SoundClone.Volume
+	end
+
 	SoundClone:Play()
 
 	SoundClone.Ended:Connect(function()

@@ -13,6 +13,7 @@ local StunManager = require(script.Parent.Parent.Utility.StunManager)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local Block = require(script.Parent.Parent.Actions.Block)
+local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 
 local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -290,6 +291,7 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 
 	AttackBase.ApplyDamage(AttackerContext, Target, HitPosition)
 	AttackBase.ApplyHitStun(AttackerContext, Target)
+	AttackBase.ApplyKnockback(AttackerContext, Target)
 
 	Ensemble.Events.Publish(CombatEvents.AttackHit, {
 		Entity = AttackerContext.Entity,
@@ -319,6 +321,15 @@ function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosit
 		ActionName = Context.Metadata.ActionName,
 		Context = Context,
 	})
+end
+
+function AttackBase.ApplyKnockback(Context: ActionContext, Target: Entity)
+	local Knockback = Context.Metadata.Knockback
+	if not Knockback or Knockback <= 0 then
+		return
+	end
+
+	KnockbackManager.Apply(Target, Context.Entity, Knockback)
 end
 
 function AttackBase.ApplyHitStun(Context: ActionContext, Target: Entity)

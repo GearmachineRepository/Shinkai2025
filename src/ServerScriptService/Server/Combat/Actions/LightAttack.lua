@@ -98,6 +98,8 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		HitboxSize = AttackData.Hitbox and AttackData.Hitbox.Size,
 		HitboxOffset = AttackData.Hitbox and AttackData.Hitbox.Offset,
 
+		Knockback = AttackData.Knockback,
+
 		Feintable = SetMetadata.Feintable,
 		FeintEndlag = SetMetadata.FeintEndlag,
 		FeintCooldown = SetMetadata.FeintCooldown,

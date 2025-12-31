@@ -116,6 +116,8 @@ ActionValidator.Required = {
 }
 
 function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, string?)
+	if not States then return false, "Missing StateComponent" end
+
 	local BlockingStates = ActionValidator.Blocking[ActionName]
 	if BlockingStates then
 		for _, StateName in BlockingStates do

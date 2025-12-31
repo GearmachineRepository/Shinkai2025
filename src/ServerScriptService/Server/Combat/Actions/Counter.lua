@@ -11,6 +11,7 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
+local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 
 local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -75,6 +76,7 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		AnimationId = LastM1Data.AnimationId,
 		Damage = math.floor((LastM1Data.Damage or 10) * DAMAGE_MULTIPLIER),
 		HitStun = LastM1Data.HitStun or 0.4,
+		Knockback = LastM1Data.Knockback or 40,
 		HitboxSize = LastM1Data.Hitbox and LastM1Data.Hitbox.Size or Vector3.new(6, 5, 7),
 		HitboxOffset = LastM1Data.Hitbox and LastM1Data.Hitbox.Offset or Vector3.new(0, 0, -4),
 		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart or 0.2,
@@ -117,6 +119,11 @@ local function ExecuteCounterAttack(Entity: Entity, Attacker: Entity)
 		end
 
 		StunManager.ApplyStun(Attacker, CounterData.HitStun, "Counter")
+
+		local Knockback = CounterData.Knockback
+		if Knockback and Knockback > 0 then
+			KnockbackManager.Apply(Attacker, Entity, Knockback)
+		end
 
 		Ensemble.Events.Publish(CombatEvents.CounterHit, {
 			Entity = Entity,

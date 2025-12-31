@@ -40,6 +40,8 @@ export type ActionMetadata = {
 	StaminaDrainOnHit: number?,
 	StaminaDrainScalar: number?,
 
+	Knockback: number?,
+
 	Feintable: boolean?,
 	FeintEndlag: number?,
 	FeintCooldown: number?,

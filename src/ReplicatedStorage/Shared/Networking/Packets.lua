@@ -61,6 +61,10 @@ return {
 	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String),
 	InterruptAction = Packet("InterruptAction", Packet.String),
 
+	--Knockback
+	ApplyKnockback = Packet("ApplyKnockback", Packet.Vector3F24, Packet.NumberF32, Packet.NumberF32),
+	KnockbackImpact = Packet("KnockbackImpact", Packet.Vector3F24, Packet.Vector3F24),
+
 	-- Sounds
 	PlaySound = Packet("PlaySound", Packet.Any, Packet.Any),
 	PlaySoundReplicate = Packet("PlaySoundReplicate", Packet.Any, Packet.String, Packet.Any),

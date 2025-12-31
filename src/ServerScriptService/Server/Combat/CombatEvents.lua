@@ -45,6 +45,9 @@ local CombatEvents = {
 	DodgeIFramesEnded = "DodgeIFramesEnded",
 	DodgeCancelExecuted = "DodgeCancelExecuted",
 
+	KnockbackStarted = "KnockbackStarted",
+	KnockbackImpact = "KnockbackImpact",
+
 	ClashOccurred = "ClashOccurred",
 
 	DamageDealt = "DamageDealt",

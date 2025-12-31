@@ -11,6 +11,7 @@ export type AttackData = {
 	AnimationId: string,
 	Hitbox: HitboxData,
 	Damage: number,
+	Knockback: number?,
 	StaminaCost: number,
 	HitStun: number,
 	Flag: string?,
@@ -111,6 +112,7 @@ local Sets: { [string]: AnimationSet } = {
 				Damage = 8,
 				StaminaCost = 4,
 				HitStun = 0.8,
+				Knockback = 50,
 			},
 		},
 
@@ -121,6 +123,7 @@ local Sets: { [string]: AnimationSet } = {
 				Damage = 12,
 				StaminaCost = 4,
 				HitStun = 0.9,
+				Knockback = 60,
 				Flag = "GuardBreak",
 			}
 		},

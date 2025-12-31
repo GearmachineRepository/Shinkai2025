@@ -69,7 +69,7 @@ local STATE_SFX = {
 	[StateTypes.PARRIED] = "ParrySound",
 }
 
-local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?) } = {
+local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?, any) } = {
 	[CombatEvents.AttackHit] = function(EventData)
 		return "Hit", EventData.Target and EventData.Target.Character, EventData.HitPosition
 	end,
@@ -102,6 +102,18 @@ local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?) } 
 	end,
 	[CombatEvents.DodgeStarted] = function(EventData)
 		return "DodgeVfx", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.KnockbackStarted] = function(EventData)
+		return "DodgeVfx", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.KnockbackImpact] = function(EventData)
+		local Target = EventData.Entity and EventData.Entity.Character
+		return "KnockbackImpact", Target, nil, {
+			ImpactPosition = EventData.ImpactPosition,
+			ImpactNormal = EventData.ImpactNormal,
+			KnockbackSpeed = EventData.KnockbackSpeed,
+			KnockbackDirection = EventData.KnockbackDirection,
+		}
 	end,
 }
 
@@ -257,15 +269,23 @@ local function SetupCombatEventReactions(Entity: Types.Entity, ComponentMaid: Ty
 				return
 			end
 
-			local VfxName, TargetCharacter, Position = VfxGetter(EventData)
+			local VfxName, TargetCharacter, Position, ExtraData = VfxGetter(EventData)
 			if not VfxName then
 				return
 			end
 
-			Packets.PlayVfxReplicate:Fire(Entity.Player or Entity.Character, VfxName, {
+			local Payload = {
 				Target = TargetCharacter,
 				HitPosition = Position,
-			})
+			}
+
+			if ExtraData then
+				for Key, Value in ExtraData do
+					Payload[Key] = Value
+				end
+			end
+
+			Packets.PlayVfxReplicate:Fire(Entity.Player or Entity.Character, VfxName, Payload)
 		end)
 
 		ComponentMaid:GiveTask(Connection)

@@ -99,6 +99,8 @@ function HeavyAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		ActionCooldown = SetMetadata.HeavyAttackCooldown,
 		StaminaCostHitReduction = SetMetadata.StaminaCostHitReduction,
 
+		Knockback = AttackData.Knockback,
+
 		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart,
 		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd,
 		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length,

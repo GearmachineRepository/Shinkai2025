@@ -125,8 +125,7 @@ local function SpawnCharacter(Player: Player, PlayerData: any)
 			return
 		end
 
-		local Success = Inventory:AddItemToHotbar(1, "Karate", 1)
-		print(Success)
+		Inventory:AddItemToHotbar(1, "Karate", 1)
 	end)
 
 	Humanoid.Died:Once(function()
