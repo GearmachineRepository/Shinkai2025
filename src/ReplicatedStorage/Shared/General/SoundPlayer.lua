@@ -27,6 +27,7 @@ function SoundPlayer.Play(Character: Model, SoundReference: string | Sound)
 
 	local SoundClone = TemplateSound:Clone()
 	SoundClone.Parent = HumanoidRootPart
+	SoundClone.RollOffMode = Enum.RollOffMode.InverseTapered
 	SoundClone.PlaybackSpeed += math.random()/10
 	SoundClone:Play()
 

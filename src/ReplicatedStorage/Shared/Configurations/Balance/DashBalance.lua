@@ -4,11 +4,9 @@ local DashBalance = {
 	StaminaCost = 8,
 	CooldownSeconds = 2,
 	IFrameWindow = 0.225,
-	Duration = 0.45,
+	Duration = 0.25,
 
-	Speed = 25,
-	AnimationDuration = 0.45,
-	TweenDuration = 1.1,
+	Speed = 65,
 	MaxForce = 50000,
 
 	DodgeCancelCooldown = 1.0,

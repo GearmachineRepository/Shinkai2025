@@ -6,6 +6,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Server = ServerScriptService:WaitForChild("Server")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
+local Assets = ReplicatedStorage:WaitForChild("Assets")
+local Sounds = Assets:WaitForChild("Sounds")
+
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 local CombatEvents = require(Server.Combat.CombatEvents)
@@ -102,7 +105,10 @@ local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?) } 
 	end,
 }
 
-local COMBAT_SFX: { [string]: (EventData: any) -> (string?, Vector3?) } = {
+local COMBAT_SFX: { [string]: (EventData: any) -> (string?, Vector3?, any?) } = {
+	[CombatEvents.HitWindowOpened] = function(_EventData)
+		return "Swing", nil, Sounds.Swings
+	end,
 	[CombatEvents.ParrySuccess] = function(_EventData)
 		return "Parry", nil
 	end,
@@ -272,9 +278,13 @@ local function SetupCombatEventReactions(Entity: Types.Entity, ComponentMaid: Ty
 				return
 			end
 
-			local SfxName, Position = SfxGetter(EventData)
+			local SfxName, Position, RandomFolder = SfxGetter(EventData)
 			if not SfxName then
 				return
+			end
+
+			if RandomFolder and typeof(RandomFolder) == "Instance" and #RandomFolder:GetChildren() > 0 then
+				SfxName = RandomFolder:GetChildren()[math.random(1, # RandomFolder:GetChildren())].Name
 			end
 
 			if not Position then

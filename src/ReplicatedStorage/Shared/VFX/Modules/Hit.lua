@@ -14,7 +14,6 @@ local Sounds = Assets:WaitForChild("Sounds")
 local PunchHits = Sounds:WaitForChild("PunchHits")
 local BloodSpills = Sounds:WaitForChild("BloodSpills")
 local BoneBreaks = Sounds:WaitForChild("BoneBreaks")
-local Swings = Sounds:WaitForChild("Swings")
 
 local HitVFX = {}
 
@@ -56,7 +55,6 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		OnHitFolder = HitAssets:FindFirstChild("OnHitBleed", true)
 	end
 
-	SoundPlayer.Play(Target, Swings:GetChildren()[math.random(1, #Swings:GetChildren())].Name)
 	SoundPlayer.Play(Target, PunchHits:GetChildren()[math.random(1, #PunchHits:GetChildren())].Name)
 
 	if not OnHitFolder then
