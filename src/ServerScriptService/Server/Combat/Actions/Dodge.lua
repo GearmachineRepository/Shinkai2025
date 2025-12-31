@@ -11,8 +11,10 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 
+local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local DodgeBalance = require(Shared.Configurations.Balance.DashBalance)
 local ActionValidator = require(Shared.Utils.ActionValidator)
+local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -48,6 +50,23 @@ local function GetDodgeDuration(AnimationKey: string?): number
 		return AnimationLength
 	end
 	return DEFAULT_DURATION
+end
+
+local function StopDodgeAnimation(Context: ActionContext, FadeTime: number?)
+	local AnimationId = Context.Metadata.AnimationId
+	if not AnimationId then
+		return
+	end
+
+	local Player = Context.Entity.Player
+	local Character = Context.Entity.Character
+	local ActualFadeTime = FadeTime or 0.1
+
+	if Player then
+		Packets.StopAnimation:FireClient(Player, AnimationId, ActualFadeTime)
+	elseif Character then
+		EntityAnimator.Stop(Character, AnimationId, ActualFadeTime)
+	end
 end
 
 function Dodge.CanExecute(Context: ActionContext): (boolean, string?)
@@ -122,9 +141,14 @@ function Dodge.OnComplete(Context: ActionContext)
 	})
 end
 
+function Dodge.OnInterrupt(Context: ActionContext)
+	StopDodgeAnimation(Context, 0.1)
+end
+
 function Dodge.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Dodging", false)
 	Context.Entity.States:SetState("Invulnerable", false)
+	StopDodgeAnimation(Context, 0.15)
 end
 
 return Dodge

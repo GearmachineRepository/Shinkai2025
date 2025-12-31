@@ -100,14 +100,14 @@ local Sets: { [string]: AnimationSet } = {
 			},
 			[3] = {
 				AnimationId = "Karate3",
-				Hitbox = { Size = Vector3.new(5, 4, 6), Offset = Vector3.new(0, 0, -4) },
+				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
 				HitStun = 0.8,
 			},
 			[4] = {
 				AnimationId = "Karate4",
-				Hitbox = { Size = Vector3.new(6, 5, 7), Offset = Vector3.new(0, 0, -4) },
+				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
 				HitStun = 0.8,
@@ -117,7 +117,7 @@ local Sets: { [string]: AnimationSet } = {
 		M2 = {
 			[1] = {
 				AnimationId = "KarateHeavy",
-				Hitbox = { Size = Vector3.new(6, 5, 8), Offset = Vector3.new(0, 0, -5) },
+				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 12,
 				StaminaCost = 4,
 				HitStun = 0.9,

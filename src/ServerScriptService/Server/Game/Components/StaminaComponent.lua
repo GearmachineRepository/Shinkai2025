@@ -80,12 +80,39 @@ function StaminaComponent.GetMaxStamina(self: Self): number
 	return self.CachedMaxStamina
 end
 
+function StaminaComponent.HasMinimumStamina(self: Self, MovementMode: string): boolean
+	local CurrentStamina = StaminaComponent.GetEffectiveStamina(self)
+	local MinBuffer = StaminaBalance.Sprint.MIN_STAMINA_BUFFER
+
+	local Cost = if MovementMode == "run"
+		then StaminaBalance.StaminaCosts.SPRINT
+		else StaminaBalance.StaminaCosts.JOG
+
+	return CurrentStamina > (Cost + MinBuffer)
+end
+
 function StaminaComponent.CanSprint(self: Self): boolean
-	return not self.IsExhausted
+	if self.IsExhausted then
+		return false
+	end
+
+	if not StaminaComponent.HasMinimumStamina(self, "run") then
+		return false
+	end
+
+	return true
 end
 
 function StaminaComponent.CanJog(self: Self): boolean
-	return not self.IsExhausted
+	if self.IsExhausted then
+		return false
+	end
+
+	if not StaminaComponent.HasMinimumStamina(self, "jog") then
+		return false
+	end
+
+	return true
 end
 
 function StaminaComponent.GetStutterStepMultiplier(self: Self, MovementType: string): number
@@ -177,9 +204,7 @@ function StaminaComponent.ApplyStamina(self: Self, TargetStamina: number, ForceS
 	local DeltaApplied = Quantized - CurrentStamina
 	self.PendingDelta -= DeltaApplied
 
-	if
-		ForceSync or not Formulas.IsNearlyEqual(Quantized, self.LastStaminaValue, StaminaBalance.Sync.UPDATE_THRESHOLD)
-	then
+	if ForceSync or not Formulas.IsNearlyEqual(Quantized, self.LastStaminaValue, StaminaBalance.Sync.UPDATE_THRESHOLD) then
 		self.Entity.Stats:SetStat(StatTypes.STAMINA, Quantized)
 		self.LastStaminaValue = Quantized
 	end
@@ -202,7 +227,7 @@ function StaminaComponent.Update(self: Self, DeltaTime: number, MovementMode: st
 	local AllowMovement = true
 
 	if IsMoving and (MovementMode == "run" or MovementMode == "jog") then
-		if (MovementMode == "run" and not StaminaComponent.CanSprint(self)) or (MovementMode == "jog" and not StaminaComponent.CanJog(self)) then
+		if self.IsExhausted then
 			return false
 		end
 

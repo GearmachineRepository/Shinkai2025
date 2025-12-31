@@ -8,7 +8,6 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
-local ActionValidator = require(Shared.Utils.ActionValidator)
 
 local VALID_MOVEMENT_MODES = {
 	walk = true,
@@ -16,12 +15,11 @@ local VALID_MOVEMENT_MODES = {
 	run = true,
 }
 
-local MODE_TO_ACTION = {
-	jog = "Jog",
-	run = "Run",
-}
-
 Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, MovementMode: string)
+	if type(MovementMode) ~= "string" then
+		return
+	end
+
 	if not VALID_MOVEMENT_MODES[MovementMode] then
 		return
 	end
@@ -36,36 +34,16 @@ Packets.MovementStateChanged.OnServerEvent:Connect(function(Player: Player, Move
 		return
 	end
 
-	if MovementMode == "walk" then
+	local Movement = Entity:GetComponent("Movement")
+	if not Movement then
+		return
+	end
+
+	local IsValid = Movement:ValidateMovementMode(MovementMode)
+
+	if IsValid then
+		Character:SetAttribute("MovementMode", MovementMode)
+	else
 		Character:SetAttribute("MovementMode", "walk")
-		return
-	end
-
-	local ActionName = MODE_TO_ACTION[MovementMode]
-	if ActionName then
-		local CanPerform, _Reason = ActionValidator.CanPerform(Entity.States, ActionName)
-		if not CanPerform then
-			Character:SetAttribute("MovementMode", "walk")
-			return
-		end
-	end
-
-	local Stamina = Entity:GetComponent("Stamina")
-	if not Stamina then
-		return
-	end
-
-	if MovementMode == "jog" then
-		if Stamina:CanJog() then
-			Character:SetAttribute("MovementMode", "jog")
-		else
-			Character:SetAttribute("MovementMode", "walk")
-		end
-	elseif MovementMode == "run" then
-		if Stamina:CanSprint() then
-			Character:SetAttribute("MovementMode", "run")
-		else
-			Character:SetAttribute("MovementMode", "walk")
-		end
 	end
 end)

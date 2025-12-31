@@ -8,11 +8,16 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
+local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
+local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
 
 local StunManager = {}
 
 local ActiveStuns: { [any]: thread } = {}
+
+local STUN_MODIFIER_ID = "Stunned"
+local STUN_SPEED_MULTIPLIER = CombatBalance.Stunned.MOVEMENT_SPEED_MULTIPLIER or 0.3
 
 function StunManager.ApplyStun(Entity: any, Duration: number, Source: string?)
 	if not Entity or not Entity.States then
@@ -27,6 +32,7 @@ function StunManager.ApplyStun(Entity: any, Duration: number, Source: string?)
 	end
 
 	Entity.States:SetState(StateTypes.STUNNED, true)
+	MovementModifiers.SetModifier(Entity, STUN_MODIFIER_ID, STUN_SPEED_MULTIPLIER, 200)
 
 	Ensemble.Events.Publish(CombatEvents.StunApplied, {
 		Entity = Entity,
@@ -37,6 +43,7 @@ function StunManager.ApplyStun(Entity: any, Duration: number, Source: string?)
 	local StunThread = task.delay(Duration, function()
 		if Entity.States then
 			Entity.States:SetState(StateTypes.STUNNED, false)
+			MovementModifiers.ClearModifier(Entity, STUN_MODIFIER_ID)
 		end
 
 		ActiveStuns[Entity] = nil
@@ -64,6 +71,7 @@ function StunManager.ClearStun(Entity: any)
 	end
 
 	Entity.States:SetState(StateTypes.STUNNED, false)
+	MovementModifiers.ClearModifier(Entity, STUN_MODIFIER_ID)
 end
 
 function StunManager.IsStunned(Entity: any): boolean
@@ -82,6 +90,8 @@ function StunManager.CleanupEntity(Entity: any)
 		end
 		ActiveStuns[Entity] = nil
 	end
+
+	MovementModifiers.ClearModifier(Entity, STUN_MODIFIER_ID)
 end
 
 return StunManager

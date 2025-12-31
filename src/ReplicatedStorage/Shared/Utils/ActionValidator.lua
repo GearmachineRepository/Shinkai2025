@@ -7,18 +7,107 @@ local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local ActionValidator = {}
 
 ActionValidator.Blocking = {
-	M1 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.DODGING },
-	M2 = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING },
+	M1 = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.ATTACKING,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+	M2 = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.ATTACKING,
+		StateTypes.GUARD_BROKEN,
+	},
 
-	Feint = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
-	DodgeCancel = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED },
+	LightAttack = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.ATTACKING,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+	HeavyAttack = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.ATTACKING,
+		StateTypes.GUARD_BROKEN,
+	},
 
-	Block = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.DODGING },
-	Dodge = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.ATTACKING, StateTypes.DODGING },
-	Skill = { StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.RAGDOLLED, StateTypes.EXHAUSTED, StateTypes.DODGING },
+	Feint = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.GUARD_BROKEN,
+	},
+	DodgeCancel = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+	},
 
-	Jog = { StateTypes.ATTACKING, StateTypes.DOWNED, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StateTypes.DODGING },
-	Run = { StateTypes.ATTACKING, StateTypes.DOWNED, StateTypes.BLOCKING, StateTypes.STUNNED, StateTypes.EXHAUSTED, StateTypes.DOWNED, StateTypes.DODGING },
+	Block = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.ATTACKING,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+	Dodge = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.ATTACKING,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+	Skill = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+		StateTypes.EXHAUSTED,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+
+	Jog = {
+		StateTypes.ATTACKING,
+		StateTypes.BLOCKING,
+		StateTypes.STUNNED,
+		StateTypes.EXHAUSTED,
+		StateTypes.DOWNED,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+	Run = {
+		StateTypes.ATTACKING,
+		StateTypes.BLOCKING,
+		StateTypes.STUNNED,
+		StateTypes.EXHAUSTED,
+		StateTypes.DOWNED,
+		StateTypes.DODGING,
+		StateTypes.GUARD_BROKEN,
+	},
+
+	Hitbox = {
+		StateTypes.STUNNED,
+		StateTypes.DOWNED,
+		StateTypes.RAGDOLLED,
+	},
 }
 
 ActionValidator.Required = {

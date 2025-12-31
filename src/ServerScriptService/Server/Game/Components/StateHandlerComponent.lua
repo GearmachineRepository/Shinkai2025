@@ -45,6 +45,8 @@ local FORCE_WALK_STATES = {
 	StateTypes.GUARD_BROKEN,
 	StateTypes.EXHAUSTED,
 	StateTypes.DODGING,
+	StateTypes.BLOCKING,
+	StateTypes.ATTACKING,
 }
 
 local STATE_ANIMATIONS = {
@@ -98,19 +100,23 @@ local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?) } 
 	[CombatEvents.DodgeStarted] = function(EventData)
 		return "DodgeVfx", EventData.Entity and EventData.Entity.Character, nil
 	end,
-	-- [CombatEvents.StunApplied] = function(EventData)
-	-- 	return "StunStars", EventData.Entity and EventData.Entity.Character, nil
-	-- end,
 }
 
 local COMBAT_SFX: { [string]: (EventData: any) -> (string?, Vector3?) } = {
 	[CombatEvents.ParrySuccess] = function(_EventData)
-		return "ParrySound", nil
-	end,
-	[CombatEvents.ClashOccurred] = function(_EventData)
-		return "ClashSound", nil
+		return "Parry", nil
 	end,
 }
+
+local DEFAULT_JUMP_POWER = StatBalance.MovementSpeeds.JumpPower or 25
+
+local function CanJump(Entity: Types.Entity, IsLocked: boolean)
+	local JumpPower = IsLocked and 0 or DEFAULT_JUMP_POWER
+	local Humanoid = Entity.Character and Entity.Character:FindFirstChildOfClass("Humanoid")
+	if Humanoid then
+		Humanoid.JumpPower = JumpPower
+	end
+end
 
 local function SetupConflictResolution(Entity: Types.Entity, ComponentMaid: Types.Maid)
 	for StateName, ConflictingStates in CONFLICTING_STATES do
@@ -127,17 +133,6 @@ local function SetupConflictResolution(Entity: Types.Entity, ComponentMaid: Type
 		end)
 
 		ComponentMaid:GiveTask(Connection)
-	end
-end
-
-local function CanJump(Entity: Types.Entity, Toggle: boolean)
-	local JumpPower = if not Toggle then StatBalance.Defaults.JumpPower else 0
-	local Character = Entity.Character
-	if Character then
-		local Humanoid = Character:FindFirstChild("Humanoid") :: Humanoid?
-		if Humanoid then
-			Humanoid.JumpPower = JumpPower
-		end
 	end
 end
 
@@ -173,6 +168,7 @@ local function SetupForceWalk(Entity: Types.Entity, ComponentMaid: Types.Maid)
 			end
 		end
 
+		CanJump(Entity, ShouldForceWalk)
 		if ShouldForceWalk then
 			local CurrentMode = Entity.Character:GetAttribute("MovementMode")
 			if CurrentMode == "jog" or CurrentMode == "run" then

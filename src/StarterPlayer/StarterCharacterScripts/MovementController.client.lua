@@ -1,31 +1,29 @@
+--!strict
+
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Config = Shared:WaitForChild("Configurations")
+local Packets = require(Shared.Networking.Packets)
 local UpdateService = require(Shared.Networking.UpdateService)
-
-local StatEnums = require(Config.Enums.StatTypes)
+local StaminaBalance = require(Shared.Configurations.Balance.StaminaBalance)
 
 local Player = Players.LocalPlayer
 local Character = script.Parent
 local Humanoid = Character:WaitForChild("Humanoid")
 
-local Packets = require(ReplicatedStorage.Shared.Networking.Packets)
-
-local DOUBLE_TAP_TIME = 0.3
+local DOUBLE_TAP_WINDOW_SECONDS = 0.5
+local STOP_MOVING_THRESHOLD = 0.1
+local STOP_MOVING_GRACE_SECONDS = 0.15
 
 local LastWPressTime = 0
 local IsInSprintMode = false
 local CurrentSprintType = "run"
 local SavedSprintType = "run"
-local IsShiftHeld = false
 local IsWHeld = false
-
-local STOP_MOVING_THRESHOLD = 0.1
 local StopMovingTimeSeconds = 0
-local STOP_MOVING_GRACE_SECONDS = 0.15
+local LastSprintEndTime = 0
 
 if not Character:GetAttribute("MovementMode") then
 	Character:SetAttribute("MovementMode", "walk")
@@ -38,42 +36,60 @@ else
 	CurrentSprintType = SavedSprintType
 end
 
-local function CanSprint(): boolean
-	return not Character:GetAttribute("Exhausted")
+local function IsExhausted(): boolean
+	return Character:GetAttribute("Exhausted") == true
 end
 
-local function CanJog(): boolean
-	return not Character:GetAttribute("Exhausted")
+local function IsOnSprintCooldown(): boolean
+	local CurrentTime = os.clock()
+	local CooldownDuration = StaminaBalance.Sprint.COOLDOWN_SECONDS
+	return (CurrentTime - LastSprintEndTime) < CooldownDuration
+end
+
+local function CanStartSprint(): boolean
+	if IsExhausted() then
+		return false
+	end
+
+	if IsOnSprintCooldown() then
+		return false
+	end
+
+	return true
 end
 
 local function SetMovementMode(Mode: string)
-	local AcceptedMode: string = "walk"
-
 	if Mode == "walk" then
-		IsInSprintMode = false
-	elseif Mode == "jog" then
-		if not CanJog() then
-			SetMovementMode("walk")
-			return
+		if IsInSprintMode then
+			LastSprintEndTime = os.clock()
 		end
+		IsInSprintMode = false
+		Packets.MovementStateChanged:Fire("walk")
+		return
+	end
+
+	if not CanStartSprint() then
+		if IsInSprintMode then
+			LastSprintEndTime = os.clock()
+		end
+		IsInSprintMode = false
+		Packets.MovementStateChanged:Fire("walk")
+		return
+	end
+
+	if Mode == "jog" then
 		Character:SetAttribute("PreferredSprintMode", "jog")
 		IsInSprintMode = true
 		CurrentSprintType = "jog"
 		SavedSprintType = "jog"
-		AcceptedMode = "jog"
+		Packets.MovementStateChanged:Fire("jog")
 	elseif Mode == "run" then
-		if not CanSprint() then
-			SetMovementMode("walk")
-			return
-		end
 		Character:SetAttribute("PreferredSprintMode", "run")
 		IsInSprintMode = true
 		CurrentSprintType = "run"
 		SavedSprintType = "run"
-		AcceptedMode = "run"
+		Packets.MovementStateChanged:Fire("run")
 	end
-
-	Packets.MovementStateChanged:Fire(AcceptedMode)
 end
 
 local function EnterSprintMode()
@@ -81,11 +97,11 @@ local function EnterSprintMode()
 		return
 	end
 
-	if SavedSprintType == "jog" then
-		SetMovementMode("jog")
-	else
-		SetMovementMode("run")
+	if not CanStartSprint() then
+		return
 	end
+
+	SetMovementMode(SavedSprintType)
 end
 
 local function ExitSprintMode()
@@ -106,7 +122,7 @@ local function ToggleSprintType()
 	end
 end
 
-local function OnInputBegan(Input, GameProcessedEvent)
+local function OnInputBegan(Input: InputObject, GameProcessedEvent: boolean)
 	if GameProcessedEvent then
 		return
 	end
@@ -114,20 +130,22 @@ local function OnInputBegan(Input, GameProcessedEvent)
 	if Input.KeyCode == Enum.KeyCode.W then
 		IsWHeld = true
 
-		local CurrentTime = tick()
-		if CurrentTime - LastWPressTime <= DOUBLE_TAP_TIME then
+		local CurrentTime = os.clock()
+		if CurrentTime - LastWPressTime <= DOUBLE_TAP_WINDOW_SECONDS then
 			EnterSprintMode()
 		end
 		LastWPressTime = CurrentTime
+
+	-- Shift-to-sprint (commented out for future use)
 	-- elseif Input.KeyCode == Enum.KeyCode.LeftShift or Input.KeyCode == Enum.KeyCode.RightShift then
-	-- 	IsShiftHeld = true
 	-- 	EnterSprintMode()
+
 	elseif Input.KeyCode == Enum.KeyCode.R then
 		ToggleSprintType()
 	end
 end
 
-local function OnInputEnded(Input, GameProcessedEvent)
+local function OnInputEnded(Input: InputObject, GameProcessedEvent: boolean)
 	if GameProcessedEvent then
 		return
 	end
@@ -137,8 +155,9 @@ local function OnInputEnded(Input, GameProcessedEvent)
 		if IsInSprintMode then
 			ExitSprintMode()
 		end
+
+	-- Shift-to-sprint (commented out for future use)
 	-- elseif Input.KeyCode == Enum.KeyCode.LeftShift or Input.KeyCode == Enum.KeyCode.RightShift then
-	-- 	IsShiftHeld = false
 	-- 	if IsInSprintMode then
 	-- 		ExitSprintMode()
 	-- 	end
@@ -149,7 +168,7 @@ UserInputService.InputBegan:Connect(OnInputBegan)
 UserInputService.InputEnded:Connect(OnInputEnded)
 
 UpdateService.Register(function(DeltaTime: number)
-	if not IsInSprintMode or IsShiftHeld then
+	if not IsInSprintMode then
 		StopMovingTimeSeconds = 0
 		return
 	end
@@ -169,6 +188,9 @@ Character:GetAttributeChangedSignal("MovementMode"):Connect(function()
 	local ServerMode = Character:GetAttribute("MovementMode")
 
 	if ServerMode == "walk" then
+		if IsInSprintMode then
+			LastSprintEndTime = os.clock()
+		end
 		IsInSprintMode = false
 	elseif ServerMode == "jog" then
 		IsInSprintMode = true
@@ -179,13 +201,13 @@ Character:GetAttributeChangedSignal("MovementMode"):Connect(function()
 	end
 end)
 
-Character:GetAttributeChangedSignal(StatEnums.RUN_SPEED):Connect(function()
-	-- No WalkSpeed adjustments anymore
-end)
-
 Player.CharacterAdded:Connect(function(NewCharacter)
 	Character = NewCharacter
 	Humanoid = NewCharacter:WaitForChild("Humanoid")
+
+	IsInSprintMode = false
+	LastSprintEndTime = 0
+	StopMovingTimeSeconds = 0
 
 	if not Character:GetAttribute("MovementMode") then
 		Character:SetAttribute("MovementMode", "walk")
@@ -198,7 +220,7 @@ Player.CharacterAdded:Connect(function(NewCharacter)
 		CurrentSprintType = SavedSprintType
 	end
 
-	SetMovementMode("walk")
+	Packets.MovementStateChanged:Fire("walk")
 end)
 
-SetMovementMode("walk")
+Packets.MovementStateChanged:Fire("walk")

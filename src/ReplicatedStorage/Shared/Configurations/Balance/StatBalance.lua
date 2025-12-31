@@ -20,7 +20,7 @@ local StatBalance = {
 		Muscle = 0,
 		Durability = 0,
 		RunSpeed = 28,
-		JumpPower = 50,
+		JumpPower = 25,
 		StrikingPower = 0,
 		StrikeSpeed = 0,
 		StunDuration = 0,
@@ -28,7 +28,9 @@ local StatBalance = {
 
 	MovementSpeeds = {
 		WalkSpeed = 8,
+		JumpPower = 35,
 		JogSpeedPercent = 0.625,
+		JumpCooldownSeconds = 2
 	},
 
 	Caps = {

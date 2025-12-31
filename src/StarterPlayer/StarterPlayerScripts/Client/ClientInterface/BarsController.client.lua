@@ -104,7 +104,9 @@ local function LerpBar(BarInfo: BarData, DeltaTime: number)
 	local Alpha = math.min(LERP_SPEED * DeltaTime, 1)
 	BarInfo.CurrentValue += (BarInfo.TargetValue - BarInfo.CurrentValue) * Alpha
 	BarInfo.Fill.Size = UDim2.fromScale(BarInfo.CurrentValue, 1)
-	BarInfo.Quantity.Text = tostring(math.floor(BarInfo.CurrentValue * 100)) .. "%"
+	local ClampedValue = math.clamp(BarInfo.CurrentValue, 0, 1)
+	local Percentage = math.clamp(math.floor(ClampedValue * 100 + 0.5), 0, 100)
+	BarInfo.Quantity.Text = tostring(Percentage) .. "%"
 end
 
 local function UpdateBodyFatigue(Character: Model)
