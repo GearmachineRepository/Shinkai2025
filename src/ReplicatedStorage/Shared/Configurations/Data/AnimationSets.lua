@@ -71,10 +71,10 @@ local Sets: { [string]: AnimationSet } = {
 
 		Metadata = {
 			Feintable = true,
-			FeintEndlag = 0.25,
+			FeintEndlag = 0.15,
 			FeintCooldown = 0.5,
 			HeavyAttackCooldown = 4.0,
-			ComboEndlag = 0.25,
+			ComboEndlag = 0.00,
 			ComboResetTime = 2.0,
 			StaminaCostHitReduction = 0.15,
 			FallbackTimings = {

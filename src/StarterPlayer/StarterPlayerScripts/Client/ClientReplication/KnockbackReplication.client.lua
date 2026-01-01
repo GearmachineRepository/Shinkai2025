@@ -60,7 +60,7 @@ Packets.ApplyKnockback.OnClientEvent:Connect(function(Direction: Vector3, Speed:
 	task.spawn(function()
 		local RayParams = RaycastParams.new()
 		RayParams.FilterType = Enum.RaycastFilterType.Exclude
-		RayParams.FilterDescendantsInstances = { Character }
+		RayParams.FilterDescendantsInstances = { Character, workspace.Characters, workspace.Debris }
 
 		local StartTime = os.clock()
 		while os.clock() - StartTime < Duration do

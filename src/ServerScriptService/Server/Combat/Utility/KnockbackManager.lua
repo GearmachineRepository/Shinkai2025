@@ -28,7 +28,7 @@ type KnockbackData = {
 local ActiveKnockbacks: { [any]: KnockbackData } = {}
 
 local IMPACT_CHECK_INTERVAL = 1 / 60
-local IMPACT_RAY_DISTANCE = 2.5
+local IMPACT_RAY_DISTANCE = 3.25
 
 local function GetFlatDirection(Direction: Vector3): Vector3
 	local Flat = Vector3.new(Direction.X, 0, Direction.Z)
