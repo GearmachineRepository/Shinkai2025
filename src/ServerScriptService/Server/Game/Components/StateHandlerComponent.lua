@@ -95,7 +95,7 @@ local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?, an
 		return "GuardBroken", EventData.Entity and EventData.Entity.Character, nil
 	end,
 	[CombatEvents.ClashOccurred] = function(EventData)
-		return "Clash", EventData.EntityA and EventData.EntityA.Character, nil
+		return "Clash", EventData.EntityA and EventData.EntityA.Character, EventData.HitPosition
 	end,
 	[CombatEvents.FeintExecuted] = function(EventData)
 		return "FeintSmoke", EventData.Entity and EventData.Entity.Character, nil

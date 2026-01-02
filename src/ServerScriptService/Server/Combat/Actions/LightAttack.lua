@@ -29,6 +29,8 @@ local LightAttack = {}
 LightAttack.ActionName = "LightAttack"
 LightAttack.ActionType = "Attack"
 
+local COOLDOWN_ID = "LightAttack"
+
 local PRESERVE_ANIMATION_INTERRUPTS = {
 	PerfectGuard = true,
 	Counter = true,
@@ -134,6 +136,11 @@ function LightAttack.CanExecute(Context: ActionContext): (boolean, string?)
 		return false, "NoStamina"
 	end
 
+	local CooldownSeconds = Context.Metadata.ComboEndlag or 0
+	if CooldownSeconds > 0 and ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, CooldownSeconds) then
+		return false, "OnCooldown"
+	end
+
 	return true, nil
 end
 
@@ -184,7 +191,6 @@ end
 function LightAttack.OnComplete(Context: ActionContext)
 	local Metadata = Context.Metadata
 	local AnimationSetName = Metadata.AnimationSet
-
 	if not AnimationSetName then
 		return
 	end
@@ -194,8 +200,11 @@ function LightAttack.OnComplete(Context: ActionContext)
 
 	ActionExecutor.AdvanceCombo(Context.Entity, "LightAttack", ComboIndex, ComboLength)
 
-	if ComboIndex == ComboLength and Metadata.ComboEndlag and Metadata.ComboEndlag > 0 then
-		task.wait(Metadata.ComboEndlag)
+	if ComboIndex == ComboLength then
+		local CooldownSeconds = Metadata.ComboEndlag or 0
+		if CooldownSeconds > 0 then
+			ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, CooldownSeconds)
+		end
 	end
 end
 

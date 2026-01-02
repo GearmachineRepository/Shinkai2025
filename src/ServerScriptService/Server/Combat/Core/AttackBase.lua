@@ -48,7 +48,7 @@ local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacte
 	return TargetPivot:PointToWorldSpace(ClampedLocalPoint)
 end
 
-local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
+local function HandleClash(ContextA: ActionContext, ContextB: ActionContext, HitPosition: Vector3?)
 	ContextA.Entity.States:SetState("Clashing", true)
 	ContextB.Entity.States:SetState("Clashing", true)
 
@@ -58,6 +58,7 @@ local function HandleClash(ContextA: ActionContext, ContextB: ActionContext)
 	Ensemble.Events.Publish(CombatEvents.ClashOccurred, {
 		EntityA = ContextA.Entity,
 		EntityB = ContextB.Entity,
+		HitPosition = HitPosition,
 	})
 
 	task.delay(0.3, function()
@@ -265,7 +266,7 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 			local TimeDifference = math.abs(TargetHitTime - AttackerHitTime)
 
 			if TimeDifference <= CombatBalance.Attacking.CLASH_WINDOW_SECONDS then
-				HandleClash(AttackerContext, TargetContext)
+				HandleClash(AttackerContext, TargetContext, HitPosition)
 				return true
 			end
 		end
