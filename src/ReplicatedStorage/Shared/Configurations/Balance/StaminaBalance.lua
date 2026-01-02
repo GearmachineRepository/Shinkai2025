@@ -7,7 +7,7 @@ local StaminaBalance = {
 	},
 
 	Regeneration = {
-		RATE = 6,
+		RATE = 8,
 		DELAY = 0.25,
 	},
 
@@ -22,7 +22,7 @@ local StaminaBalance = {
 	},
 
 	StutterStep = {
-		GRACE_PERIOD = 0.15,
+		GRACE_PERIOD = 0.35,
 		REDUCTION_PERCENT = 100,
 		COOLDOWN = 0.1,
 	},

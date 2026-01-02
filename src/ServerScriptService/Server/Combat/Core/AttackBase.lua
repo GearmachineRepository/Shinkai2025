@@ -71,6 +71,38 @@ local function HandleClash(ContextA: ActionContext, ContextB: ActionContext, Hit
 	end)
 end
 
+local function HasLineOfSight(
+	OriginPart: BasePart,
+	TargetCharacter: Model,
+	TargetPosition: Vector3,
+	AttackerCharacter: Model
+): boolean
+	local OriginPosition: Vector3 = OriginPart.Position
+
+	local Direction: Vector3 = TargetPosition - OriginPosition
+	local Distance: number = Direction.Magnitude
+	if Distance <= 0.001 then
+		return true
+	end
+
+	local RaycastParamsInstance: RaycastParams = RaycastParams.new()
+	RaycastParamsInstance.FilterType = Enum.RaycastFilterType.Exclude
+	RaycastParamsInstance.FilterDescendantsInstances = { AttackerCharacter }
+	RaycastParamsInstance.IgnoreWater = true
+
+	local RaycastResultInstance: RaycastResult? = workspace:Raycast(OriginPosition, Direction, RaycastParamsInstance)
+	if not RaycastResultInstance then
+		return true
+	end
+
+	local HitInstance: Instance = RaycastResultInstance.Instance
+	if HitInstance:IsDescendantOf(TargetCharacter) then
+		return true
+	end
+
+	return false
+end
+
 function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, Vector3?) -> ())
 	local RootPart = Context.Entity.Character and Context.Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not RootPart then
@@ -120,6 +152,19 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 				HitPosition = HitParts[Index].Position
 			else
 				HitPosition = GetFallbackHitPosition(RootPart, TargetCharacter)
+			end
+
+			if not HitPosition then
+				continue
+			end
+
+			local AttackerCharacter: Model? = Context.Entity.Character
+			if not AttackerCharacter then
+				continue
+			end
+
+			if not HasLineOfSight(RootPart, TargetCharacter, HitPosition, AttackerCharacter) then
+				continue
 			end
 
 			Context.CustomData.HasHit = true
