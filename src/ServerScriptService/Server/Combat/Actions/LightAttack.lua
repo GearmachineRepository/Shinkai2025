@@ -123,12 +123,7 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 end
 
 function LightAttack.CanExecute(Context: ActionContext): (boolean, string?)
-        local WantsAfrodash = Context.InputData and Context.InputData.Afrodash == true
-        local ComboLength = Context.Metadata.ComboLength or 0
-        local ComboIndex = Context.Metadata.ComboIndex or 1
-        local IsFinalCombo = ComboLength > 0 and ComboIndex >= ComboLength
-        local IsAfrodash = WantsAfrodash and IsFinalCombo
-
+        local IsAfrodash = Context.InputData and Context.InputData.Afrodash == true
         local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
         if not CanPerform then
                 if not (IsAfrodash and Reason == "Dodging") then

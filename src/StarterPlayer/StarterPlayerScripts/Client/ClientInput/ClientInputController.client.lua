@@ -46,6 +46,7 @@ local STEERABLE_DODGE = true
 local AFRODASH_WINDOW = 0.2
 
 local AFRODASH_ACTIONS: { [string]: boolean } = {
+        M1 = true,
         M2 = true,
         Skill1 = true,
         Skill2 = true,
@@ -236,34 +237,17 @@ local function IsInputLocked(): boolean
         return true
 end
 
-local function WasRecentAfrodashPartner(RawInput: string, Character: Model): boolean
+local function WasRecentAfrodashPartner(RawInput: string): boolean
         local Now = os.clock()
 
-        if not IsAfrodashEligible(RawInput, Character) then
-                return false
-        end
-
         if RawInput == "Dodge" then
-                if IsAfrodashEligible("M1", Character) then
-                        local LastM1 = AfrodashTimers["M1"]
-                        if LastM1 and (Now - LastM1) <= AFRODASH_WINDOW then
+                for ActionName, _ in AFRODASH_ACTIONS do
+                        local LastTime = AfrodashTimers[ActionName]
+                        if LastTime and (Now - LastTime) <= AFRODASH_WINDOW then
                                 return true
                         end
                 end
-
-                for ActionName, _ in AFRODASH_ACTIONS do
-                        if IsAfrodashEligible(ActionName, Character) then
-                                local LastTime = AfrodashTimers[ActionName]
-                                if LastTime and (Now - LastTime) <= AFRODASH_WINDOW then
-                                        return true
-                                end
-                        end
-                end
-        elseif AFRODASH_ACTIONS[RawInput] or RawInput == "M1" then
-                if RawInput == "M1" and not IsLastM1(Character) then
-                        return false
-                end
-
+        elseif AFRODASH_ACTIONS[RawInput] then
                 local LastDodge = AfrodashTimers["Dodge"]
                 if LastDodge and (Now - LastDodge) <= AFRODASH_WINDOW then
                         return true
@@ -273,11 +257,7 @@ local function WasRecentAfrodashPartner(RawInput: string, Character: Model): boo
         return false
 end
 
-local function RecordAfrodashInput(RawInput: string, Character: Model)
-        if not IsAfrodashEligible(RawInput, Character) then
-                return
-        end
-
+local function RecordAfrodashInput(RawInput: string)
         AfrodashTimers[RawInput] = os.clock()
 end
 
@@ -396,7 +376,7 @@ local function CanPerformAction(RawInput: string, IsAfrodash: boolean?): (boolea
         return true, StaminaCost
 end
 
-local function TryExecuteAction(RawInput: string, InputData: { [string]: any }?, BypassLock: boolean?, IsAfrodash: boolean?)
+local function TryExecuteAction(RawInput: string, InputData: { [string]: any }?, BypassLock: boolean?)
     SyncLocalState()
 
     if not BypassLock and IsInputLocked() then
@@ -404,7 +384,7 @@ local function TryExecuteAction(RawInput: string, InputData: { [string]: any }?,
         return
     end
 
-    local CanPerform, StaminaCost = CanPerformAction(RawInput, IsAfrodash)
+    local CanPerform, StaminaCost = CanPerformAction(RawInput)
     if not CanPerform then
         InputBuffer.BufferAction(RawInput)
         return
@@ -485,12 +465,12 @@ InputBuffer.OnAction(function(ActionName: string)
 
         SyncLocalState()
 
-        local IsAfrodash = WasRecentAfrodashPartner(ActionName, Character)
+        local IsAfrodash = WasRecentAfrodashPartner(ActionName)
         local InputData = if IsAfrodash then { Afrodash = true } else nil
         local ShouldBypassLock = IsAfrodash
 
-        TryExecuteAction(ActionName, InputData, ShouldBypassLock, IsAfrodash)
-        RecordAfrodashInput(ActionName, Character)
+        TryExecuteAction(ActionName, InputData, ShouldBypassLock)
+        RecordAfrodashInput(ActionName)
 end)
 
 InputBuffer.OnRelease(function(ActionName: string)
