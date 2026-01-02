@@ -16,10 +16,10 @@ local ClientDodgeHandler = require(script.Parent.ClientDodgeHandler)
 local Player = Players.LocalPlayer
 
 type PendingAction = {
-	ActionName: string,
-	Timestamp: number,
-	StaminaCost: number?,
-	IsPredicted: boolean?,
+        ActionName: string,
+        Timestamp: number,
+        StaminaCost: number?,
+        IsPredicted: boolean?,
 }
 
 local PendingAction: PendingAction? = nil
@@ -37,12 +37,25 @@ type LocalCooldownState = {
 }
 
 local LocalCooldown: LocalCooldownState = {
-	DodgeEndTime = 0,
+        DodgeEndTime = 0,
 }
 
 local PENDING_ACTION_TIMEOUT = 1.0
 local STAMINA_SYNC_INTERVAL = 0.5
 local STEERABLE_DODGE = true
+local AFRODASH_WINDOW = 0.2
+
+local AFRODASH_ACTIONS: { [string]: boolean } = {
+        M2 = true,
+        Skill1 = true,
+        Skill2 = true,
+        Skill3 = true,
+        Skill4 = true,
+        Skill5 = true,
+        Skill6 = true,
+}
+
+local AfrodashTimers: { [string]: number } = {}
 
 local function GetCooldownEndTimeFromAttribute(Character: Model): number?
 	local DodgeCooldownEndTime = Character:GetAttribute("DodgeCooldownEndTime") :: number?
@@ -113,24 +126,55 @@ local function GetComboCount(Character: Model): number
 end
 
 local function GetAnimationSetName(Character: Model): string?
-	local ItemId = GetEquippedItemId(Character)
-	if not ItemId then
-		return nil
-	end
+        local ItemId = GetEquippedItemId(Character)
+        if not ItemId then
+                return nil
+        end
 
 	local ItemData = ItemDatabase.GetItem(ItemId)
 	if not ItemData then
 		return nil
 	end
 
-	return ItemData.AnimationSet
+return ItemData.AnimationSet
+end
+
+local function GetComboLength(Character: Model): number?
+        local AnimationSetName = GetAnimationSetName(Character)
+        if not AnimationSetName then
+                return nil
+        end
+
+        return AnimationSets.GetComboLength(AnimationSetName, "M1")
+end
+
+local function IsLastM1(Character: Model): boolean
+        local ComboLength = GetComboLength(Character)
+        if not ComboLength then
+                return false
+        end
+
+        local ComboCount = GetComboCount(Character)
+        return ComboCount >= ComboLength
+end
+
+local function IsAfrodashEligible(ActionName: string, Character: Model): boolean
+        if ActionName == "M1" then
+                return IsLastM1(Character)
+        end
+
+        if ActionName == "Dodge" then
+                return true
+        end
+
+        return AFRODASH_ACTIONS[ActionName] == true
 end
 
 local function GetStaminaCostMultiplier(Character: Model): number
-	local ItemId = GetEquippedItemId(Character)
-	if not ItemId then
-		return 1
-	end
+        local ItemId = GetEquippedItemId(Character)
+        if not ItemId then
+                return 1
+        end
 
 	local Item = ItemDatabase.GetItem(ItemId)
 	if not Item then return 1 end
@@ -179,9 +223,9 @@ local function RefundLocalStamina(Amount: number)
 end
 
 local function IsInputLocked(): boolean
-	if not PendingAction then
-		return false
-	end
+        if not PendingAction then
+                return false
+        end
 
 	local TimeSincePending = os.clock() - PendingAction.Timestamp
 	if TimeSincePending > PENDING_ACTION_TIMEOUT then
@@ -189,7 +233,52 @@ local function IsInputLocked(): boolean
 		return false
 	end
 
-	return true
+        return true
+end
+
+local function WasRecentAfrodashPartner(RawInput: string, Character: Model): boolean
+        local Now = os.clock()
+
+        if not IsAfrodashEligible(RawInput, Character) then
+                return false
+        end
+
+        if RawInput == "Dodge" then
+                if IsAfrodashEligible("M1", Character) then
+                        local LastM1 = AfrodashTimers["M1"]
+                        if LastM1 and (Now - LastM1) <= AFRODASH_WINDOW then
+                                return true
+                        end
+                end
+
+                for ActionName, _ in AFRODASH_ACTIONS do
+                        if IsAfrodashEligible(ActionName, Character) then
+                                local LastTime = AfrodashTimers[ActionName]
+                                if LastTime and (Now - LastTime) <= AFRODASH_WINDOW then
+                                        return true
+                                end
+                        end
+                end
+        elseif AFRODASH_ACTIONS[RawInput] or RawInput == "M1" then
+                if RawInput == "M1" and not IsLastM1(Character) then
+                        return false
+                end
+
+                local LastDodge = AfrodashTimers["Dodge"]
+                if LastDodge and (Now - LastDodge) <= AFRODASH_WINDOW then
+                        return true
+                end
+        end
+
+        return false
+end
+
+local function RecordAfrodashInput(RawInput: string, Character: Model)
+        if not IsAfrodashEligible(RawInput, Character) then
+                return
+        end
+
+        AfrodashTimers[RawInput] = os.clock()
 end
 
 local function ResolveActionName(RawInput: string): string
@@ -272,21 +361,29 @@ local function GetStaminaCost(Character: Model, ResolvedAction: string): number?
 	return nil
 end
 
-local function CanPerformAction(RawInput: string): (boolean, number?)
-	local Character = GetCharacter()
-	if not Character then
-		return false, nil
-	end
+local function CanPerformAction(RawInput: string, IsAfrodash: boolean?): (boolean, number?)
+        local Character = GetCharacter()
+        if not Character then
+                return false, nil
+        end
 
-	local ResolvedAction = ResolveActionName(RawInput)
+        local ResolvedAction = ResolveActionName(RawInput)
 
-	local CanPerform, _Reason = ActionValidator.CanPerformClient(Character, ResolvedAction)
-	if not CanPerform then
-		return false, nil
-	end
+        local CanPerform, Reason = ActionValidator.CanPerformClient(Character, ResolvedAction)
+        if not CanPerform then
+                if IsAfrodash then
+                        if ResolvedAction == "Dodge" and Reason == "Attacking" then
+                                CanPerform = true
+                        elseif (ResolvedAction == "M1" or ResolvedAction == "LightAttack" or ResolvedAction == "M2" or ResolvedAction == "HeavyAttack") and Reason == "Dodging" then
+                                CanPerform = true
+                        end
+                end
 
-	if ResolvedAction == "Dodge" then
-		if IsDodgeOnCooldown(Character) then
+                return false, nil
+        end
+
+        if ResolvedAction == "Dodge" then
+                if IsDodgeOnCooldown(Character) then
 			return false, nil
 		end
 	end
@@ -296,13 +393,18 @@ local function CanPerformAction(RawInput: string): (boolean, number?)
 		return false, nil
 	end
 
-	return true, StaminaCost
+        return true, StaminaCost
 end
 
-local function TryExecuteAction(RawInput: string)
+local function TryExecuteAction(RawInput: string, InputData: { [string]: any }?, BypassLock: boolean?, IsAfrodash: boolean?)
     SyncLocalState()
 
-    local CanPerform, StaminaCost = CanPerformAction(RawInput)
+    if not BypassLock and IsInputLocked() then
+        InputBuffer.BufferAction(RawInput)
+        return
+    end
+
+    local CanPerform, StaminaCost = CanPerformAction(RawInput, IsAfrodash)
     if not CanPerform then
         InputBuffer.BufferAction(RawInput)
         return
@@ -310,30 +412,30 @@ local function TryExecuteAction(RawInput: string)
 
     local ResolvedAction = ResolveActionName(RawInput)
 
-	if StaminaCost and StaminaCost > 0 then
-		DeductLocalStamina(StaminaCost)
-	end
+        if StaminaCost and StaminaCost > 0 then
+                DeductLocalStamina(StaminaCost)
+        end
 
-	local IsPredicted = false
+        local IsPredicted = false
 
-	if ResolvedAction == "Dodge" then
-		local Started = ClientDodgeHandler.StartDodge(STEERABLE_DODGE)
-		if Started then
-			LocalState.IsDodging = true
-			IsPredicted = true
-		end
-	elseif ResolvedAction == "M1" or ResolvedAction == "M2" then
-		LocalState.IsAttacking = true
-	end
+        if ResolvedAction == "Dodge" then
+                local Started = ClientDodgeHandler.StartDodge(STEERABLE_DODGE)
+                if Started then
+                        LocalState.IsDodging = true
+                        IsPredicted = true
+                end
+        elseif ResolvedAction == "M1" or ResolvedAction == "M2" then
+                LocalState.IsAttacking = true
+        end
 
-	PendingAction = {
-		ActionName = RawInput,
-		Timestamp = os.clock(),
-		StaminaCost = StaminaCost,
-		IsPredicted = IsPredicted,
-	}
+        PendingAction = {
+                ActionName = RawInput,
+                Timestamp = os.clock(),
+                StaminaCost = StaminaCost,
+                IsPredicted = IsPredicted,
+        }
 
-	Packets.PerformAction:Fire(RawInput)
+        Packets.PerformAction:Fire(RawInput, InputData)
 end
 
 local function TryExecuteBufferedAction()
@@ -376,19 +478,19 @@ local function RollbackPrediction()
 end
 
 InputBuffer.OnAction(function(ActionName: string)
-	local Character = GetCharacter()
-	if not Character then
-		return
-	end
+        local Character = GetCharacter()
+        if not Character then
+                return
+        end
 
-	SyncLocalState()
+        SyncLocalState()
 
-	if IsInputLocked() then
-		InputBuffer.BufferAction(ActionName)
-		return
-	end
+        local IsAfrodash = WasRecentAfrodashPartner(ActionName, Character)
+        local InputData = if IsAfrodash then { Afrodash = true } else nil
+        local ShouldBypassLock = IsAfrodash
 
-	TryExecuteAction(ActionName)
+        TryExecuteAction(ActionName, InputData, ShouldBypassLock, IsAfrodash)
+        RecordAfrodashInput(ActionName, Character)
 end)
 
 InputBuffer.OnRelease(function(ActionName: string)

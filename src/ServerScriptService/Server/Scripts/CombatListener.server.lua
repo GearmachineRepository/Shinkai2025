@@ -119,25 +119,29 @@ local function HandleWindowCommand(Entity: Entity, WindowType: string): boolean
 end
 
 local function HandleActionRequest(Player: Player, RawInput: string, InputData: { [string]: any }?)
-	local Entity = GetEntityFromPlayer(Player)
-	if not Entity then
-		NotifyActionDenied(Player, "NoEntity")
-		return
-	end
+        local Entity = GetEntityFromPlayer(Player)
+        if not Entity then
+                NotifyActionDenied(Player, "NoEntity")
+                return
+        end
 
-	local ResolvedAction = Combat.ResolveInput(Entity, RawInput)
-	if not ResolvedAction then
-		NotifyActionDenied(Player, "NoValidAction")
-		return
-	end
+        local FinalInputData = InputData or {}
+        local IsAfrodash = FinalInputData.Afrodash == true
 
-	local FinalInputData = InputData or {}
+        local ResolvedAction = Combat.ResolveInput(Entity, RawInput)
+        if not ResolvedAction and IsAfrodash and RawInput == "Dodge" then
+                ResolvedAction = "Dodge"
+        end
+        if not ResolvedAction then
+                NotifyActionDenied(Player, "NoValidAction")
+                return
+        end
 
-	-- Allow dodging to run parallel to blocking
+        -- Allow dodging to run parallel to blocking or other afrodash actions
     if ResolvedAction == "Dodge" then
         local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
-        if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
-            local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
+        if ActiveContext and (ActiveContext.Metadata.ActionName == "Block" or IsAfrodash) then
+            local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, FinalInputData)
             if Success then
                 NotifyActionApproved(Player, RawInput)
             else
@@ -191,7 +195,10 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 		end
 	end
 
-	local Success, Reason = Combat.ActionExecutor.Execute(Entity, ResolvedAction, RawInput, FinalInputData)
+        local UseParallel = IsAfrodash and Combat.ActionExecutor.IsExecuting(Entity)
+        local Executor = if UseParallel then Combat.ActionExecutor.ExecuteParallel else Combat.ActionExecutor.Execute
+
+        local Success, Reason = Executor(Entity, ResolvedAction, RawInput, FinalInputData)
 
 	if Success then
 		NotifyActionApproved(Player, RawInput)

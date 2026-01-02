@@ -75,9 +75,10 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		return nil
 	end
 
-	local ComboIndex = ActionExecutor.GetComboCount(Entity, "LightAttack")
-	local AttackData = AnimationSets.GetAttack(AnimationSetName, "M1", ComboIndex)
-	local SetMetadata = AnimationSets.GetMetadata(AnimationSetName)
+        local ComboIndex = ActionExecutor.GetComboCount(Entity, "LightAttack")
+        local ComboLength = AnimationSets.GetComboLength(AnimationSetName, "M1")
+        local AttackData = AnimationSets.GetAttack(AnimationSetName, "M1", ComboIndex)
+        local SetMetadata = AnimationSets.GetMetadata(AnimationSetName)
 
 	if not AttackData then
 		return nil
@@ -89,8 +90,9 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		ActionName = "LightAttack",
 		ActionType = "Attack",
 		AnimationSet = AnimationSetName,
-		AnimationId = AttackData.AnimationId,
-		ComboIndex = ComboIndex,
+                AnimationId = AttackData.AnimationId,
+                ComboIndex = ComboIndex,
+                ComboLength = ComboLength,
 
 		Damage = ApplyStatModifiers(AttackData.Damage, StatModifiers and StatModifiers.DamageMultiplier),
 		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, StatModifiers and StatModifiers.StaminaCostMultiplier),
@@ -121,10 +123,18 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 end
 
 function LightAttack.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
-	if not CanPerform then
-		return false, Reason
-	end
+        local WantsAfrodash = Context.InputData and Context.InputData.Afrodash == true
+        local ComboLength = Context.Metadata.ComboLength or 0
+        local ComboIndex = Context.Metadata.ComboIndex or 1
+        local IsFinalCombo = ComboLength > 0 and ComboIndex >= ComboLength
+        local IsAfrodash = WantsAfrodash and IsFinalCombo
+
+        local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
+        if not CanPerform then
+                if not (IsAfrodash and Reason == "Dodging") then
+                        return false, Reason
+                end
+        end
 
 	local StatComponent = Context.Entity:GetComponent("Stats")
 	if not StatComponent then
