@@ -71,10 +71,13 @@ local function StopDodgeAnimation(Context: ActionContext, FadeTime: number?)
 end
 
 function Dodge.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "Dodge")
-	if not CanPerform then
-		return false, Reason
-	end
+        local IsAfrodash = Context.InputData and Context.InputData.Afrodash == true
+        local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "Dodge")
+        if not CanPerform then
+                if not (IsAfrodash and Reason == "Attacking") then
+                        return false, Reason
+                end
+        end
 
 	local StatComponent = Context.Entity:GetComponent("Stats")
 	if StatComponent then
