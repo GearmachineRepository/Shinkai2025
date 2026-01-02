@@ -121,10 +121,13 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 end
 
 function LightAttack.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
-	if not CanPerform then
-		return false, Reason
-	end
+        local IsAfrodash = Context.InputData and Context.InputData.Afrodash == true
+        local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
+        if not CanPerform then
+                if not (IsAfrodash and Reason == "Dodging") then
+                        return false, Reason
+                end
+        end
 
 	local StatComponent = Context.Entity:GetComponent("Stats")
 	if not StatComponent then
