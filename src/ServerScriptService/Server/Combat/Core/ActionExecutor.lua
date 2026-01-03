@@ -266,15 +266,15 @@ function ActionExecutor.Execute(
 
 	local ActiveContext = ActiveContexts[Entity]
 
-	if Definition.RequiresActiveAction then
-		if not ActiveContext then
-			return false, "NoActiveAction"
-		end
-	else
-		if ActiveContext then
-			return false, "AlreadyExecuting"
-		end
-	end
+	-- if Definition.RequiresActiveAction then
+	-- 	if not ActiveContext then
+	-- 		return false, "NoActiveAction"
+	-- 	end
+	-- else
+	-- 	if ActiveContext then
+	-- 		return false, "AlreadyExecuting"
+	-- 	end
+	-- end
 
 	local FinalInputData = InputData or {}
 	local Metadata: ActionMetadata
