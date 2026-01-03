@@ -17,6 +17,7 @@ local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 local Packets = require(Shared.Networking.Packets)
 local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local CombatValidationConfig = require(Shared.Configurations.CombatValidationConfig)
 
 local StateHandlerComponent = {}
 StateHandlerComponent.__index = StateHandlerComponent
@@ -27,29 +28,6 @@ StateHandlerComponent.Dependencies = { "States" }
 type Self = {
 	Entity: Types.Entity,
 	Maid: Types.Maid,
-}
-
-local CONFLICTING_STATES = {
-	[StateTypes.STUNNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING },
-	[StateTypes.RAGDOLLED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.STUNNED },
-	[StateTypes.ATTACKING] = { StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING, StateTypes.JOGGING },
-	[StateTypes.DODGING] = { StateTypes.ATTACKING },
-	[StateTypes.DOWNED] = { StateTypes.ATTACKING, StateTypes.BLOCKING, StateTypes.DODGING, StateTypes.SPRINTING },
-}
-
-local MOVEMENT_BLOCKING_STATES = {
-	StateTypes.GUARD_BROKEN,
-	StateTypes.RAGDOLLED,
-	StateTypes.DOWNED,
-}
-
-local FORCE_WALK_STATES = {
-	StateTypes.STUNNED,
-	StateTypes.GUARD_BROKEN,
-	StateTypes.EXHAUSTED,
-	StateTypes.DODGING,
-	StateTypes.BLOCKING,
-	StateTypes.ATTACKING,
 }
 
 local STATE_ANIMATIONS = {
@@ -136,29 +114,11 @@ local function CanJump(Entity: Types.Entity, IsLocked: boolean)
 	end
 end
 
-local function SetupConflictResolution(Entity: Types.Entity, ComponentMaid: Types.Maid)
-	for StateName, ConflictingStates in CONFLICTING_STATES do
-		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
-			if not Enabled then
-				return
-			end
-
-			for _, ConflictingState in ConflictingStates do
-				if Entity.States:GetState(ConflictingState) then
-					Entity.States:SetState(ConflictingState, false)
-				end
-			end
-		end)
-
-		ComponentMaid:GiveTask(Connection)
-	end
-end
-
 local function SetupMovementLocking(Entity: Types.Entity, ComponentMaid: Types.Maid)
 	local function UpdateMovementLock()
 		local IsLocked = false
 
-		for _, StateName in MOVEMENT_BLOCKING_STATES do
+		for _, StateName in CombatValidationConfig.GetMovementBlockingStates() do
 			if Entity.States:GetState(StateName) then
 				IsLocked = true
 				break
@@ -169,7 +129,7 @@ local function SetupMovementLocking(Entity: Types.Entity, ComponentMaid: Types.M
 		Entity.States:SetState(StateTypes.MOVEMENT_LOCKED, IsLocked)
 	end
 
-	for _, StateName in MOVEMENT_BLOCKING_STATES do
+	for _, StateName in CombatValidationConfig.GetMovementBlockingStates() do
 		local Connection = Entity.States:OnStateChanged(StateName, UpdateMovementLock)
 		ComponentMaid:GiveTask(Connection)
 	end
@@ -179,7 +139,7 @@ local function SetupForceWalk(Entity: Types.Entity, ComponentMaid: Types.Maid)
 	local function UpdateForceWalk()
 		local ShouldForceWalk = false
 
-		for _, StateName in FORCE_WALK_STATES do
+		for _, StateName in CombatValidationConfig.GetForceWalkStates() do
 			if Entity.States:GetState(StateName) then
 				ShouldForceWalk = true
 				break
@@ -195,7 +155,7 @@ local function SetupForceWalk(Entity: Types.Entity, ComponentMaid: Types.Maid)
 		end
 	end
 
-	for _, StateName in FORCE_WALK_STATES do
+	for _, StateName in CombatValidationConfig.GetForceWalkStates() do
 		local Connection = Entity.States:OnStateChanged(StateName, UpdateForceWalk)
 		ComponentMaid:GiveTask(Connection)
 	end
@@ -343,7 +303,6 @@ end
 function StateHandlerComponent.new(Entity: Types.Entity, _Context: any): Self
 	local ComponentMaid = Ensemble.Maid.new()
 
-	SetupConflictResolution(Entity, ComponentMaid)
 	SetupMovementLocking(Entity, ComponentMaid)
 	SetupForceWalk(Entity, ComponentMaid)
 	SetupStateAnimations(Entity, ComponentMaid)

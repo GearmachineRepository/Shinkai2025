@@ -33,6 +33,7 @@ export type StateDefinition = {
 	Replication: "All" | "Owner" | "None",
 	Conflicts: { string }?,
 	LockMovement: boolean?,
+	ForceWalk: boolean?,
 }
 
 export type StateConfig = {

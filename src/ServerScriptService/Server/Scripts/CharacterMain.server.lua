@@ -14,7 +14,8 @@ local ArchTypes = require(Server.Ensemble.Types)
 local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
 local DataModule = require(Server.Game.Data.DataModule)
 
-local StateConfig = require(Server.Game.Configs.StateConfig)
+local CombatValidationConfig = require(Shared.Configurations.CombatValidationConfig)
+
 local StatConfig = require(Server.Game.Configs.StatConfig)
 local EventConfig = require(Server.Game.Configs.EventConfig)
 
@@ -23,7 +24,7 @@ Ensemble.Init({
 	Hooks = Server.Game.Hooks,
 
 	Configs = {
-		States = StateConfig,
+		States = CombatValidationConfig.GetStateConfig(),
 		Stats = StatConfig,
 		Events = EventConfig,
 	},
