@@ -13,8 +13,9 @@ export type StateDefinition = {
 }
 
 export type ActionDefinition = {
-	BlockedBy: { string }?,
-	RequiredStates: { string }?,
+        BlockedBy: { string }?,
+        RequiredStates: { string }?,
+        AfroDashIgnoredStates: { string }?,
 }
 
 export type CombatValidationConfigDefinition = {
@@ -164,51 +165,55 @@ CombatValidationConfig.States = {
 }
 
 CombatValidationConfig.Actions = {
-	M1 = {
-		BlockedBy = {
+        M1 = {
+                BlockedBy = {
 			StateTypes.STUNNED,
 			StateTypes.DOWNED,
 			StateTypes.RAGDOLLED,
 			StateTypes.EXHAUSTED,
-			StateTypes.ATTACKING,
-			StateTypes.DODGING,
-			StateTypes.GUARD_BROKEN,
-		},
-	},
+                        StateTypes.ATTACKING,
+                        StateTypes.DODGING,
+                        StateTypes.GUARD_BROKEN,
+                },
+                AfroDashIgnoredStates = { StateTypes.DODGING },
+        },
 
-	M2 = {
+        M2 = {
 		BlockedBy = {
 			StateTypes.STUNNED,
 			StateTypes.DOWNED,
 			StateTypes.RAGDOLLED,
-			StateTypes.EXHAUSTED,
-			StateTypes.ATTACKING,
-			StateTypes.GUARD_BROKEN,
-		},
-	},
+                        StateTypes.EXHAUSTED,
+                        StateTypes.ATTACKING,
+                        StateTypes.GUARD_BROKEN,
+                },
+                AfroDashIgnoredStates = { StateTypes.DODGING },
+        },
 
-	LightAttack = {
+        LightAttack = {
 		BlockedBy = {
 			StateTypes.STUNNED,
 			StateTypes.DOWNED,
 			StateTypes.RAGDOLLED,
 			StateTypes.EXHAUSTED,
-			StateTypes.ATTACKING,
-			StateTypes.DODGING,
-			StateTypes.GUARD_BROKEN,
-		},
-	},
+                        StateTypes.ATTACKING,
+                        StateTypes.DODGING,
+                        StateTypes.GUARD_BROKEN,
+                },
+                AfroDashIgnoredStates = { StateTypes.DODGING },
+        },
 
-	HeavyAttack = {
+        HeavyAttack = {
 		BlockedBy = {
 			StateTypes.STUNNED,
 			StateTypes.DOWNED,
 			StateTypes.RAGDOLLED,
-			StateTypes.EXHAUSTED,
-			StateTypes.ATTACKING,
-			StateTypes.GUARD_BROKEN,
-		},
-	},
+                        StateTypes.EXHAUSTED,
+                        StateTypes.ATTACKING,
+                        StateTypes.GUARD_BROKEN,
+                },
+                AfroDashIgnoredStates = { StateTypes.DODGING },
+        },
 
 	Feint = {
 		BlockedBy = {
@@ -241,17 +246,18 @@ CombatValidationConfig.Actions = {
 		},
 	},
 
-	Dodge = {
-		BlockedBy = {
-			StateTypes.STUNNED,
+        Dodge = {
+                BlockedBy = {
+                        StateTypes.STUNNED,
 			StateTypes.DOWNED,
 			StateTypes.RAGDOLLED,
-			StateTypes.EXHAUSTED,
-			StateTypes.ATTACKING,
-			StateTypes.DODGING,
-			StateTypes.GUARD_BROKEN,
-		},
-	},
+                        StateTypes.EXHAUSTED,
+                        StateTypes.ATTACKING,
+                        StateTypes.DODGING,
+                        StateTypes.GUARD_BROKEN,
+                },
+                AfroDashIgnoredStates = { StateTypes.ATTACKING },
+        },
 
 	Skill = {
 		BlockedBy = {

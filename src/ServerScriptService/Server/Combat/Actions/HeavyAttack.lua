@@ -113,7 +113,7 @@ function HeavyAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 end
 
 function HeavyAttack.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "HeavyAttack")
+        local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "HeavyAttack", Context.Metadata.ValidationOverrides)
 	if not CanPerform then
 		return false, Reason
 	end

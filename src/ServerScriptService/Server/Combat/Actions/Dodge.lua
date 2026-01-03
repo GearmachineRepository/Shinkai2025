@@ -71,7 +71,7 @@ local function StopDodgeAnimation(Context: ActionContext, FadeTime: number?)
 end
 
 function Dodge.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "Dodge")
+        local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "Dodge", Context.Metadata.ValidationOverrides)
 	if not CanPerform then
 		return false, Reason
 	end

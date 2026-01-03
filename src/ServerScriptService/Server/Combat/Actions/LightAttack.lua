@@ -85,12 +85,13 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 
 	local StatModifiers = ItemData.StatModifiers
 
-	local Metadata: ActionMetadata = {
-		ActionName = "LightAttack",
-		ActionType = "Attack",
-		AnimationSet = AnimationSetName,
-		AnimationId = AttackData.AnimationId,
-		ComboIndex = ComboIndex,
+        local Metadata: ActionMetadata = {
+                ActionName = "LightAttack",
+                ActionType = "Attack",
+                AnimationSet = AnimationSetName,
+                AnimationId = AttackData.AnimationId,
+                ComboIndex = ComboIndex,
+                ComboLength = AnimationSets.GetComboLength(AnimationSetName, "M1"),
 
 		Damage = ApplyStatModifiers(AttackData.Damage, StatModifiers and StatModifiers.DamageMultiplier),
 		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, StatModifiers and StatModifiers.StaminaCostMultiplier),
@@ -121,7 +122,7 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 end
 
 function LightAttack.CanExecute(Context: ActionContext): (boolean, string?)
-	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack")
+        local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "LightAttack", Context.Metadata.ValidationOverrides)
 	if not CanPerform then
 		return false, Reason
 	end

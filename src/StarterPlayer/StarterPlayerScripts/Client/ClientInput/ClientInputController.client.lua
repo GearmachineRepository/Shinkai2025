@@ -8,6 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local InputBuffer = require(Shared.General.InputBuffer)
 local Packets = require(Shared.Networking.Packets)
 local ActionValidator = require(Shared.Utils.ActionValidator)
+local AfroDash = require(Shared.Utils.AfroDash)
 local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
 local DashBalance = require(Shared.Configurations.Balance.DashBalance)
@@ -113,17 +114,33 @@ local function GetComboCount(Character: Model): number
 end
 
 local function GetAnimationSetName(Character: Model): string?
-	local ItemId = GetEquippedItemId(Character)
-	if not ItemId then
-		return nil
-	end
+        local ItemId = GetEquippedItemId(Character)
+        if not ItemId then
+                return nil
+        end
 
 	local ItemData = ItemDatabase.GetItem(ItemId)
 	if not ItemData then
 		return nil
 	end
 
-	return ItemData.AnimationSet
+        return ItemData.AnimationSet
+end
+
+local function GetAfroDashMetadata(Character: Model, ResolvedAction: string): AfroDash.AfroDashMetadata?
+        if ResolvedAction ~= "M1" and ResolvedAction ~= "LightAttack" then
+                return nil
+        end
+
+        local AnimationSetName = GetAnimationSetName(Character)
+        if not AnimationSetName then
+                return nil
+        end
+
+        return {
+                ComboIndex = GetComboCount(Character),
+                ComboLength = AnimationSets.GetComboLength(AnimationSetName, "M1"),
+        }
 end
 
 local function GetStaminaCostMultiplier(Character: Model): number
@@ -272,15 +289,15 @@ local function GetStaminaCost(Character: Model, ResolvedAction: string): number?
 	return nil
 end
 
-local function CanPerformAction(RawInput: string): (boolean, number?)
-	local Character = GetCharacter()
-	if not Character then
-		return false, nil
+local function CanPerformAction(RawInput: string, Overrides: ActionValidator.ValidationOverrides?): (boolean, number?)
+        local Character = GetCharacter()
+        if not Character then
+                return false, nil
 	end
 
 	local ResolvedAction = ResolveActionName(RawInput)
 
-	local CanPerform, _Reason = ActionValidator.CanPerformClient(Character, ResolvedAction)
+        local CanPerform, _Reason = ActionValidator.CanPerformClient(Character, ResolvedAction, Overrides)
 	if not CanPerform then
 		return false, nil
 	end
@@ -300,15 +317,30 @@ local function CanPerformAction(RawInput: string): (boolean, number?)
 end
 
 local function TryExecuteAction(RawInput: string)
-    SyncLocalState()
+        SyncLocalState()
 
-    local CanPerform, StaminaCost = CanPerformAction(RawInput)
+        local Character = GetCharacter()
+        local ResolvedAction = ResolveActionName(RawInput)
+
+        local Overrides: ActionValidator.ValidationOverrides? = nil
+        local AllowConcurrent = false
+
+        if Character then
+                local AfroDashMetadata = GetAfroDashMetadata(Character, ResolvedAction)
+                local ShouldAllowConcurrent, IgnoredStates = AfroDash.ShouldAllowConcurrent(Character, ResolvedAction, AfroDashMetadata)
+
+                AllowConcurrent = ShouldAllowConcurrent
+
+                if IgnoredStates then
+                        Overrides = { IgnoreBlockedStates = IgnoredStates }
+                end
+        end
+
+    local CanPerform, StaminaCost = CanPerformAction(RawInput, Overrides)
     if not CanPerform then
         InputBuffer.BufferAction(RawInput)
         return
     end
-
-    local ResolvedAction = ResolveActionName(RawInput)
 
 	if StaminaCost and StaminaCost > 0 then
 		DeductLocalStamina(StaminaCost)
@@ -326,14 +358,24 @@ local function TryExecuteAction(RawInput: string)
 		LocalState.IsAttacking = true
 	end
 
-	PendingAction = {
-		ActionName = RawInput,
-		Timestamp = os.clock(),
-		StaminaCost = StaminaCost,
-		IsPredicted = IsPredicted,
-	}
+        PendingAction = {
+                ActionName = RawInput,
+                Timestamp = os.clock(),
+                StaminaCost = StaminaCost,
+                IsPredicted = IsPredicted,
+        }
 
-	Packets.PerformAction:Fire(RawInput)
+        local FinalInputData: { [string]: any } = {}
+
+        if AllowConcurrent then
+                FinalInputData._AllowConcurrent = true
+        end
+
+        if Overrides then
+                FinalInputData._ValidationOverrides = Overrides
+        end
+
+        Packets.PerformAction:Fire(RawInput, FinalInputData)
 end
 
 local function TryExecuteBufferedAction()

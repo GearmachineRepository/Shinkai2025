@@ -10,6 +10,9 @@ local Combat = require(Server.Combat)
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+local AfroDash = require(Shared.Utils.AfroDash)
+local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
+local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
 
 Combat.Init({
 	ActionsFolder = Server.Combat.Actions,
@@ -102,17 +105,43 @@ local function NotifyActionInterrupted(Entity: Entity, ActionName: string, Reaso
 end
 
 local function GetToolInputData(Entity: Entity): { [string]: any }?
-	local ToolComponent = Entity:GetComponent("Tool")
-	if not ToolComponent then
-		return nil
-	end
+        local ToolComponent = Entity:GetComponent("Tool")
+        if not ToolComponent then
+                return nil
+        end
 
 	local EquippedTool = ToolComponent:GetEquippedTool()
 	if not EquippedTool or not EquippedTool.ToolId then
 		return nil
 	end
 
-	return { ItemId = EquippedTool.ToolId }
+        return { ItemId = EquippedTool.ToolId }
+end
+
+local function GetAfroDashMetadata(Entity: Entity, ResolvedAction: string, InputData: { [string]: any }?): AfroDash.AfroDashMetadata?
+        if ResolvedAction ~= "LightAttack" and ResolvedAction ~= "M1" then
+                return nil
+        end
+
+        local ItemId = InputData and InputData.ItemId
+        if not ItemId then
+                local ToolData = GetToolInputData(Entity)
+                ItemId = ToolData and ToolData.ItemId
+        end
+
+        if not ItemId then
+                return nil
+        end
+
+        local ItemData = ItemDatabase.GetItem(ItemId)
+        if not ItemData or not ItemData.AnimationSet then
+                return nil
+        end
+
+        return {
+                ComboIndex = Combat.ActionExecutor.GetComboCount(Entity, "LightAttack"),
+                ComboLength = AnimationSets.GetComboLength(ItemData.AnimationSet, "M1"),
+        }
 end
 
 local function HandleWindowCommand(Entity: Entity, WindowType: string): boolean
@@ -134,23 +163,9 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 
 	local FinalInputData = InputData or {}
 
-	-- Allow dodging to run parallel to blocking
-    if ResolvedAction == "Dodge" then
-        local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
-        if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
-            local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
-            if Success then
-                NotifyActionApproved(Player, RawInput)
-            else
-                NotifyActionDenied(Player, Reason or "Failed")
-            end
-            return
-        end
-    end
-
-	-- Gate feinting behind Unpredictable hook
-	if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
-		if not HasUnpredictable(Entity) then
+        -- Gate feinting behind Unpredictable hook
+        if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
+                if not HasUnpredictable(Entity) then
 			NotifyActionDenied(Player, "RequiresUnpredictable")
 			return
 		end
@@ -180,17 +195,27 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 	end
 
 	local Definition = Combat.ActionRegistry.Get(ResolvedAction)
-	if Definition and Definition.ActionType == "Attack" then
-		local ToolData = GetToolInputData(Entity)
-		if not ToolData then
+        if Definition and Definition.ActionType == "Attack" then
+                local ToolData = GetToolInputData(Entity)
+                if not ToolData then
 			NotifyActionDenied(Player, "NoTool")
 			return
-		end
+                end
 
-		for Key, Value in ToolData do
-			FinalInputData[Key] = Value
-		end
-	end
+                for Key, Value in ToolData do
+                        FinalInputData[Key] = Value
+                end
+        end
+
+        local AfroDashMetadata = GetAfroDashMetadata(Entity, ResolvedAction, FinalInputData)
+        local AllowConcurrent, IgnoredStates = AfroDash.ShouldAllowConcurrent(Entity, ResolvedAction, AfroDashMetadata)
+
+        if AllowConcurrent then
+                FinalInputData._AllowConcurrent = true
+                if IgnoredStates then
+                        FinalInputData._ValidationOverrides = { IgnoreBlockedStates = IgnoredStates }
+                end
+        end
 
 	local Success, Reason = Combat.ActionExecutor.Execute(Entity, ResolvedAction, RawInput, FinalInputData)
 

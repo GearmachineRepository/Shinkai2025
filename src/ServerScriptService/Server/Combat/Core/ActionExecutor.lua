@@ -23,7 +23,7 @@ type WindowDefinition = CombatTypes.WindowDefinition
 local ActionExecutor = {}
 
 local ActiveContexts: { [Entity]: ActionContext } = {}
-local ParallelContexts: { [any]: ActionContext } = {}
+local ConcurrentContexts: { [Entity]: { ActionContext } } = {}
 
 local EntityComboCounts: { [Entity]: { [string]: number } } = {}
 local EntityComboTimers: { [Entity]: { [string]: number } } = {}
@@ -31,6 +31,29 @@ local EntityCooldowns: { [Entity]: { [string]: number } } = {}
 local RegisteredWindows: { [string]: WindowDefinition } = {}
 
 local DEFAULT_COMBO_RESET_TIME = 2.0
+
+local function getConcurrentList(Entity: Entity): { ActionContext }
+        ConcurrentContexts[Entity] = ConcurrentContexts[Entity] or {}
+        return ConcurrentContexts[Entity]
+end
+
+local function removeConcurrentContext(Entity: Entity, Context: ActionContext)
+        local List = ConcurrentContexts[Entity]
+        if not List then
+                return
+        end
+
+        for Index, Stored in List do
+                if Stored == Context then
+                        table.remove(List, Index)
+                        break
+                end
+        end
+
+        if #List == 0 then
+                ConcurrentContexts[Entity] = nil
+        end
+end
 
 local function PublishEvent(EventName: string, Data: { [string]: any })
 	Ensemble.Events.Publish(EventName, Data)
@@ -71,8 +94,8 @@ function ActionExecutor.ScheduleThread(Context: ActionContext, Duration: number,
 end
 
 function ActionExecutor.CancelAllThreads(Context: ActionContext)
-	if not Context.PendingThreads then
-		return
+        if not Context.PendingThreads then
+                return
 	end
 
 	for _, Thread in Context.PendingThreads do
@@ -80,9 +103,29 @@ function ActionExecutor.CancelAllThreads(Context: ActionContext)
 		if Status == "suspended" then
 			task.cancel(Thread)
 		end
-	end
+        end
 
-	table.clear(Context.PendingThreads)
+        table.clear(Context.PendingThreads)
+end
+
+local function cleanupContext(Context: ActionContext)
+        ActionExecutor.CloseWindow(Context)
+        ActionExecutor.CancelAllThreads(Context)
+
+        local ActionName = Context.Metadata.ActionName
+        local Definition = ActionRegistry.Get(ActionName)
+
+        if Definition and Definition.OnCleanup then
+                Definition.OnCleanup(Context)
+        end
+
+        Context.Entity.States:SetState("Attacking", false)
+
+        if Context.AllowConcurrent then
+                removeConcurrentContext(Context.Entity, Context)
+        else
+                ActiveContexts[Context.Entity] = nil
+        end
 end
 
 function ActionExecutor.RegisterWindow(Definition: WindowDefinition)
@@ -276,8 +319,10 @@ function ActionExecutor.Execute(
 	-- 	end
 	-- end
 
-	local FinalInputData = InputData or {}
-	local Metadata: ActionMetadata
+        local FinalInputData = InputData or {}
+        local Metadata: ActionMetadata
+        local AllowConcurrent = FinalInputData._AllowConcurrent == true
+        local ValidationOverrides = FinalInputData._ValidationOverrides
 
 	if Definition.BuildMetadata then
 		local BuiltMetadata = Definition.BuildMetadata(Entity, FinalInputData)
@@ -287,26 +332,29 @@ function ActionExecutor.Execute(
 		Metadata = BuiltMetadata
 	elseif Definition.DefaultMetadata then
 		Metadata = table.clone(Definition.DefaultMetadata)
-	else
-		Metadata = {
-			ActionName = ActionName,
-			ActionType = Definition.ActionType,
-		}
-	end
+        else
+                Metadata = {
+                        ActionName = ActionName,
+                        ActionType = Definition.ActionType,
+                }
+        end
+
+        Metadata.ValidationOverrides = ValidationOverrides
 
 	local Context: ActionContext = {
 		Entity = Entity,
 		RawInput = RawInput,
 		InputData = FinalInputData,
 		Metadata = Metadata,
-		StartTime = workspace:GetServerTimeNow(),
-		Interrupted = false,
-		InterruptReason = nil,
-		InterruptedContext = ActiveContext,
-		CustomData = {},
-		ActiveWindow = nil,
-		PendingThreads = {},
-	}
+                StartTime = workspace:GetServerTimeNow(),
+                Interrupted = false,
+                InterruptReason = nil,
+                InterruptedContext = ActiveContext,
+                CustomData = {},
+                ActiveWindow = nil,
+                PendingThreads = {},
+                AllowConcurrent = AllowConcurrent,
+        }
 
 	PublishEvent(CombatEvents.ActionConfiguring, {
 		Entity = Entity,
@@ -321,9 +369,9 @@ function ActionExecutor.Execute(
 		end
 	end
 
-	if Definition.RequiresActiveAction and ActiveContext then
-		ActiveContext.Interrupted = true
-		ActiveContext.InterruptReason = ActionName
+        if Definition.RequiresActiveAction and ActiveContext then
+                ActiveContext.Interrupted = true
+                ActiveContext.InterruptReason = ActionName
 
 		local ActiveDefinition = ActionRegistry.Get(ActiveContext.Metadata.ActionName)
 		if ActiveDefinition and ActiveDefinition.OnInterrupt then
@@ -337,12 +385,19 @@ function ActionExecutor.Execute(
 			Context = ActiveContext,
 		})
 
-		if ActiveDefinition and ActiveDefinition.OnCleanup then
-			ActiveDefinition.OnCleanup(ActiveContext)
-		end
-	end
+                if ActiveDefinition and ActiveDefinition.OnCleanup then
+                        ActiveDefinition.OnCleanup(ActiveContext)
+                end
+        end
 
-	ActiveContexts[Entity] = Context
+        if not AllowConcurrent then
+                if ActiveContext and not Definition.RequiresActiveAction then
+                        ActionExecutor.Interrupt(Entity, ActionName)
+                end
+                ActiveContexts[Entity] = Context
+        else
+                table.insert(getConcurrentList(Entity), Context)
+        end
 
 	if Definition.OnStart then
 		Definition.OnStart(Context)
@@ -355,96 +410,104 @@ function ActionExecutor.Execute(
 		Context = Context,
 	})
 
-	task.spawn(function()
-		Definition.OnExecute(Context)
+        task.spawn(function()
+                Definition.OnExecute(Context)
 
-		if not Context.Interrupted then
-			ActionExecutor.Complete(Entity)
-		end
-	end)
+                if not Context.Interrupted then
+                        ActionExecutor.Complete(Context)
+                end
+        end)
 
 	return true, nil
 end
 
-function ActionExecutor.Interrupt(Entity: Entity, Reason: string?): (boolean, string?)
-	local Context = ActiveContexts[Entity]
-	if not Context or Context.Interrupted then
-		return false
-	end
+local function interruptContext(Context: ActionContext?, Reason: string?)
+        if not Context or Context.Interrupted then
+                return false
+        end
 
-	local InterruptReason = Reason or "Unknown"
+        local InterruptReason = Reason or "Unknown"
+        Context.Interrupted = true
+        Context.InterruptReason = InterruptReason
 
-	Context.Interrupted = true
-	Context.InterruptReason = InterruptReason
+        ActionExecutor.CloseWindow(Context)
 
-	ActionExecutor.CloseWindow(Context)
+        local ActionName = Context.Metadata.ActionName
+        local Definition = ActionRegistry.Get(ActionName)
 
-	local ActionName = Context.Metadata.ActionName
-	local Definition = ActionRegistry.Get(ActionName)
+        if Definition and Definition.OnInterrupt then
+                Definition.OnInterrupt(Context)
+        end
 
-	if Definition and Definition.OnInterrupt then
-		Definition.OnInterrupt(Context)
-	end
+        PublishEvent(CombatEvents.ActionInterrupted, {
+                Entity = Context.Entity,
+                ActionName = ActionName,
+                Reason = InterruptReason,
+                Context = Context,
+                IsConcurrent = Context.AllowConcurrent,
+        })
 
-	PublishEvent(CombatEvents.ActionInterrupted, {
-		Entity = Entity,
-		ActionName = ActionName,
-		Reason = InterruptReason,
-		Context = Context,
-	})
-
-	ActionExecutor.Cleanup(Entity)
-	return true, ActionName
+        cleanupContext(Context)
+        return true
 end
 
-function ActionExecutor.Complete(Entity: Entity)
-	local Context = ActiveContexts[Entity]
-	if not Context or Context.Interrupted then
-		return
-	end
+function ActionExecutor.Interrupt(Entity: Entity, Reason: string?): (boolean, string?)
+        local Primary = ActiveContexts[Entity]
+        local PrimaryInterrupted = interruptContext(Primary, Reason)
+        local InterruptedName = Primary and Primary.Metadata.ActionName or nil
 
-	local ActionName = Context.Metadata.ActionName
-	local Definition = ActionRegistry.Get(ActionName)
+        local ConcurrentList = ConcurrentContexts[Entity]
+        if ConcurrentList then
+                for _, Context in table.clone(ConcurrentList) do
+                        interruptContext(Context, Reason)
+                end
+        end
 
-	if Definition and Definition.OnComplete then
-		Definition.OnComplete(Context)
-	end
+        return PrimaryInterrupted, InterruptedName
+end
 
-	PublishEvent(CombatEvents.ActionCompleted, {
-		Entity = Entity,
-		ActionName = ActionName,
-		Context = Context,
-	})
+function ActionExecutor.Complete(Context: ActionContext)
+        if not Context or Context.Interrupted then
+                return
+        end
 
-	ActionExecutor.Cleanup(Entity)
+        local ActionName = Context.Metadata.ActionName
+        local Definition = ActionRegistry.Get(ActionName)
+
+        if Definition and Definition.OnComplete then
+                Definition.OnComplete(Context)
+        end
+
+        PublishEvent(CombatEvents.ActionCompleted, {
+                Entity = Context.Entity,
+                ActionName = ActionName,
+                Context = Context,
+                IsConcurrent = Context.AllowConcurrent,
+        })
+
+        cleanupContext(Context)
 end
 
 function ActionExecutor.Cleanup(Entity: Entity)
-	local Context = ActiveContexts[Entity]
-	if not Context then
-		return
-	end
+        local Context = ActiveContexts[Entity]
+        if Context then
+                cleanupContext(Context)
+        end
 
-	ActionExecutor.CloseWindow(Context)
-	ActionExecutor.CancelAllThreads(Context)
-
-	local ActionName = Context.Metadata.ActionName
-	local Definition = ActionRegistry.Get(ActionName)
-
-	if Definition and Definition.OnCleanup then
-		Definition.OnCleanup(Context)
-	end
-
-	Entity.States:SetState("Attacking", false)
-	ActiveContexts[Entity] = nil
+        local ConcurrentList = ConcurrentContexts[Entity]
+        if ConcurrentList then
+                for _, ConcurrentContext in table.clone(ConcurrentList) do
+                        cleanupContext(ConcurrentContext)
+                end
+        end
 end
 
 function ActionExecutor.GetActiveContext(Entity: Entity): ActionContext?
-	return ActiveContexts[Entity]
+        return ActiveContexts[Entity]
 end
 
 function ActionExecutor.IsExecuting(Entity: Entity): boolean
-	return ActiveContexts[Entity] ~= nil
+        return ActiveContexts[Entity] ~= nil or (ConcurrentContexts[Entity] ~= nil and #ConcurrentContexts[Entity] > 0)
 end
 
 function ActionExecutor.GetActiveActionName(Entity: Entity): string?
@@ -562,169 +625,12 @@ function ActionExecutor.ResetCombo(Entity: Entity, ActionName: string)
 	end
 end
 
------------------[[Parallel action support]]------------------------------
-
-function ActionExecutor.ExecuteParallel(
-    Entity: Entity,
-    ActionName: string,
-	RawInput: string?,
-    InputData: { [string]: any }?
-): (boolean, string?)
-    local Definition = ActionRegistry.Get(ActionName)
-    if not Definition then
-        return false, "UnknownAction"
-    end
-
-    if ParallelContexts[Entity] then
-        return false, "ParallelActionActive"
-    end
-
-    local FinalInputData = InputData or {}
-    local Metadata: ActionMetadata
-
-    if Definition.BuildMetadata then
-        local BuiltMetadata = Definition.BuildMetadata(Entity, FinalInputData)
-        if not BuiltMetadata then
-            return false, "FailedToBuildMetadata"
-        end
-        Metadata = BuiltMetadata
-    elseif Definition.DefaultMetadata then
-        Metadata = table.clone(Definition.DefaultMetadata)
-    else
-        Metadata = {
-            ActionName = ActionName,
-            ActionType = Definition.ActionType,
-        }
-    end
-
-    local Context: ActionContext = {
-        Entity = Entity,
-        RawInput = RawInput,
-        InputData = FinalInputData,
-        Metadata = Metadata,
-        StartTime = workspace:GetServerTimeNow(),
-        Interrupted = false,
-        InterruptReason = nil,
-        InterruptedContext = nil,
-        CustomData = {},
-        ActiveWindow = nil,
-        PendingThreads = {},
-    }
-
-    if Definition.CanExecute then
-        local CanExecute, Reason = Definition.CanExecute(Context)
-        if not CanExecute then
-            return false, Reason or "CannotExecute"
-        end
-    end
-
-    ParallelContexts[Entity] = Context
-
-    if Definition.OnStart then
-        Definition.OnStart(Context)
-    end
-
-    PublishEvent(CombatEvents.ActionStarted, {
-        Entity = Entity,
-        ActionName = ActionName,
-        ActionType = Definition.ActionType,
-        Context = Context,
-        IsParallel = true,
-    })
-
-    task.spawn(function()
-        Definition.OnExecute(Context)
-
-        if not Context.Interrupted then
-            ActionExecutor.CompleteParallel(Entity)
-        end
-    end)
-
-    return true, nil
-end
-
-function ActionExecutor.CompleteParallel(Entity: Entity)
-    local Context = ParallelContexts[Entity]
-    if not Context or Context.Interrupted then
-        return
-    end
-
-    local ActionName = Context.Metadata.ActionName
-    local Definition = ActionRegistry.Get(ActionName)
-
-    if Definition and Definition.OnComplete then
-        Definition.OnComplete(Context)
-    end
-
-    PublishEvent(CombatEvents.ActionCompleted, {
-        Entity = Entity,
-        ActionName = ActionName,
-        Context = Context,
-        IsParallel = true,
-    })
-
-    ActionExecutor.CleanupParallel(Entity)
-end
-
-function ActionExecutor.InterruptParallel(Entity: Entity, Reason: string?): boolean
-    local Context = ParallelContexts[Entity]
-    if not Context or Context.Interrupted then
-        return false
-    end
-
-    Context.Interrupted = true
-    Context.InterruptReason = Reason or "Unknown"
-
-    local ActionName = Context.Metadata.ActionName
-    local Definition = ActionRegistry.Get(ActionName)
-
-    if Definition and Definition.OnInterrupt then
-        Definition.OnInterrupt(Context)
-    end
-
-    PublishEvent(CombatEvents.ActionInterrupted, {
-        Entity = Entity,
-        ActionName = ActionName,
-        Reason = Reason,
-        Context = Context,
-        IsParallel = true,
-    })
-
-    ActionExecutor.CleanupParallel(Entity)
-    return true
-end
-
-function ActionExecutor.CleanupParallel(Entity: Entity)
-    local Context = ParallelContexts[Entity]
-    if not Context then
-        return
-    end
-
-    ActionExecutor.CancelAllThreads(Context)
-
-    local ActionName = Context.Metadata.ActionName
-    local Definition = ActionRegistry.Get(ActionName)
-
-    if Definition and Definition.OnCleanup then
-        Definition.OnCleanup(Context)
-    end
-
-    ParallelContexts[Entity] = nil
-end
-
-function ActionExecutor.GetParallelContext(Entity: Entity): ActionContext?
-    return ParallelContexts[Entity]
-end
-
-function ActionExecutor.IsParallelExecuting(Entity: Entity): boolean
-    return ParallelContexts[Entity] ~= nil
-end
-
 function ActionExecutor.CleanupEntity(Entity: Entity)
-	ActiveContexts[Entity] = nil
-	EntityComboCounts[Entity] = nil
-	EntityComboTimers[Entity] = nil
-	EntityCooldowns[Entity] = nil
+        ActiveContexts[Entity] = nil
+        ConcurrentContexts[Entity] = nil
+        EntityComboCounts[Entity] = nil
+        EntityComboTimers[Entity] = nil
+        EntityCooldowns[Entity] = nil
 end
 
 return ActionExecutor

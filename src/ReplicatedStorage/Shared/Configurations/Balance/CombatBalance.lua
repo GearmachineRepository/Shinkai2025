@@ -119,10 +119,16 @@ local CombatBalance = {
 		RANGE_TOLERANCE = 2.5,
 	},
 
-	Momentum = {
-		THRESHOLD = 5,
-		DAMAGE_DIVISOR = 20,
-	},
+        Momentum = {
+                THRESHOLD = 5,
+                DAMAGE_DIVISOR = 20,
+        },
+
+        AfroDash = {
+                InputWindowSeconds = 0.2,
+                DashActionName = "Dodge",
+                AllowFutureInputs = true,
+        },
 }
 
 return CombatBalance

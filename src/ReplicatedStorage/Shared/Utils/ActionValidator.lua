@@ -5,23 +5,29 @@ local CombatValidationConfig = require(Shared.Configurations.CombatValidationCon
 
 local ActionValidator = {}
 
-function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, string?)
-	if not States then
-		return false, "MissingStateComponent"
-	end
+export type ValidationOverrides = {
+        IgnoreBlockedStates: { [string]: boolean }?,
+}
+
+function ActionValidator.CanPerform(States: any, ActionName: string, Overrides: ValidationOverrides?): (boolean, string?)
+        if not States then
+                return false, "MissingStateComponent"
+        end
 
 	local ActionDef = CombatValidationConfig.Actions[ActionName]
 	if not ActionDef then
 		return true, nil
 	end
 
-	if ActionDef.BlockedBy then
-		for _, StateName in ActionDef.BlockedBy do
-			if States:GetState(StateName) then
-				return false, StateName
-			end
-		end
-	end
+        local IgnoreBlockedStates = Overrides and Overrides.IgnoreBlockedStates
+
+        if ActionDef.BlockedBy then
+                for _, StateName in ActionDef.BlockedBy do
+                        if not (IgnoreBlockedStates and IgnoreBlockedStates[StateName]) and States:GetState(StateName) then
+                                return false, StateName
+                        end
+                end
+        end
 
 	if ActionDef.RequiredStates then
 		for _, StateName in ActionDef.RequiredStates do
@@ -31,25 +37,27 @@ function ActionValidator.CanPerform(States: any, ActionName: string): (boolean, 
 		end
 	end
 
-	return true, nil
+        return true, nil
 end
 
-function ActionValidator.CanPerformClient(Character: Model, ActionName: string): (boolean, string?)
-	if not Character then
-		return false, "MissingCharacter"
-	end
+function ActionValidator.CanPerformClient(Character: Model, ActionName: string, Overrides: ValidationOverrides?): (boolean, string?)
+        if not Character then
+                return false, "MissingCharacter"
+        end
 
 	local ActionDef = CombatValidationConfig.Actions[ActionName]
 	if not ActionDef then
 		return true, nil
 	end
 
-	if ActionDef.BlockedBy then
-		for _, StateName in ActionDef.BlockedBy do
-			if Character:GetAttribute(StateName) then
-				return false, StateName
-			end
-		end
+        local IgnoreBlockedStates = Overrides and Overrides.IgnoreBlockedStates
+
+        if ActionDef.BlockedBy then
+                for _, StateName in ActionDef.BlockedBy do
+                        if not (IgnoreBlockedStates and IgnoreBlockedStates[StateName]) and Character:GetAttribute(StateName) then
+                                return false, StateName
+                        end
+                end
 	end
 
 	if ActionDef.RequiredStates then
