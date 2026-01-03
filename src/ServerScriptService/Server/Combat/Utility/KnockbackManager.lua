@@ -250,7 +250,7 @@ Packets.KnockbackImpact.OnServerEvent:Connect(function(Player: Player, ImpactPos
 	local TimeElapsed = os.clock() - KnockbackInfo.StartTime
 	local MaxTravelDistance = KnockbackInfo.Speed * TimeElapsed + 5
 	local ClaimedDistance = (ImpactPosition - KnockbackInfo.StartPosition).Magnitude
-	print(ClaimedDistance, MaxTravelDistance)
+
 	if ClaimedDistance > MaxTravelDistance then
 		return
 	end

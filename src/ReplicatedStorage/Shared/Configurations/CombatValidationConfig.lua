@@ -45,6 +45,7 @@ CombatValidationConfig.States = {
 	[StateTypes.BLOCKING] = {
 		Default = false,
 		Replication = "All",
+		ForceWalk = true,
 		Conflicts = { StateTypes.SPRINTING, StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.ATTACKING },
 	},
 
@@ -133,6 +134,32 @@ CombatValidationConfig.States = {
 	[StateTypes.PARRIED] = {
 		Default = false,
 		Replication = "All",
+	},
+
+	PerfectGuardWindow = {
+		Default = false,
+		Replication = "Owner",
+	},
+
+	CounterWindow = {
+		Default = false,
+		Replication = "Owner",
+	},
+
+	InCombat = {
+		Default = false,
+		Replication = "All",
+	},
+
+	Training = {
+		Default = false,
+		Replication = "Owner",
+	},
+
+	Interacting = {
+		Default = false,
+		Replication = "None",
+		LockMovement = true,
 	},
 }
 

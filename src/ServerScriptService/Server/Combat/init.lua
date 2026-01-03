@@ -120,7 +120,7 @@ function Combat.Execute(Entity: Entity, RawInput: string, InputData: { [string]:
 	return ActionExecutor.Execute(Entity, ResolvedAction, RawInput, InputData)
 end
 
-function Combat.Interrupt(Entity: Entity, Reason: string?): boolean
+function Combat.Interrupt(Entity: Entity, Reason: string?): (boolean, string?)
 	return ActionExecutor.Interrupt(Entity, Reason)
 end
 

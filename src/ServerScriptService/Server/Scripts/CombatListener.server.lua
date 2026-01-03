@@ -94,9 +94,10 @@ local function NotifyActionDenied(Player: Player, Reason: string)
 	Packets.ActionDenied:FireClient(Player, Reason)
 end
 
-local function NotifyActionInterrupted(Entity: Entity, Reason: string)
-	if Entity.Player then
-		Packets.ActionInterrupted:FireClient(Entity.Player, Entity.Character, Reason)
+local function NotifyActionInterrupted(Entity: Entity, ActionName: string, Reason: string)
+	local Player = Entity.Player
+	if Player and Entity.Character then
+		Packets.ActionInterrupted:FireClient(Player, Entity.Character, ActionName, Reason)
 	end
 end
 
@@ -207,13 +208,13 @@ local function HandleInterruptRequest(Player: Player, Reason: string)
 		return
 	end
 
-	local Interrupted = Combat.Interrupt(Entity, Reason)
+	local Interrupted, ActionName = Combat.Interrupt(Entity, Reason)
 	if not Interrupted then
 		NotifyActionDenied(Player, "InterruptFailed")
 		return
 	end
 
-	NotifyActionInterrupted(Entity, Reason)
+	NotifyActionInterrupted(Entity, ActionName or "Unknown", Reason)
 end
 
 local function HandleReleaseAction(Player: Player, RawInput: string)
@@ -250,8 +251,8 @@ Ensemble.Events.Subscribe("ActionCompleted", function(Data: any)
 end)
 
 Ensemble.Events.Subscribe("ActionInterrupted", function(Data: any)
-	if Data.Entity and Data.Reason then
-		NotifyActionInterrupted(Data.Entity, Data.Reason)
+	if Data.Entity and Data.Reason and Data.ActionName then
+		NotifyActionInterrupted(Data.Entity, Data.ActionName, Data.Reason)
 	end
 end)
 

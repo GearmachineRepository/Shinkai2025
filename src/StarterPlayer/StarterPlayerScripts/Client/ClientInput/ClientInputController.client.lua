@@ -426,10 +426,10 @@ Packets.ActionCompleted.OnClientEvent:Connect(function(_Character: Instance, Act
 	TryExecuteBufferedAction()
 end)
 
-Packets.ActionInterrupted.OnClientEvent:Connect(function(_Character: Instance, Reason: string)
+Packets.ActionInterrupted.OnClientEvent:Connect(function(_Character: Instance, ActionName: string, Reason: string)
 	LocalState.IsAttacking = false
 
-	if LocalState.IsDodging then
+	if ActionName == "Dodge" and LocalState.IsDodging then
 		if Reason == "Feint" or Reason == "Hit" or Reason == "Stunned" or Reason == "DodgeCancel" then
 			ClientDodgeHandler.Rollback()
 		else

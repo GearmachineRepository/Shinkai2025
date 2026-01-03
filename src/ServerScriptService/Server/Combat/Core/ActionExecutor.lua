@@ -366,7 +366,7 @@ function ActionExecutor.Execute(
 	return true, nil
 end
 
-function ActionExecutor.Interrupt(Entity: Entity, Reason: string?): boolean
+function ActionExecutor.Interrupt(Entity: Entity, Reason: string?): (boolean, string?)
 	local Context = ActiveContexts[Entity]
 	if not Context or Context.Interrupted then
 		return false
@@ -394,7 +394,7 @@ function ActionExecutor.Interrupt(Entity: Entity, Reason: string?): boolean
 	})
 
 	ActionExecutor.Cleanup(Entity)
-	return true
+	return true, ActionName
 end
 
 function ActionExecutor.Complete(Entity: Entity)

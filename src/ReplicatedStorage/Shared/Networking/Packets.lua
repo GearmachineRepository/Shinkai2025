@@ -58,7 +58,7 @@ return {
 	ActionApproved = Packet("ActionApproved", Packet.String),
 	ActionDenied = Packet("ActionDenied", Packet.String),
 	ActionCompleted = Packet("ActionCompleted", Packet.Instance, Packet.String),
-	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String),
+	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String, Packet.String),
 	InterruptAction = Packet("InterruptAction", Packet.String),
 
 	--Knockback
