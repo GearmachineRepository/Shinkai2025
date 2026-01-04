@@ -31,6 +31,8 @@ local StateTypes = {
     FATIGUED = "Fatigued",
     DIZZY = "Dizzy",
     MOVEMENT_LOCKED = "MovementLocked",
+    PERFECT_GUARD_WINDOW = "PerfectGuardWindow",
+    COUNTER_WINDOW = "CounterWindow",
 }
 
 local ReplicationConfig = {

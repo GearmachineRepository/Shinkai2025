@@ -67,10 +67,21 @@ CombatValidationConfig.States = {
 		Conflicts = {},
 	},
 
+	[StateTypes.COUNTER_WINDOW] = {
+		Default = false,
+		Replication = "All",
+		Conflicts = {},
+	},
+
+	[StateTypes.PERFECT_GUARD_WINDOW] = {
+		Default = false,
+		Replication = "All",
+		Conflicts = {},
+	},
+
 	[StateTypes.STUNNED] = {
 		Default = false,
 		Replication = "All",
-		LockMovement = true,
 		ForceWalk = true,
 		Conflicts = { StateTypes.SPRINTING, StateTypes.BLOCKING, StateTypes.ATTACKING, StateTypes.DODGING },
 	},
