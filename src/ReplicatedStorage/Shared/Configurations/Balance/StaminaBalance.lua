@@ -2,13 +2,13 @@
 
 local StaminaBalance = {
 	StaminaCosts = {
-		SPRINT = 6,
+		SPRINT = 5,
 		JOG = 3,
 	},
 
 	Regeneration = {
-		RATE = 6,
-		DELAY = 0.25,
+		RATE = 8,
+		DELAY = 0.15,
 	},
 
 	Exhaustion = {
@@ -22,7 +22,7 @@ local StaminaBalance = {
 	},
 
 	StutterStep = {
-		GRACE_PERIOD = 0.15,
+		GRACE_PERIOD = 0.25,
 		REDUCTION_PERCENT = 100,
 		COOLDOWN = 0.1,
 	},
