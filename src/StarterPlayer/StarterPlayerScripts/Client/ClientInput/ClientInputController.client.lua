@@ -107,7 +107,8 @@ local function TryExecuteAction(RawInput: string)
 		IsPredicted = IsPredicted,
 	}
 
-	Packets.PerformAction:Fire(RawInput)
+	local InputTimestamp = workspace:GetServerTimeNow()
+	Packets.PerformAction:Fire(RawInput, InputTimestamp)
 end
 
 local function TryExecuteBufferedAction()

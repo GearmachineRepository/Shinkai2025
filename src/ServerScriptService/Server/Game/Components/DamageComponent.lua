@@ -9,8 +9,6 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
-local NetworkService = require(Server.Game.Services.NetworkService)
-
 local StateTypes = require(Shared.Configurations.Enums.StateTypes)
 
 local DamageComponent = {}
@@ -19,8 +17,6 @@ DamageComponent.__index = DamageComponent
 DamageComponent.ComponentName = "Damage"
 DamageComponent.Dependencies = { "States", "Stats" }
 
-local PING_THRESHOLD_MS = 70
-local MAX_COMP_SECONDS = 0.06
 local ON_HIT_HOLD_SECONDS = 0.1
 
 type Self = {
@@ -35,24 +31,6 @@ function DamageComponent.new(Entity: Types.Entity, _Context: Types.EntityContext
 	}, DamageComponent) :: any
 
 	return self
-end
-
-local function GetCompDelaySeconds(TargetPlayer: Player?): number
-	if not TargetPlayer then
-		return 0
-	end
-
-	local SmoothedPingMs = NetworkService.GetPingMs(TargetPlayer)
-	if type(SmoothedPingMs) ~= "number" then
-		return 0
-	end
-
-	if SmoothedPingMs < PING_THRESHOLD_MS then
-		return 0
-	end
-
-	local RawDelaySeconds = (SmoothedPingMs - PING_THRESHOLD_MS) / 1000
-	return math.min(RawDelaySeconds, MAX_COMP_SECONDS)
 end
 
 function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: Vector3?)
@@ -100,19 +78,6 @@ function DamageComponent:TakeDamage(Damage: number, Source: Player?, Direction: 
 end
 
 function DamageComponent:DealDamage(Damage: number, Source: Player?, Direction: Vector3?, HitPosition: Vector3?)
-	local TargetPlayer = self.Entity.Player
-
-	if TargetPlayer then
-		local DelaySeconds = GetCompDelaySeconds(TargetPlayer)
-
-		if DelaySeconds > 0 then
-			task.delay(DelaySeconds, function()
-				self:TakeDamage(Damage, Source, Direction, HitPosition)
-			end)
-			return
-		end
-	end
-
 	self:TakeDamage(Damage, Source, Direction, HitPosition)
 end
 

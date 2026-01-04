@@ -114,11 +114,11 @@ local function GetToolInputData(Entity: Entity): { [string]: any }?
 	return { ItemId = EquippedTool.ToolId }
 end
 
-local function HandleWindowCommand(Entity: Entity, WindowType: string): boolean
-	return Combat.OpenWindow(Entity, WindowType)
+local function HandleWindowCommand(Entity: Entity, WindowType: string, InputTimestamp: number?): boolean
+	return Combat.OpenWindow(Entity, WindowType, InputTimestamp)
 end
 
-local function HandleActionRequest(Player: Player, RawInput: string, InputData: { [string]: any }?)
+local function HandleActionRequest(Player: Player, RawInput: string, InputTimestamp: number?, InputData: { [string]: any }?)
 	local Entity = GetEntityFromPlayer(Player)
 	if not Entity then
 		NotifyActionDenied(Player, "NoEntity")
@@ -131,20 +131,8 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 		return
 	end
 
-	local FinalInputData = InputData or {}
-
-	if ResolvedAction == "Dodge" then
-		local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
-		if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
-			local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
-			if Success then
-				NotifyActionApproved(Player, RawInput)
-			else
-				NotifyActionDenied(Player, Reason or "Failed")
-			end
-			return
-		end
-	end
+	local FinalInputData = InputData or {} :: { [string]: any }
+	FinalInputData.InputTimestamp = InputTimestamp
 
 	if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
 		if not HasUnpredictable(Entity) then
@@ -161,9 +149,8 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 	end
 
 	if ResolvedAction == "PerfectGuard" or ResolvedAction == "Counter" then
-		local Success = HandleWindowCommand(Entity, ResolvedAction)
+		local Success = HandleWindowCommand(Entity, ResolvedAction, InputTimestamp)
 		if Success then
-
 			Ensemble.Events.Publish(ResolvedAction .. "Initiated", {
 				Entity = Entity,
 				ActionName = ResolvedAction,

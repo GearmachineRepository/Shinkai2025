@@ -14,6 +14,7 @@ local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimin
 local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local Block = require(script.Parent.Parent.Actions.Block)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
+local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
 
 local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -155,13 +156,17 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 		return
 	end
 
+	local InputTimestamp = Context.InputData and Context.InputData.InputTimestamp
+	local InputCompensation = LatencyCompensation.GetCompensation(InputTimestamp)
+	Context.CustomData.InputCompensation = InputCompensation
+
 	if Player then
 		Packets.PlayAnimation:FireClient(Player, AnimationId)
 	elseif Character then
 		EntityAnimator.Play(Character, AnimationId)
 	end
 
-	local StartTimestamp = os.clock()
+	local StartTimestamp = os.clock() - InputCompensation
 
 	local function WaitUntil(TargetTime: number): boolean
 		local Remaining = TargetTime - (os.clock() - StartTimestamp)
@@ -177,6 +182,7 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 
 	Context.CustomData.CanFeint = false
 	Context.CustomData.HitWindowOpen = true
+	Context.CustomData.HitWindowOpenTime = os.clock()
 
 	if Context.CustomData.ActiveHitbox then
 		Context.CustomData.ActiveHitbox:Start()
@@ -286,7 +292,6 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 				TargetContext = TargetContext,
 			})
 
-			-- Apply knockback through block if flag is present
 			if AttackFlags.HasFlag(Flags, AttackFlags.KNOCKBACK_THROUGH_BLOCK) then
 				AttackBase.ApplyKnockback(AttackerContext, Target)
 			end

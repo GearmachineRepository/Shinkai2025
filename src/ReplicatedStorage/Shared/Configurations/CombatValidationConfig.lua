@@ -45,6 +45,7 @@ CombatValidationConfig.States = {
 	[StateTypes.BLOCKING] = {
 		Default = false,
 		Replication = "All",
+		ForceWalk = true,
 		Conflicts = { StateTypes.SPRINTING, StateTypes.STUNNED, StateTypes.DOWNED, StateTypes.ATTACKING },
 	},
 

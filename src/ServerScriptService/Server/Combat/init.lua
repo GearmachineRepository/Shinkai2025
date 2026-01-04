@@ -144,8 +144,8 @@ function Combat.RegisterWindow(Definition: WindowDefinition)
 	ActionExecutor.RegisterWindow(Definition)
 end
 
-function Combat.OpenWindow(Entity: Entity, WindowType: string): boolean
-	return ActionExecutor.OpenWindow(Entity, WindowType)
+function Combat.OpenWindow(Entity: Entity, WindowType: string, InputTimestamp: number?): boolean
+	return ActionExecutor.OpenWindow(Entity, WindowType, InputTimestamp)
 end
 
 function Combat.AddInputBinding(Binding: InputResolver.InputBinding, ConfigName: string?)

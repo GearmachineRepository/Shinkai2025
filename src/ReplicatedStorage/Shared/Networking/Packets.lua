@@ -6,7 +6,7 @@ return {
 	-- Animations
 	PlayAnimation = Packet("PlayAnimation", Packet.String, Packet.Any),
 	StopAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
-	PauseAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
+	PauseAnimation = Packet("PauseAnimation", Packet.String, Packet.NumberF32),
 
 	-- Equipment
 	EquipItem = Packet("EquipItem", Packet.NumberU16, Packet.String),
@@ -53,7 +53,7 @@ return {
 	ClearCooldown = Packet("ClearCooldown", Packet.String),
 
 	-- Combat Actions
-	PerformAction = Packet("PerformAction", Packet.String, Packet.Any),
+	PerformAction = Packet("PerformAction", Packet.String, Packet.NumberF64, Packet.Any),
 	ReleaseAction = Packet("ReleaseAction", Packet.String),
 	ActionApproved = Packet("ActionApproved", Packet.String),
 	ActionDenied = Packet("ActionDenied", Packet.String),
@@ -61,7 +61,7 @@ return {
 	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String, Packet.String),
 	InterruptAction = Packet("InterruptAction", Packet.String),
 
-	--Knockback
+	-- Knockback
 	ApplyKnockback = Packet("ApplyKnockback", Packet.Vector3F24, Packet.NumberF32, Packet.NumberF32),
 	KnockbackImpact = Packet("KnockbackImpact", Packet.Vector3F24, Packet.Vector3F24),
 

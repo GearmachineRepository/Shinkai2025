@@ -43,9 +43,7 @@ local STATE_VFX = {
 	[StateTypes.PARRIED] = "ParryFlash",
 }
 
-local STATE_SFX = {
-	[StateTypes.PARRIED] = "ParrySound",
-}
+local STATE_SFX = {}
 
 local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?, any) } = {
 	[CombatEvents.AttackHit] = function(EventData)
@@ -203,7 +201,7 @@ local function SetupStateVfx(Entity: Types.Entity, ComponentMaid: Types.Maid)
 end
 
 local function SetupStateSfx(Entity: Types.Entity, ComponentMaid: Types.Maid)
-	for StateName, SfxName in STATE_SFX do
+	for StateName, SfxName in pairs(STATE_SFX) do
 		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
 			if not Enabled then
 				return

@@ -11,6 +11,7 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionRegistry = require(script.Parent.ActionRegistry)
 local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
+local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
 local Packets = require(Shared.Networking.Packets)
 
 type Entity = CombatTypes.Entity
@@ -94,7 +95,7 @@ function ActionExecutor.RegisterWindow(Definition: WindowDefinition)
 	RegisteredWindows[Definition.WindowType] = Definition
 end
 
-function ActionExecutor.OpenWindow(Entity: Entity, WindowType: string): boolean
+function ActionExecutor.OpenWindow(Entity: Entity, WindowType: string, InputTimestamp: number?): boolean
 	local Context = ActiveContexts[Entity]
 	if not Context then
 		return false
@@ -103,6 +104,7 @@ function ActionExecutor.OpenWindow(Entity: Entity, WindowType: string): boolean
 	if Context.ActiveWindow then
 		return false
 	end
+
 
 	local Definition = RegisteredWindows[WindowType]
 	if not Definition then
@@ -119,10 +121,21 @@ function ActionExecutor.OpenWindow(Entity: Entity, WindowType: string): boolean
 		return false
 	end
 
+	local AttemptCooldownId = WindowType .. "Attempt"
+	local AttemptCooldown = 0.15
+	if ActionExecutor.IsOnCooldown(Entity, AttemptCooldownId, AttemptCooldown) then
+		return false
+	end
+
+	ActionExecutor.StartCooldown(Entity, AttemptCooldownId, AttemptCooldown)
+
+	local Compensation = LatencyCompensation.GetCompensation(InputTimestamp)
+	local AdjustedDuration = Definition.Duration + Compensation
+
 	local WindowData: WindowData = {
 		WindowType = WindowType,
 		StartTime = workspace:GetServerTimeNow(),
-		Duration = Definition.Duration,
+		Duration = AdjustedDuration,
 		ExpiryThread = nil,
 	}
 
@@ -132,17 +145,12 @@ function ActionExecutor.OpenWindow(Entity: Entity, WindowType: string): boolean
 	PublishEvent(CombatEvents.WindowOpened, {
 		Entity = Entity,
 		WindowType = WindowType,
-		Duration = Definition.Duration,
+		Duration = AdjustedDuration,
 		Context = Context,
 	})
 
-	local ExpiryThread = ActionExecutor.ScheduleThread(Context, Definition.Duration, function()
+	local ExpiryThread = ActionExecutor.ScheduleThread(Context, AdjustedDuration, function()
 		if ActionExecutor.IsOnCooldown(Entity, WindowType, Definition.Cooldown) then
-			return
-		end
-
-		local CurrentContext = ActiveContexts[Entity]
-		if CurrentContext ~= Context then
 			return
 		end
 
