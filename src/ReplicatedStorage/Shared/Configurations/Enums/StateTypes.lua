@@ -30,6 +30,7 @@ local StateTypes = {
     SLUGGISH = "Sluggish",
     FATIGUED = "Fatigued",
     DIZZY = "Dizzy",
+    AIRBORNE = "Airborne",
     MOVEMENT_LOCKED = "MovementLocked",
     PERFECT_GUARD_WINDOW = "PerfectGuardWindow",
     COUNTER_WINDOW = "CounterWindow",

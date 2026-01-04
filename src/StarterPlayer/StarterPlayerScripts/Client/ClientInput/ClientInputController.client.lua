@@ -1,17 +1,16 @@
 --!strict
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local InputBuffer = require(Shared.General.InputBuffer)
 local Packets = require(Shared.Networking.Packets)
 local ActionValidator = require(Shared.Utils.ActionValidator)
-local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
-local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
-local DashBalance = require(Shared.Configurations.Balance.DashBalance)
+local InputResolverShared = require(Shared.Combat.InputResolverShared)
 local ClientDodgeHandler = require(script.Parent.ClientDodgeHandler)
+local ClientCombatState = require(script.Parent.ClientCombatState)
 
 local Player = Players.LocalPlayer
 
@@ -24,159 +23,8 @@ type PendingAction = {
 
 local PendingAction: PendingAction? = nil
 
-local LocalState = {
-	IsAttacking = false,
-	IsBlocking = false,
-	IsDodging = false,
-	PredictedStamina = 0,
-	LastStaminaSync = 0,
-}
-
-type LocalCooldownState = {
-	DodgeEndTime: number,
-}
-
-local LocalCooldown: LocalCooldownState = {
-	DodgeEndTime = 0,
-}
-
 local PENDING_ACTION_TIMEOUT = 1.0
-local STAMINA_SYNC_INTERVAL = 0.5
 local STEERABLE_DODGE = true
-
-local function GetCooldownEndTimeFromAttribute(Character: Model): number?
-	local DodgeCooldownEndTime = Character:GetAttribute("DodgeCooldownEndTime") :: number?
-	if DodgeCooldownEndTime then
-		return DodgeCooldownEndTime
-	end
-
-	local DodgeCooldownEnd = Character:GetAttribute("DodgeCooldownEnd") :: number?
-	if DodgeCooldownEnd then
-		return DodgeCooldownEnd
-	end
-
-	local DodgeCooldownUntil = Character:GetAttribute("DodgeCooldownUntil") :: number?
-	if DodgeCooldownUntil then
-		return DodgeCooldownUntil
-	end
-
-	local DodgeCooldown = Character:GetAttribute("DodgeCooldown") :: number?
-	if DodgeCooldown then
-		local CurrentTime = os.clock()
-		if DodgeCooldown > CurrentTime then
-			return DodgeCooldown
-		end
-		if DodgeCooldown > 0 then
-			return CurrentTime + DodgeCooldown
-		end
-	end
-
-	return nil
-end
-
-local function GetLocalDodgeCooldownEndTime(Character: Model): number
-	local AttributeEndTime = GetCooldownEndTimeFromAttribute(Character)
-	if AttributeEndTime then
-		return math.max(LocalCooldown.DodgeEndTime, AttributeEndTime)
-	end
-
-	return LocalCooldown.DodgeEndTime
-end
-
-local function IsDodgeOnCooldown(Character: Model): boolean
-	local CurrentTime = os.clock()
-	return CurrentTime < GetLocalDodgeCooldownEndTime(Character)
-end
-
-local function StartLocalDodgeCooldown(Character: Model)
-	local CurrentTime = os.clock()
-
-	local CooldownSecondsAttribute = Character:GetAttribute("DodgeCooldownSeconds") :: number?
-	local CooldownSeconds = CooldownSecondsAttribute or (DashBalance.CooldownSeconds :: number?) or 0
-
-	if CooldownSeconds > 0 then
-		LocalCooldown.DodgeEndTime = math.max(LocalCooldown.DodgeEndTime, CurrentTime + CooldownSeconds)
-	end
-end
-
-local function GetCharacter(): Model?
-	return Player.Character
-end
-
-local function GetEquippedItemId(Character: Model): string?
-	return Character:GetAttribute("EquippedItemId") :: string?
-end
-
-local function GetComboCount(Character: Model): number
-	local ComboCount = Character:GetAttribute("M1ComboCount") :: number?
-	return ComboCount or 1
-end
-
-local function GetAnimationSetName(Character: Model): string?
-	local ItemId = GetEquippedItemId(Character)
-	if not ItemId then
-		return nil
-	end
-
-	local ItemData = ItemDatabase.GetItem(ItemId)
-	if not ItemData then
-		return nil
-	end
-
-	return ItemData.AnimationSet
-end
-
-local function GetStaminaCostMultiplier(Character: Model): number
-	local ItemId = GetEquippedItemId(Character)
-	if not ItemId then
-		return 1
-	end
-
-	local Item = ItemDatabase.GetItem(ItemId)
-	if not Item then return 1 end
-	local StatModifiers = Item["StatModifiers"]
-	if StatModifiers and StatModifiers.StaminaCostMultiplier then
-		return StatModifiers.StaminaCostMultiplier
-	end
-
-	return 1
-end
-
-local function SyncLocalState()
-	local Character = GetCharacter()
-	if not Character then
-		return
-	end
-
-	LocalState.IsAttacking = Character:GetAttribute("Attacking") :: boolean? or false
-	LocalState.IsBlocking = Character:GetAttribute("Blocking") :: boolean? or false
-
-	local ServerStamina = Character:GetAttribute("Stamina") :: number? or 0
-	local TimeSinceSync = os.clock() - LocalState.LastStaminaSync
-
-	if TimeSinceSync > STAMINA_SYNC_INTERVAL or LocalState.PredictedStamina > ServerStamina then
-		LocalState.PredictedStamina = ServerStamina
-		LocalState.LastStaminaSync = os.clock()
-	end
-end
-
-local function GetLocalStamina(): number
-	local Character = GetCharacter()
-	if not Character then
-		return 0
-	end
-
-	local ServerStamina = Character:GetAttribute("Stamina") :: number? or 0
-	return math.min(LocalState.PredictedStamina, ServerStamina)
-end
-
-local function DeductLocalStamina(Amount: number)
-	LocalState.PredictedStamina = math.max(0, LocalState.PredictedStamina - Amount)
-end
-
-local function RefundLocalStamina(Amount: number)
-	LocalState.PredictedStamina = LocalState.PredictedStamina + Amount
-end
 
 local function IsInputLocked(): boolean
 	if not PendingAction then
@@ -193,106 +41,32 @@ local function IsInputLocked(): boolean
 end
 
 local function ResolveActionName(RawInput: string): string
-	if RawInput == "M1" then
-		if LocalState.IsBlocking then
-			return "PerfectGuard"
-		end
-		return "M1"
-	end
-
-	if RawInput == "M2" then
-		if LocalState.IsBlocking then
-			return "Counter"
-		end
-		if LocalState.IsAttacking then
-			return "Feint"
-		end
-		return "M2"
-	end
-
-	return RawInput
-end
-
-local function GetM1StaminaCost(Character: Model): number?
-	local AnimationSetName = GetAnimationSetName(Character)
-	if not AnimationSetName then
-		return nil
-	end
-
-	local ComboCount = GetComboCount(Character)
-	local AttackData = AnimationSets.GetAttack(AnimationSetName, "M1", ComboCount)
-	if not AttackData then
-		return nil
-	end
-
-	local BaseCost = AttackData.StaminaCost
-	local Multiplier = GetStaminaCostMultiplier(Character)
-
-	return BaseCost * Multiplier
-end
-
-local function GetM2StaminaCost(Character: Model): number?
-	local AnimationSetName = GetAnimationSetName(Character)
-	if not AnimationSetName then
-		return nil
-	end
-
-	local HeavyAttackData = AnimationSets.GetAttack(AnimationSetName, "M2", 1)
-	if not HeavyAttackData then
-		return nil
-	end
-
-	local BaseCost = HeavyAttackData.StaminaCost
-	local Multiplier = GetStaminaCostMultiplier(Character)
-
-	return BaseCost * Multiplier
-end
-
-local function GetStaminaCost(Character: Model, ResolvedAction: string): number?
-	if ResolvedAction == "M1" or ResolvedAction == "LightAttack" then
-		return GetM1StaminaCost(Character)
-	end
-
-	if ResolvedAction == "M2" or ResolvedAction == "HeavyAttack" then
-		return GetM2StaminaCost(Character)
-	end
-
-	if ResolvedAction == "Dodge" then
-		return 15
-	end
-
-	if ResolvedAction == "Feint" then
-		return 0
-	end
-
-	if ResolvedAction == "PerfectGuard" or ResolvedAction == "Counter" or ResolvedAction == "Block" then
-		return 0
-	end
-
-	return nil
+	local States = ClientCombatState.BuildStateTable()
+	return InputResolverShared.ResolveFromTable(RawInput, States) or RawInput
 end
 
 local function CanPerformAction(RawInput: string): (boolean, number?)
-	local Character = GetCharacter()
+	local Character = ClientCombatState.GetCharacter()
 	if not Character then
 		return false, nil
 	end
 
 	local ResolvedAction = ResolveActionName(RawInput)
+	if not ResolvedAction then
+		return false, nil
+	end
 
 	local CanPerform, _Reason = ActionValidator.CanPerformClient(Character, ResolvedAction)
 	if not CanPerform then
 		return false, nil
 	end
 
-	if ResolvedAction == "Dodge" then
-		if IsDodgeOnCooldown(Character) then
-			return false, nil
-		end
+	if ResolvedAction == "Dodge" and ClientCombatState.IsDodgeOnCooldown() then
+		return false, nil
 	end
 
-	local StaminaCost = GetStaminaCost(Character, ResolvedAction)
-	if StaminaCost and StaminaCost > 0 and GetLocalStamina() < StaminaCost then
+	local StaminaCost = ClientCombatState.GetStaminaCost(ResolvedAction)
+	if StaminaCost and StaminaCost > 0 and ClientCombatState.GetStamina() < StaminaCost then
 		return false, nil
 	end
 
@@ -300,18 +74,18 @@ local function CanPerformAction(RawInput: string): (boolean, number?)
 end
 
 local function TryExecuteAction(RawInput: string)
-    SyncLocalState()
+	ClientCombatState.SyncFromServer()
 
-    local CanPerform, StaminaCost = CanPerformAction(RawInput)
-    if not CanPerform then
-        InputBuffer.BufferAction(RawInput)
-        return
-    end
+	local CanPerform, StaminaCost = CanPerformAction(RawInput)
+	if not CanPerform then
+		InputBuffer.BufferAction(RawInput)
+		return
+	end
 
-    local ResolvedAction = ResolveActionName(RawInput)
+	local ResolvedAction = ResolveActionName(RawInput)
 
 	if StaminaCost and StaminaCost > 0 then
-		DeductLocalStamina(StaminaCost)
+		ClientCombatState.DeductStamina(StaminaCost)
 	end
 
 	local IsPredicted = false
@@ -319,11 +93,11 @@ local function TryExecuteAction(RawInput: string)
 	if ResolvedAction == "Dodge" then
 		local Started = ClientDodgeHandler.StartDodge(STEERABLE_DODGE)
 		if Started then
-			LocalState.IsDodging = true
+			ClientCombatState.SetState("Dodging", true)
 			IsPredicted = true
 		end
 	elseif ResolvedAction == "M1" or ResolvedAction == "M2" then
-		LocalState.IsAttacking = true
+		ClientCombatState.SetState("Attacking", true)
 	end
 
 	PendingAction = {
@@ -340,14 +114,15 @@ local function TryExecuteBufferedAction()
 	local BufferedActions = { "M1", "M2", "Block", "Dodge" }
 
 	for _, ActionName in BufferedActions do
+		if ActionName == "Block" and not InputBuffer.IsHeld("Block") then
+			InputBuffer.ClearBuffer("Block")
+			continue
+		end
+
 		if InputBuffer.TryExecuteBuffered(ActionName) then
 			return
 		end
 	end
-end
-
-local function ClearPendingAction()
-	PendingAction = nil
 end
 
 local function RollbackPrediction()
@@ -356,32 +131,29 @@ local function RollbackPrediction()
 	end
 
 	if PendingAction.StaminaCost and PendingAction.StaminaCost > 0 then
-		RefundLocalStamina(PendingAction.StaminaCost)
+		ClientCombatState.RefundStamina(PendingAction.StaminaCost)
 	end
 
 	local ResolvedAction = ResolveActionName(PendingAction.ActionName)
 
-	if PendingAction.IsPredicted then
-		if ResolvedAction == "Dodge" then
-			ClientDodgeHandler.Rollback()
-			LocalState.IsDodging = false
-		end
+	if PendingAction.IsPredicted and ResolvedAction == "Dodge" then
+		ClientDodgeHandler.Rollback()
+		ClientCombatState.SetState("Dodging", false)
 	end
 
 	if ResolvedAction == "M1" or ResolvedAction == "M2" then
-		LocalState.IsAttacking = false
+		ClientCombatState.SetState("Attacking", false)
 	end
 
 	PendingAction = nil
 end
 
 InputBuffer.OnAction(function(ActionName: string)
-	local Character = GetCharacter()
-	if not Character then
+	if not ClientCombatState.GetCharacter() then
 		return
 	end
 
-	SyncLocalState()
+	ClientCombatState.SyncFromServer()
 
 	if IsInputLocked() then
 		InputBuffer.BufferAction(ActionName)
@@ -397,14 +169,11 @@ end)
 
 Packets.ActionApproved.OnClientEvent:Connect(function(ActionName: string)
 	if PendingAction and PendingAction.ActionName == ActionName then
-		ClearPendingAction()
+		PendingAction = nil
 	end
 
 	if ActionName == "Dodge" then
-		local Character = GetCharacter()
-		if Character then
-			StartLocalDodgeCooldown(Character)
-		end
+		ClientCombatState.StartDodgeCooldown()
 	end
 
 	TryExecuteBufferedAction()
@@ -416,66 +185,62 @@ Packets.ActionDenied.OnClientEvent:Connect(function(_Reason: string)
 end)
 
 Packets.ActionCompleted.OnClientEvent:Connect(function(_Character: Instance, ActionName: string)
-	LocalState.IsAttacking = false
+	ClientCombatState.SetState("Attacking", false)
 
-	if ActionName == "Dodge" and LocalState.IsDodging then
+	if ActionName == "Dodge" and ClientCombatState.GetState("Dodging") then
 		ClientDodgeHandler.StopDodge()
-		LocalState.IsDodging = false
+		ClientCombatState.SetState("Dodging", false)
 	end
 
 	TryExecuteBufferedAction()
 end)
 
-Packets.ActionInterrupted.OnClientEvent:Connect(function(_Character: Instance, Reason: string)
-	LocalState.IsAttacking = false
+Packets.ActionInterrupted.OnClientEvent:Connect(function(_Character: Instance, ActionName: string, Reason: string)
+	if ActionName == "LightAttack" or ActionName == "HeavyAttack" then
+		ClientCombatState.SetState("Attacking", false)
+	end
 
-	if LocalState.IsDodging then
+	if ActionName == "Dodge" and ClientCombatState.GetState("Dodging") then
 		if Reason == "Feint" or Reason == "Hit" or Reason == "Stunned" or Reason == "DodgeCancel" then
 			ClientDodgeHandler.Rollback()
 		else
 			ClientDodgeHandler.StopDodge()
 		end
-		LocalState.IsDodging = false
+		ClientCombatState.SetState("Dodging", false)
+	end
+
+	if ActionName == "Block" then
+		ClientCombatState.SetState("Blocking", false)
 	end
 
 	TryExecuteBufferedAction()
 end)
 
 local function OnCharacterAdded(Character: Model)
-	LocalState.IsAttacking = false
-	LocalState.IsBlocking = false
-	LocalState.IsDodging = false
-	LocalState.PredictedStamina = Character:GetAttribute("Stamina") :: number? or 0
-	LocalState.LastStaminaSync = os.clock()
+	ClientCombatState.Reset()
 	PendingAction = nil
 	InputBuffer.ClearAllBuffers()
-
 	ClientDodgeHandler.Rollback()
 
 	Character:GetAttributeChangedSignal("Stamina"):Connect(function()
 		local ServerStamina = Character:GetAttribute("Stamina") :: number? or 0
-		if ServerStamina > LocalState.PredictedStamina then
-			LocalState.PredictedStamina = ServerStamina
-			LocalState.LastStaminaSync = os.clock()
-		end
+		ClientCombatState.SyncStaminaFromServer(ServerStamina)
 	end)
 
 	Character:GetAttributeChangedSignal("Attacking"):Connect(function()
-		local ServerAttacking = Character:GetAttribute("Attacking") :: boolean? or false
-		if not ServerAttacking then
-			LocalState.IsAttacking = false
+		if not Character:GetAttribute("Attacking") then
+			ClientCombatState.SetState("Attacking", false)
 		end
 	end)
 
 	Character:GetAttributeChangedSignal("Blocking"):Connect(function()
-		LocalState.IsBlocking = Character:GetAttribute("Blocking") :: boolean? or false
+		ClientCombatState.SetState("Blocking", Character:GetAttribute("Blocking") == true)
 	end)
 
 	Character:GetAttributeChangedSignal("Dodging"):Connect(function()
-		local ServerDodging = Character:GetAttribute("Dodging") :: boolean? or false
-		if not ServerDodging and LocalState.IsDodging then
+		if not Character:GetAttribute("Dodging") and ClientCombatState.GetState("Dodging") then
 			ClientDodgeHandler.Rollback()
-			LocalState.IsDodging = false
+			ClientCombatState.SetState("Dodging", false)
 		end
 	end)
 end

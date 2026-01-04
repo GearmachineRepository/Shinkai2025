@@ -235,6 +235,11 @@ function ActionExecutor.CloseWindow(Context: ActionContext)
 		end
 	end
 
+	if Definition then
+		local FailureCooldownId = WindowType .. "Failure"
+		ActionExecutor.StartCooldown(Context.Entity, FailureCooldownId, Definition.SpamCooldown)
+	end
+
 	Context.ActiveWindow = nil
 
 	if Definition then

@@ -1,6 +1,11 @@
 --!strict
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local InputBindings = require(Shared.Combat.InputBindings)
 
 type Entity = CombatTypes.Entity
 
@@ -16,60 +21,7 @@ local InputResolver = {}
 
 local InputConfigs: { [string]: { InputBinding } } = {}
 
-local DEFAULT_BINDINGS: { InputBinding } = {
-	{
-		Input = "M1",
-		RequiredStates = { "Blocking" },
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted" },
-		Priority = 100,
-		Action = "PerfectGuard",
-	},
-	{
-		Input = "M2",
-		RequiredStates = { "Blocking" },
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted" },
-		Priority = 100,
-		Action = "Counter",
-	},
-	{
-		Input = "M2",
-		RequiredStates = { "Attacking" },
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted" },
-		Priority = 100,
-		Action = "Feint",
-	},
-	-- {
-	-- 	Input = "M2",
-	-- 	RequiredStates = { "Dodging" },
-	-- 	BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted" },
-	-- 	Priority = 100,
-	-- 	Action = "DodgeCancel",
-	-- },
-	{
-		Input = "M1",
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted", "Attacking", "Blocking" },
-		Priority = 50,
-		Action = "LightAttack",
-	},
-	{
-		Input = "M2",
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted", "Attacking" },
-		Priority = 50,
-		Action = "HeavyAttack",
-	},
-	{
-		Input = "Block",
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted", "Attacking" },
-		Priority = 50,
-		Action = "Block",
-	},
-	{
-		Input = "Dodge",
-		BlockingStates = { "Stunned", "Downed", "Ragdolled", "Exhausted", "Attacking" },
-		Priority = 50,
-		Action = "Dodge",
-	},
-}
+local DEFAULT_BINDINGS = InputBindings.Default
 
 local function SortBindingsByPriority(Bindings: { InputBinding }): { InputBinding }
 	local Sorted = table.clone(Bindings)
@@ -167,7 +119,7 @@ function InputResolver.GetBindingsForInput(RawInput: string, ConfigName: string?
 	local Bindings = InputConfigs[TargetConfig] or DEFAULT_BINDINGS
 
 	local Matches = {}
-	for _, Binding in Bindings do
+	for _, Binding in pairs(Bindings) do
 		if Binding.Input == RawInput then
 			table.insert(Matches, Binding)
 		end

@@ -94,9 +94,9 @@ local function NotifyActionDenied(Player: Player, Reason: string)
 	Packets.ActionDenied:FireClient(Player, Reason)
 end
 
-local function NotifyActionInterrupted(Entity: Entity, Reason: string)
-	if Entity.Player then
-		Packets.ActionInterrupted:FireClient(Entity.Player, Entity.Character, Reason)
+local function NotifyActionInterrupted(Entity: Entity, ActionName: string, Reason: string)
+	if Entity.Player and Entity.Character then
+		Packets.ActionInterrupted:FireClient(Entity.Player, Entity.Character, ActionName, Reason)
 	end
 end
 
@@ -133,21 +133,19 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputData: 
 
 	local FinalInputData = InputData or {}
 
-	-- Allow dodging to run parallel to blocking
-    if ResolvedAction == "Dodge" then
-        local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
-        if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
-            local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
-            if Success then
-                NotifyActionApproved(Player, RawInput)
-            else
-                NotifyActionDenied(Player, Reason or "Failed")
-            end
-            return
-        end
-    end
+	if ResolvedAction == "Dodge" then
+		local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
+		if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
+			local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
+			if Success then
+				NotifyActionApproved(Player, RawInput)
+			else
+				NotifyActionDenied(Player, Reason or "Failed")
+			end
+			return
+		end
+	end
 
-	-- Gate feinting behind Unpredictable hook
 	if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
 		if not HasUnpredictable(Entity) then
 			NotifyActionDenied(Player, "RequiresUnpredictable")
@@ -207,13 +205,7 @@ local function HandleInterruptRequest(Player: Player, Reason: string)
 		return
 	end
 
-	local Interrupted = Combat.Interrupt(Entity, Reason)
-	if not Interrupted then
-		NotifyActionDenied(Player, "InterruptFailed")
-		return
-	end
-
-	NotifyActionInterrupted(Entity, Reason)
+	Combat.Interrupt(Entity, Reason)
 end
 
 local function HandleReleaseAction(Player: Player, RawInput: string)
@@ -250,8 +242,8 @@ Ensemble.Events.Subscribe("ActionCompleted", function(Data: any)
 end)
 
 Ensemble.Events.Subscribe("ActionInterrupted", function(Data: any)
-	if Data.Entity and Data.Reason then
-		NotifyActionInterrupted(Data.Entity, Data.Reason)
+	if Data.Entity and Data.ActionName and Data.Reason then
+		NotifyActionInterrupted(Data.Entity, Data.ActionName, Data.Reason)
 	end
 end)
 
