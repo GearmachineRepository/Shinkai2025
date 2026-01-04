@@ -73,6 +73,9 @@ return {
 	PlayVfx = Packet("PlayVfx", Packet.String, Packet.Any),
 	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.Any, Packet.String, Packet.Any),
 
+	-- Damage indicator
+	ShowDamageIndicator = Packet("ShowDamageIndicator", Packet.Instance, Packet.NumberF32, Packet.Vector3F24, Packet.String),
+
 	-- Network
 	NetworkPing = Packet("NetworkPing", Packet.NumberF32),
 	NetworkPong = Packet("NetworkPong", Packet.NumberF32),

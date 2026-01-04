@@ -99,6 +99,14 @@ local function HandleGuardBreakAttack(Context: ActionContext, Attacker: Entity, 
 		Context = Context,
 	})
 
+	Ensemble.Events.Publish("DamageIndicatorTriggered", {
+		Attacker = Attacker,
+		Target = Context.Entity,
+		DamageAmount = IncomingDamage,
+		HitPosition = Context.Entity.Character:GetPivot().Position,
+		IndicatorType = "Crit",
+	})
+
 	ActionExecutor.Interrupt(Context.Entity, "GuardBreak")
 	return true
 end
@@ -181,6 +189,14 @@ local function HandleBlockedHit(Context: ActionContext, Attacker: Entity, Incomi
 	if not ConsumeBlockStamina(Context, Attacker, StaminaDrain, IncomingDamage) then
 		return
 	end
+
+	Ensemble.Events.Publish("DamageIndicatorTriggered", {
+		Attacker = Attacker,
+		Target = Context.Entity,
+		DamageAmount = ReducedDamage,
+		HitPosition = HitPosition or Context.Entity.Character:GetPivot().Position,
+		IndicatorType = "Blocked",
+	})
 
 	Ensemble.Events.Publish(CombatEvents.BlockHit, {
 		Entity = Context.Entity,

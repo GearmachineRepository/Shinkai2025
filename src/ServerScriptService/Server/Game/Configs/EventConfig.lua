@@ -37,6 +37,8 @@ local Config: EventConfig = {
 		"CombatEntered",
 		"CombatExited",
 
+		"DamageIndicatorTriggered",
+
 		"StatusEffectApplied",
 		"StatusEffectRemoved",
 		"StatusEffectStacked",

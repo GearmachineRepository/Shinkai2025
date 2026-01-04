@@ -14,7 +14,7 @@ local CombatBalance = {
 
 	Attacking = {
 		DEFAULT_MOVEMENT_SPEED_MULTIPLIER = 0.65,
-		CLASH_WINDOW_SECONDS = 0.05
+		CLASH_WINDOW_SECONDS = 0.30
 	},
 
 	Stunned = {
@@ -28,7 +28,7 @@ local CombatBalance = {
 		NEGATES_ALL_DAMAGE = true,
 		STAGGER_ATTACKER = true,
 		STAGGER_DURATION = 1.25,
-		MAX_ANGLE = 120,
+		MAX_ANGLE = 360,
 	},
 
 	Counter = {
@@ -38,7 +38,7 @@ local CombatBalance = {
 		NEGATES_ALL_DAMAGE = true,
 		STAGGER_ATTACKER = true,
 		STAGGER_DURATION = 0.8,
-		MAX_ANGLE = 120,
+		MAX_ANGLE = 180,
 	},
 
 	Parry = {

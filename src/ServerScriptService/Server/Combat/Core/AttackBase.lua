@@ -28,6 +28,8 @@ type ActionContext = CombatTypes.ActionContext
 
 local AttackBase = {}
 
+AttackBase.Debug = false
+
 local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacter: Model): Vector3?
 	local TargetPivot = TargetCharacter:GetPivot()
 	local TargetSize = TargetCharacter:GetExtentsSize()
@@ -86,7 +88,7 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 		SizeOrPart = HitboxSize,
 		InitialCframe = RootPart.CFrame * HitboxOffset,
 		VelocityPrediction = true,
-		Debug = false,
+		Debug = AttackBase.Debug,
 		LifeTime = 0,
 		LookingFor = "Humanoid",
 		Blacklist = { Context.Entity.Character },
@@ -331,6 +333,14 @@ function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosit
 		HitPosition = HitPosition,
 		ActionName = Context.Metadata.ActionName,
 		Context = Context,
+	})
+
+	Ensemble.Events.Publish("DamageIndicatorTriggered", {
+		Attacker = Context.Entity,
+		Target = Target,
+		DamageAmount = Damage,
+		HitPosition = HitPosition or Target.Character:GetPivot().Position,
+		IndicatorType = "Normal",
 	})
 end
 

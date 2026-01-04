@@ -134,6 +134,19 @@ local function HandleActionRequest(Player: Player, RawInput: string, InputTimest
 	local FinalInputData = InputData or {} :: { [string]: any }
 	FinalInputData.InputTimestamp = InputTimestamp
 
+	if ResolvedAction == "Dodge" then
+		local ActiveContext = Combat.ActionExecutor.GetActiveContext(Entity)
+		if ActiveContext and ActiveContext.Metadata.ActionName == "Block" then
+			local Success, Reason = Combat.ActionExecutor.ExecuteParallel(Entity, ResolvedAction, RawInput, InputData)
+			if Success then
+				NotifyActionApproved(Player, RawInput)
+			else
+				NotifyActionDenied(Player, Reason or "Failed")
+			end
+			return
+		end
+	end
+
 	if ResolvedAction == "Feint" and REQUIRE_UNPREDICTABLE_FOR_FEINT then
 		if not HasUnpredictable(Entity) then
 			NotifyActionDenied(Player, "RequiresUnpredictable")
@@ -238,6 +251,33 @@ Ensemble.Events.Subscribe("FeintExecuted", function(Data: any)
 	if Data.Entity and REQUIRE_UNPREDICTABLE_FOR_FEINT then
 		ConsumeFeintCharge(Data.Entity)
 	end
+end)
+
+Ensemble.Events.Subscribe("DamageIndicatorTriggered", function(Data: any)
+	if not Data.Attacker or not Data.Target or not Data.DamageAmount then
+		return
+	end
+
+	local AttackerPlayer = Data.Attacker.Player
+	if not AttackerPlayer then
+		return
+	end
+
+	local TargetCharacter = Data.Target.Character
+	if not TargetCharacter then
+		return
+	end
+
+	local HitPosition = Data.HitPosition or TargetCharacter:GetPivot().Position
+	local IndicatorType = Data.IndicatorType or "Normal"
+
+	Packets.ShowDamageIndicator:FireClient(
+		AttackerPlayer,
+		TargetCharacter,
+		Data.DamageAmount,
+		HitPosition,
+		IndicatorType
+	)
 end)
 
 Packets.PerformAction.OnServerEvent:Connect(HandleActionRequest)
