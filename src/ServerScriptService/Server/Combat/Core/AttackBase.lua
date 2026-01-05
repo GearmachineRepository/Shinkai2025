@@ -16,10 +16,10 @@ local Block = require(script.Parent.Parent.Actions.Block)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
 local HitValidation = require(script.Parent.Parent.Utility.HitValidation)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local CombatBalance = require(Shared.Config.Balance.CombatBalance)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
@@ -293,7 +293,7 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 			local AttackerHitTime = AttackerContext.CustomData.HitWindowOpenTime or 0
 			local TimeDifference = math.abs(TargetHitTime - AttackerHitTime)
 
-			if TimeDifference <= CombatBalance.Attacking.CLASH_WINDOW_SECONDS then
+			if TimeDifference <= CombatBalance.Attacking.ClashWindowSeconds then
 				HandleClash(AttackerContext, TargetContext, HitPosition)
 				return true
 			end

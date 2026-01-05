@@ -11,13 +11,13 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AttackBase = require(script.Parent.Parent.Core.AttackBase)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local Packets = require(Shared.Networking.Packets)
-local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
-local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
+local CombatBalance = require(Shared.Config.Balance.CombatBalance)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -150,7 +150,7 @@ function HeavyAttack.OnStart(Context: ActionContext)
 	end
 
 	local Multiplier = Context.Metadata.MovementSpeedMultiplier
-		or CombatBalance.Attacking.DEFAULT_MOVEMENT_SPEED_MULTIPLIER
+		or CombatBalance.Attacking.MovementSpeedMultiplier
 		or 0.65
 	MovementModifiers.SetModifier(Context.Entity, "Attacking", Multiplier)
 

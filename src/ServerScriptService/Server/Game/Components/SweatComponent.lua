@@ -9,9 +9,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local Formulas = require(Shared.General.Formulas)
-local SweatBalance = require(Shared.Configurations.Balance.SweatBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local Formulas = require(Shared.Utility.Formulas)
+local HungerBalance = require(Shared.Config.Body.HungerBalance)
 
 local SweatComponent = {}
 SweatComponent.__index = SweatComponent
@@ -75,15 +75,15 @@ function SweatComponent.Update(self: Self, _DeltaTime: number)
 	local StaminaPercent = Formulas.SafeDivide(CurrentStamina, MaxStamina)
 
 	local TimeSinceActivity = tick() - self.LastActivityTime
-	local IsRecentlyActive = TimeSinceActivity < SweatBalance.Thresholds.ACTIVITY_TIMEOUT_SECONDS
+	local IsRecentlyActive = TimeSinceActivity < HungerBalance.Sweat.ActivityTimeoutSeconds
 
-	local ShouldStartSweating = StaminaPercent < SweatBalance.Thresholds.STAMINA_THRESHOLD_PERCENT and IsRecentlyActive
+	local ShouldStartSweating = StaminaPercent < HungerBalance.Sweat.StaminaThresholdPercent and IsRecentlyActive
 
 	if ShouldStartSweating and not self.IsActive then
 		SweatComponent.StartSweating(self)
 	elseif self.IsActive then
 		local TimeSinceSweatStart = tick() - self.SweatStartTime
-		if TimeSinceSweatStart >= SweatBalance.Cooldown.DURATION_SECONDS then
+		if TimeSinceSweatStart >= HungerBalance.Sweat.CooldownDurationSeconds then
 			SweatComponent.StopSweating(self)
 		end
 	end
@@ -109,11 +109,11 @@ function SweatComponent.StopSweating(self: Self)
 end
 
 function SweatComponent.GetStatGainMultiplier(self: Self): number
-	return self.IsActive and SweatBalance.Multipliers.STAT_GAIN or 1.0
+	return self.IsActive and HungerBalance.Sweat.StatGainMultiplier or 1.0
 end
 
 function SweatComponent.GetHungerDrainMultiplier(self: Self): number
-	return self.IsActive and SweatBalance.Multipliers.HUNGER_DRAIN or 1.0
+	return self.IsActive and HungerBalance.Sweat.HungerDrainMultiplier or 1.0
 end
 
 function SweatComponent.Destroy(self: Self)

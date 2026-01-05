@@ -12,13 +12,13 @@ local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
 local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
-local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
-local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
+local CombatBalance = require(Shared.Config.Balance.CombatBalance)
+local StateTypes = require(Shared.Config.Enums.StateTypes)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
@@ -34,8 +34,8 @@ Block.ActionType = "Defensive"
 Block.DefaultMetadata = {
 	ActionName = "Block",
 	ActionType = "Defensive",
-	DamageReduction = CombatBalance.Blocking.DAMAGE_REDUCTION,
-	StaminaDrainOnHit = CombatBalance.Blocking.STAMINA_DRAIN_ON_HIT,
+	DamageReduction = CombatBalance.Blocking.DamageReduction,
+	StaminaDrainOnHit = CombatBalance.Blocking.StaminaDrainOnHit,
 }
 
 local function PlayAnimation(Context: ActionContext, AnimationId: string?)
@@ -70,7 +70,7 @@ local function ApplyGuardBreakState(Context: ActionContext)
 	local Entity = Context.Entity
 	Entity.States:SetState(StateTypes.GUARD_BROKEN, true)
 
-	local Duration = CombatBalance.Blocking.GUARD_BREAK_DURATION or 1.5
+	local Duration = CombatBalance.Blocking.GuardBreakDuration or 1.5
 
 	task.delay(Duration, function()
 		if Entity.States then
@@ -143,7 +143,7 @@ local function ApplyBlockHitState(Context: ActionContext)
 	local Entity = Context.Entity
 	Entity.States:SetState(StateTypes.BLOCK_HIT, true)
 
-	local Duration = CombatBalance.Blocking.BLOCK_HIT_DURATION or 0.3
+	local Duration = CombatBalance.Blocking.BlockHitDuration or 0.3
 
 	task.delay(Duration, function()
 		if Entity.States then
@@ -153,8 +153,8 @@ local function ApplyBlockHitState(Context: ActionContext)
 end
 
 local function CalculateBlockReduction(Context: ActionContext, IncomingDamage: number): (number, number)
-	local DamageReduction = Context.Metadata.DamageReduction or CombatBalance.Blocking.DAMAGE_REDUCTION
-	local StaminaScalar = Context.Metadata.StaminaDrainScalar or CombatBalance.Blocking.STAMINA_DRAIN_SCALAR or 1.0
+	local DamageReduction = Context.Metadata.DamageReduction or CombatBalance.Blocking.DamageReduction
+	local StaminaScalar = Context.Metadata.StaminaDrainScalar or CombatBalance.Blocking.StaminaDrainScalar or 1.0
 
 	local ReducedDamage = IncomingDamage * (1 - DamageReduction)
 	local StaminaDrain = IncomingDamage * StaminaScalar
@@ -249,9 +249,9 @@ function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 		ActionName = "Block",
 		ActionType = "Defensive",
 		AnimationSet = AnimationSetName,
-		DamageReduction = CombatBalance.Blocking.DAMAGE_REDUCTION,
-		StaminaDrainOnHit = CombatBalance.Blocking.STAMINA_DRAIN_ON_HIT,
-		StaminaDrainScalar = CombatBalance.Blocking.STAMINA_DRAIN_SCALAR,
+		DamageReduction = CombatBalance.Blocking.DamageReduction,
+		StaminaDrainOnHit = CombatBalance.Blocking.StaminaDrainOnHit,
+		StaminaDrainScalar = CombatBalance.Blocking.StaminaDrainScalar,
 		AnimationId = AnimationId,
 	}
 
@@ -270,7 +270,7 @@ end
 function Block.OnStart(Context: ActionContext)
 	Context.Entity.States:SetState("Blocking", true)
 
-	local Multiplier = CombatBalance.Blocking.MOVEMENT_SPEED_MULTIPLIER or 0.5
+	local Multiplier = CombatBalance.Blocking.MovementSpeedMultiplier or 0.5
 	MovementModifiers.SetModifier(Context.Entity, "Blocking", Multiplier)
 
 	Ensemble.Events.Publish(CombatEvents.BlockStarted, {
@@ -292,7 +292,7 @@ function Block.OnExecute(Context: ActionContext)
 end
 
 local function IsBlockAngleValid(Context: ActionContext, Attacker: Entity): boolean
-	local MaxAngle = CombatBalance.Blocking.BLOCK_ANGLE or 180
+	local MaxAngle = CombatBalance.Blocking.BlockAngle or 180
 	local HalfAngle = MaxAngle / 2
 
 	if not Context.Entity.Character or not Attacker.Character then

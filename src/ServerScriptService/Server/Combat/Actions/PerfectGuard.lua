@@ -10,10 +10,10 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local Packets = require(Shared.Networking.Packets)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -23,11 +23,11 @@ local PerfectGuard = {}
 
 PerfectGuard.ActionName = "PerfectGuard"
 PerfectGuard.WindowType = "PerfectGuard"
-PerfectGuard.Duration = CombatBalance.PerfectBlock.WINDOW_SECONDS
-PerfectGuard.Cooldown = CombatBalance.PerfectBlock.COOLDOWN_SECONDS
-PerfectGuard.SpamCooldown = CombatBalance.PerfectBlock.SPAM_COOLDOWN_SECONDS
-PerfectGuard.StaggerDuration = CombatBalance.PerfectBlock.STAGGER_DURATION
-PerfectGuard.MaxAngle = CombatBalance.PerfectBlock.MAX_ANGLE
+PerfectGuard.Duration = CombatBalance.PerfectBlock.WindowSeconds
+PerfectGuard.Cooldown = CombatBalance.PerfectBlock.CooldownSeconds
+PerfectGuard.SpamCooldown = CombatBalance.PerfectBlock.SpamCooldownSeconds
+PerfectGuard.StaggerDuration = CombatBalance.PerfectBlock.StaggerDuration
+PerfectGuard.MaxAngle = CombatBalance.PerfectBlock.MaxAngle
 PerfectGuard.StaggerPauseDivisor = 1.5
 
 local function OnTrigger(Context: ActionContext, Attacker: Entity)

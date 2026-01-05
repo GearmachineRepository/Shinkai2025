@@ -12,12 +12,12 @@ local Sounds = Assets:WaitForChild("Sounds")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 local CombatEvents = require(Server.Combat.CombatEvents)
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
+local EntityAnimator = require(Server.Combat.Utility.EntityAnimator)
 
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
+local StateTypes = require(Shared.Config.Enums.StateTypes)
 local Packets = require(Shared.Networking.Packets)
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
-local CombatValidationConfig = require(Shared.Configurations.CombatValidationConfig)
+local CharacterBalance = require(Shared.Config.Balance.CharacterBalance)
+local CombatValidationConfig = require(Shared.Config.CombatValidationConfig)
 
 local StateHandlerComponent = {}
 StateHandlerComponent.__index = StateHandlerComponent
@@ -102,7 +102,7 @@ local COMBAT_SFX: { [string]: (EventData: any) -> (string?, Vector3?, any?) } = 
 	end,
 }
 
-local DEFAULT_JUMP_POWER = StatBalance.MovementSpeeds.JumpPower or 25
+local DEFAULT_JUMP_POWER = CharacterBalance.Movement.JumpPower or 25
 
 local function CanJump(Entity: Types.Entity, IsLocked: boolean)
 	local JumpPower = IsLocked and 0 or DEFAULT_JUMP_POWER

@@ -3,10 +3,10 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Formulas = require(Shared.General.Formulas)
-local UpdateService = require(Shared.Networking.UpdateService)
-local Maid = require(Shared.General.Maid)
-local HudBinder = require(Shared.Utils.HudBinder)
+local Formulas = require(Shared.Utility.Formulas)
+local UpdateService = require(Shared.Utility.UpdateService)
+local Maid = require(Shared.Utility.Maid)
+local HudBinder = require(Shared.Utility.HudBinder)
 
 local Player = Players.LocalPlayer
 

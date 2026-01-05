@@ -3,8 +3,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local SoundPlayer = require(Shared.General.SoundPlayer)
-local VfxEmitter = require(Shared.General.VfxEmitter)
+local SoundPlayer = require(Shared.Audio.SoundPlayer)
+local VfxEmitter = require(Shared.VFX.VfxEmitter)
 
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local VfxAssets = Assets:WaitForChild("VFXAssets")

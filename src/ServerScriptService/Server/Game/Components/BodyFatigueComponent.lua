@@ -10,8 +10,8 @@ local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
 local ProgressionSystem = require(Server.Game.Systems.ProgressionSystem)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local FatigueBalance = require(Shared.Configurations.Balance.FatigueBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local FatigueBalance = require(Shared.Config.Body.FatigueBalance)
 
 local BodyFatigueComponent = {}
 BodyFatigueComponent.__index = BodyFatigueComponent
@@ -47,7 +47,7 @@ function BodyFatigueComponent.Update(self: Self, DeltaTime: number)
 end
 
 function BodyFatigueComponent.AddFatigueFromStatGain(self: Self, FatigueGain: number)
-	if FatigueGain < FatigueBalance.Updates.UPDATE_THRESHOLD then
+	if FatigueGain < FatigueBalance.Updates.Threshold then
 		return
 	end
 

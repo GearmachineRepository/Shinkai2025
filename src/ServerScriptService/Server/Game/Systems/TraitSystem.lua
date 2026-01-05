@@ -3,7 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local TraitData = require(Shared.Configurations.Data.TraitData)
+local TraitData = require(Shared.Config.Data.TraitData)
 
 local TraitSystem = {}
 
@@ -13,7 +13,7 @@ function TraitSystem.GetWeightedRandomTrait(): string
 	local TotalWeight = 0
 	local WeightedTraits = {}
 
-	for TraitName, TraitDef in TraitData.Definitions do
+	for TraitName, TraitDef in pairs(TraitData.Definitions) do
 		TotalWeight += TraitDef.RarityWeight
 		table.insert(WeightedTraits, {
 			Trait = TraitName,
@@ -31,7 +31,8 @@ function TraitSystem.GetWeightedRandomTrait(): string
 		end
 	end
 
-	local FirstTrait = next(TraitData.Definitions)
+	local FirstTrait = next(TraitData.Definitions) :: string
+
 	return FirstTrait
 end
 

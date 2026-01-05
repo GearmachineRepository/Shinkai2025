@@ -53,9 +53,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 

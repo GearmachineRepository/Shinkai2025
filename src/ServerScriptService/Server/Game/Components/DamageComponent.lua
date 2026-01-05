@@ -9,7 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
+local StateTypes = require(Shared.Config.Enums.StateTypes)
 
 local DamageComponent = {}
 DamageComponent.__index = DamageComponent

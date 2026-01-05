@@ -4,8 +4,8 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local StatUtils = require(Shared.Utils.StatUtils)
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local StatUtils = require(Shared.Utility.StatUtils)
+local ProgressionBalance = require(Shared.Config.Balance.ProgressionBalance)
 local Packets = require(Shared.Networking.Packets)
 
 local Player = Players.LocalPlayer
@@ -190,7 +190,7 @@ local function UpdateAvailablePoints(BaseStatName: string)
 		return
 	end
 
-	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
+	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0 :: number
 	local StatFrame = StatFrames[BaseStatName]
 
 	if not StatFrame then
@@ -213,9 +213,9 @@ local function UpdateXPProgress(BaseStatName: string)
 		return
 	end
 
-	local CurrentXP = CurrentCharacter:GetAttribute(BaseStatName .. "_XP") or 0
-	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0
-	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
+	local CurrentXP = CurrentCharacter:GetAttribute(BaseStatName .. "_XP") or 0 :: number
+	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0 :: number
+	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0 :: number
 
 	local StatFrame = StatFrames[BaseStatName]
 
@@ -228,9 +228,9 @@ local function UpdateXPProgress(BaseStatName: string)
 		return
 	end
 
-	local BaseThreshold = StatBalance.XPThresholds[BaseStatName]
-	local TierIncrement = StatBalance.XPTierIncrement[BaseStatName]
-	local TierSize = StatBalance.XPTierSize
+	local BaseThreshold = ProgressionBalance.XPThresholds[BaseStatName]
+	local TierIncrement = ProgressionBalance.XPTierIncrement[BaseStatName]
+	local TierSize = ProgressionBalance.XPTierSize
 
 	if not BaseThreshold or not TierIncrement or not TierSize then
 		ProgressLabel.Text = "(0/0)"

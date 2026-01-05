@@ -3,8 +3,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local UpdateService = require(Shared.Networking.UpdateService)
-local Config = require(Shared.Configurations.Balance.RegenerationBalance)
+local UpdateService = require(Shared.Utility.UpdateService)
+local Config = require(Shared.Config.Balance.CharacterBalance)
 
 local character = script.Parent :: Model
 local humanoid = character:WaitForChild("Humanoid") :: Humanoid
@@ -32,7 +32,7 @@ UpdateService.Register(function(deltaTime)
 	if character:GetAttribute("InCombat") then
 		return
 	end
-	if os.clock() - lastDamageTime < Config.HEALTH_REGEN_DELAY then
+	if os.clock() - lastDamageTime < Config.HealthRegen.Delay then
 		return
 	end
 
@@ -41,5 +41,5 @@ UpdateService.Register(function(deltaTime)
 		return
 	end
 
-	h.Health = math.min(h.MaxHealth, h.Health + Config.HEALTH_REGEN_RATE * deltaTime)
+	h.Health = math.min(h.MaxHealth, h.Health + Config.HealthRegen.Rate * deltaTime)
 end, RUN_TIME_INTERVAL)

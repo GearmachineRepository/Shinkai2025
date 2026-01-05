@@ -3,77 +3,73 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
-local UpdateService = require(Shared.Networking.UpdateService)
-local TableUtil = require(Shared.Utils.TableUtil)
--- local DebugLogger = require(Shared.Debug.DebugLogger)
+local PlayerDataTemplate = require(Shared.Config.Data.PlayerDataTemplate)
+local UpdateService = require(Shared.Utility.UpdateService)
+local TableUtil = require(Shared.Utility.TableUtil)
 
-local AUTOSAVE_INTERVAL = 60
+local AUTOSAVE_INTERVAL: number = 60
+local AUTOSAVE_RATE_SECONDS: number = 1 / 2
 
 local DataModule = {}
-local PlayerDataCache: { [Player]: any } = {}
-local AutosaveConnections: { [Player]: RBXScriptConnection } = {}
 
-function DataModule.LoadData(Player: Player): any
-	if PlayerDataCache[Player] then
-		-- DebugLogger.Info("DataModule", "Loaded cached data for: %s", Player.Name)
-		return PlayerDataCache[Player]
+local PlayerDataCache: { [Player]: unknown } = {}
+local AutosaveHandles: { [Player]: UpdateService.Handle } = {}
+
+function DataModule.LoadData(Player: Player): unknown
+	local ExistingData = PlayerDataCache[Player]
+	if ExistingData ~= nil then
+		return ExistingData
 	end
 
 	local NewData = TableUtil.DeepCopy(PlayerDataTemplate)
 	PlayerDataCache[Player] = NewData
 
-	-- DebugLogger.Info("DataModule", "Created new data for: %s", Player.Name)
 	return NewData
 end
 
-function DataModule.GetData(Player: Player): any?
+function DataModule.GetData(Player: Player): unknown?
 	return PlayerDataCache[Player]
 end
 
 function DataModule.SaveData(Player: Player)
 	local Data = PlayerDataCache[Player]
-	if not Data then
-		-- DebugLogger.Warning("DataModule", "No data to save for: %s", Player.Name)
+	if Data == nil then
 		return
 	end
 
-	-- DebugLogger.Info("DataModule", "Saved data for: %s", Player.Name)
+	-- Persist Data here
 end
 
 function DataModule.StartAutosave(Player: Player)
-	if AutosaveConnections[Player] then
-		-- DebugLogger.Warning("DataModule", "Autosave already running for: %s", Player.Name)
+	if AutosaveHandles[Player] ~= nil then
 		return
 	end
 
-	local LastSave = tick()
+	local LastSave: number = tick()
 
-	AutosaveConnections[Player] = UpdateService.Register(function()
+	local AutosaveHandle: UpdateService.Handle = UpdateService.Register(function()
 		if tick() - LastSave >= AUTOSAVE_INTERVAL then
 			DataModule.SaveData(Player)
 			LastSave = tick()
 		end
-	end, 1 / 2)
+	end, AUTOSAVE_RATE_SECONDS)
 
-	-- DebugLogger.Info("DataModule", "Started autosave for: %s", Player.Name)
+	AutosaveHandles[Player] = AutosaveHandle
 end
 
 function DataModule.StopAutosave(Player: Player)
-	if AutosaveConnections[Player] then
-		AutosaveConnections[Player]:Disconnect()
-		AutosaveConnections[Player] = nil
-		-- DebugLogger.Info("DataModule", "Stopped autosave for: %s", Player.Name)
+	local AutosaveHandle = AutosaveHandles[Player]
+	if AutosaveHandle == nil then
+		return
 	end
+
+	UpdateService.Disconnect(AutosaveHandle)
+	AutosaveHandles[Player] = nil
 end
 
 function DataModule.RemoveData(Player: Player)
 	DataModule.StopAutosave(Player)
-
-	if PlayerDataCache[Player] then
-		PlayerDataCache[Player] = nil
-		-- DebugLogger.Info("DataModule", "Removed data for: %s", Player.Name)
-	end
+	PlayerDataCache[Player] = nil
 end
 
 Players.PlayerRemoving:Connect(function(Player: Player)

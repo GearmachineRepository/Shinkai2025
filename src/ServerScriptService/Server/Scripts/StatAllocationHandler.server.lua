@@ -8,8 +8,8 @@ local Server = ServerScriptService:WaitForChild("Server")
 
 local Ensemble = require(Server.Ensemble)
 local StatSystem = require(Server.Game.Systems.StatSystem)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local StatBalance = require(Shared.Config.Balance.StatDefaults)
 local Packets = require(Shared.Networking.Packets)
 
 local TRAINABLE_STATS = {
@@ -78,7 +78,7 @@ local function HandleAllocateStatPoint(Player: Player, StatName: string)
 	end
 
 	local NewStars = PlayerData.Stats[StatName .. "_Stars"]
-	local BaseValue = StatBalance.Defaults[StatName] or 0
+	local BaseValue = StatBalance[StatName] or 0
 	local NewStatValue = StatSystem.CalculateStatValue(BaseValue, NewStars, StatName)
 
 	EntityInstance.Stats:SetStat(StatName, NewStatValue)

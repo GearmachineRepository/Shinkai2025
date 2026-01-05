@@ -14,9 +14,9 @@ local FADE_DURATION = 0.25
 local HIGHLIGHT_FILL_TRANSPARENCY = 0.85
 local HIGHLIGHT_BORDER_TRANSPARENCY = 0.45
 local HIGHLIGHT_COLORS = {
-	Color3.fromRGB(255, 255, 255), -- white
-	Color3.fromRGB(211, 152, 152), -- cyan
-	Color3.fromRGB(255, 255, 255), -- bluish
+	Color3.fromRGB(255, 255, 255),
+	Color3.fromRGB(211, 152, 152),
+	Color3.fromRGB(255, 255, 255),
 }
 
 local Player = Players.LocalPlayer
@@ -147,10 +147,16 @@ local function GetPromptText(InteractableObject: Model): string
 
 	if IsActive then
 		local StopPrompt = InteractableObject:GetAttribute("StopPrompt")
-		return string.format("[E] - %s", StopPrompt or "Stop Interacting")
+		if not StopPrompt then
+			StopPrompt = "Stop Interacting"
+		end
+		return string.format("[E] - %s", StopPrompt :: string)
 	else
 		local ActionPrompt = InteractableObject:GetAttribute("ActionPrompt")
-		return string.format("[E] - %s", ActionPrompt or "Interact")
+		if not ActionPrompt then
+			ActionPrompt = "Interact"
+		end
+		return string.format("[E] - %s", ActionPrompt :: string)
 	end
 end
 
@@ -177,13 +183,16 @@ local function CreateHighlight(InteractableObject: Model): Highlight
 	return NewHighlight
 end
 
-local function CreateBillboard(InteractableObject: Model): BillboardGui
+local function CreateBillboard(InteractableObject: Model): BillboardGui?
+	local Root = InteractableObject.PrimaryPart
+	if not Root then return nil end
+
 	local Billboard = Instance.new("BillboardGui")
 	Billboard.Name = "InteractionPrompt"
 	Billboard.Size = UDim2.fromOffset(200, 30)
 	Billboard.StudsOffset = Vector3.new(0, 3, 0)
 	Billboard.AlwaysOnTop = true
-	Billboard.Adornee = InteractableObject.PrimaryPart
+	Billboard.Adornee = Root
 	Billboard.Parent = script
 
 	local TextLabel = Instance.new("TextLabel")
@@ -265,7 +274,7 @@ local function UpdateInteraction()
 			CurrentHighlight = CreateHighlight(ClosestInteractable)
 			CurrentBillboard = CreateBillboard(ClosestInteractable)
 
-			if IsActiveForPlayer then
+			if IsActiveForPlayer and CurrentHighlight then
 				FadeHighlight(CurrentHighlight, false)
 			end
 		end
@@ -307,7 +316,7 @@ end
 CollectionService:GetInstanceAddedSignal(INTERACTABLE_TAG):Connect(function(TaggedObject)
 	if TaggedObject:IsA("Model") then
 		TaggedObject:GetAttributeChangedSignal("ActiveFor"):Connect(function()
-			OnAttributeChanged(TaggedObject)
+			OnAttributeChanged(TaggedObject :: any)
 		end)
 	end
 end)

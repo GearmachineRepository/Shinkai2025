@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
-local KnockbackBalance = require(Shared.Configurations.Balance.KnockbackBalance)
+local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 
 local Player = Players.LocalPlayer
 
@@ -50,7 +50,7 @@ Packets.ApplyKnockback.OnClientEvent:Connect(function(Direction: Vector3, Speed:
 	Cleanup()
 	local BodyVelocityInstance = Instance.new("BodyVelocity")
 	BodyVelocityInstance.Name = "KnockbackVelocity"
-	BodyVelocityInstance.MaxForce = Vector3.new(KnockbackBalance.MaxForce, 0, KnockbackBalance.MaxForce)
+	BodyVelocityInstance.MaxForce = Vector3.new(PhysicsBalance.Knockback.MaxForce, 0, PhysicsBalance.Knockback.MaxForce)
 	BodyVelocityInstance.Velocity = Direction * Speed
 	BodyVelocityInstance.Parent = RootPart
 

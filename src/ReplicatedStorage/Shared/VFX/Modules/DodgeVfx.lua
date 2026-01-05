@@ -11,7 +11,7 @@ local DashAssets = VfxAssets:WaitForChild("Dash")
 local SfxAssets = Assets:WaitForChild("Sounds")
 local DodgeSound = SfxAssets:WaitForChild("Dodge")
 
-local SoundPlayer = require(Shared.General.SoundPlayer)
+local SoundPlayer = require(Shared.Audio.SoundPlayer)
 
 local DodgeVfx = {}
 

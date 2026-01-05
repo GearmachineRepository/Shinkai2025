@@ -11,10 +11,10 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
-local DodgeBalance = require(Shared.Configurations.Balance.DashBalance)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
@@ -28,11 +28,11 @@ Dodge.ActionName = "Dodge"
 Dodge.ActionType = "Movement"
 
 local COOLDOWN_ID = "Dodge"
-local DEFAULT_COOLDOWN = DodgeBalance.CooldownSeconds
-local DEFAULT_STAMINA_COST = DodgeBalance.StaminaCost
-local DEFAULT_IFRAMES_DURATION = DodgeBalance.IFrameWindow
-local DEFAULT_DURATION = DodgeBalance.Duration
-local DODGE_RECOVERY_PERCENT = DodgeBalance.DodgeRecoveryPecentage
+local DEFAULT_COOLDOWN = PhysicsBalance.Dash.CooldownSeconds
+local DEFAULT_STAMINA_COST = PhysicsBalance.Dash.StaminaCost
+local DEFAULT_IFRAMES_DURATION = PhysicsBalance.Dash.IFrameWindow
+local DEFAULT_DURATION = PhysicsBalance.Dash.Duration
+local DODGE_RECOVERY_PERCENT = PhysicsBalance.Dash.RecoveryPercent
 local DEFAULT_ANIMATION = "DashForward"
 
 Dodge.DefaultMetadata = {

@@ -5,9 +5,9 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local DashBalance = require(Shared.Configurations.Balance.DashBalance)
+local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 local AnimationService = require(Shared.Services.AnimationService)
-local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+local AnimationDatabase = require(Shared.Config.Data.AnimationDatabase)
 
 local Player = Players.LocalPlayer
 
@@ -25,10 +25,10 @@ type DodgeState = {
 
 local ActiveDodge: DodgeState? = nil
 
-local DODGE_SPEED = DashBalance.Speed
-local DODGE_DURATION = DashBalance.Duration
+local DODGE_SPEED = PhysicsBalance.Dash.Speed
+local DODGE_DURATION = PhysicsBalance.Dash.Duration
 
-local DODGE_MAX_FORCE = Vector3.new(DashBalance.MaxForce, 0, DashBalance.MaxForce)
+local DODGE_MAX_FORCE = Vector3.new(PhysicsBalance.Dash.MaxForce, 0, PhysicsBalance.Dash.MaxForce)
 
 local DIRECTION_TO_ANIMATION: { [string]: string } = {
 	Forward = "DashForward",

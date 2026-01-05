@@ -3,19 +3,26 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local ProgressionBalance = require(Shared.Config.Balance.ProgressionBalance)
 
 local StatSystem = {}
 
+type StarTier = {
+	Min: number,
+	Max: number,
+	Name: string,
+	Color: { R: number, G: number, B: number}
+}
+
 function StatSystem.CalculateStatValue(BaseStat: number, AllocatedStars: number, StatType: string): number
-	local BonusPerStar = StatBalance.StarBonuses[StatType] or 0
+	local BonusPerStar = ProgressionBalance.StarBonuses[StatType] or 0
 	return BaseStat + (AllocatedStars * BonusPerStar)
 end
 
 function StatSystem.GetXPThresholdForStar(StatType: string, StarNumber: number): number
-	local BaseThreshold = StatBalance.XPThresholds[StatType]
-	local TierIncrement = StatBalance.XPTierIncrement[StatType]
-	local TierSize = StatBalance.XPTierSize
+	local BaseThreshold = ProgressionBalance.XPThresholds[StatType]
+	local TierIncrement = ProgressionBalance.XPTierIncrement[StatType]
+	local TierSize = ProgressionBalance.XPTierSize
 
 	if not BaseThreshold or not TierIncrement or not TierSize then
 		return 0
@@ -56,17 +63,17 @@ function StatSystem.CanAllocateStar(PlayerData: any, StatType: string): (boolean
 	local CurrentStars = PlayerData.Stats[StatType .. "_Stars"] or 0
 	local AvailablePoints = PlayerData.Stats[StatType .. "_AvailablePoints"] or 0
 
-	if CurrentStars >= StatBalance.Caps.MAX_STARS_PER_STAT then
-		return false, "Stat already at maximum (" .. StatBalance.Caps.MAX_STARS_PER_STAT .. " stars)"
+	if CurrentStars >= ProgressionBalance.Caps.MaxStarsPerStat then
+		return false, "Stat already at maximum (" .. ProgressionBalance.Caps.MaxStarsPerStat .. " stars)"
 	end
 
 	local TotalStars = StatSystem.GetTotalAllocatedStars(PlayerData)
-	if TotalStars >= StatBalance.Caps.TOTAL_SOFT_CAP_STARS then
-		return false, "Reached total star cap (" .. StatBalance.Caps.TOTAL_SOFT_CAP_STARS .. " stars)"
+	if TotalStars >= ProgressionBalance.Caps.TotalSoftCapStars then
+		return false, "Reached total star cap (" .. ProgressionBalance.Caps.TotalSoftCapStars .. " stars)"
 	end
 
-	if AvailablePoints < StatBalance.Caps.POINTS_PER_STAR then
-		return false, "Need " .. StatBalance.Caps.POINTS_PER_STAR .. " points to allocate a star"
+	if AvailablePoints < ProgressionBalance.Caps.PointsPerStar then
+		return false, "Need " .. ProgressionBalance.Caps.PointsPerStar .. " points to allocate a star"
 	end
 
 	return true
@@ -79,7 +86,7 @@ function StatSystem.AllocateStar(PlayerData: any, StatType: string): (boolean, s
 	end
 
 	PlayerData.Stats[StatType .. "_Stars"] += 1
-	PlayerData.Stats[StatType .. "_AvailablePoints"] -= StatBalance.Caps.POINTS_PER_STAR
+	PlayerData.Stats[StatType .. "_AvailablePoints"] -= ProgressionBalance.Caps.PointsPerStar
 
 	return true
 end
@@ -87,7 +94,7 @@ end
 function StatSystem.GetTotalAllocatedStars(PlayerData: any): number
 	local Total = 0
 
-	for StatType, _ in StatBalance.StarBonuses do
+	for StatType : any, _ in ProgressionBalance.StarBonuses do
 		Total += PlayerData.Stats[StatType .. "_Stars"] or 0
 	end
 
@@ -99,24 +106,24 @@ function StatSystem.UpdateAvailablePoints(PlayerData: any, StatType: string)
 	local AllocatedStars = PlayerData.Stats[StatType .. "_Stars"] or 0
 
 	local TotalPointsEarned = StatSystem.GetAvailablePointsFromXP(XPValue, StatType)
-	local PointsSpent = AllocatedStars * StatBalance.Caps.POINTS_PER_STAR
+	local PointsSpent = AllocatedStars * ProgressionBalance.Caps.PointsPerStar
 
 	PlayerData.Stats[StatType .. "_AvailablePoints"] = TotalPointsEarned - PointsSpent
 end
 
-function StatSystem.GetStarTier(TotalStars: number): { Min: number, Max: number, Name: string, Color: Color3 }
-	for _, Tier in StatBalance.StarTiers do
+function StatSystem.GetStarTier(TotalStars: number): StarTier
+	for _, Tier in pairs(ProgressionBalance.StarTiers) do
 		if TotalStars >= Tier.Min and TotalStars <= Tier.Max then
 			return Tier
 		end
 	end
 
-	return StatBalance.StarTiers[1]
+	return ProgressionBalance.StarTiers[1]
 end
 
 function StatSystem.IsAboveSoftCap(PlayerData: any): boolean
 	local TotalStars = StatSystem.GetTotalAllocatedStars(PlayerData)
-	return TotalStars >= StatBalance.Caps.TOTAL_SOFT_CAP_STARS
+	return TotalStars >= ProgressionBalance.Caps.TotalSoftCapStars
 end
 
 return StatSystem

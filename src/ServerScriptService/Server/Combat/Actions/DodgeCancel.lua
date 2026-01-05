@@ -10,8 +10,8 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 
-local DashBalance = require(Shared.Configurations.Balance.DashBalance)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -25,8 +25,8 @@ DodgeCancel.ActionType = "Utility"
 DodgeCancel.RequiresActiveAction = true
 
 local COOLDOWN_ID = "DodgeCancel"
-local DEFAULT_COOLDOWN = DashBalance.DodgeCancelCooldown or 1.0
-local DEFAULT_ENDLAG = DashBalance.DodgeCancelEndlag or 0.15
+local DEFAULT_COOLDOWN = PhysicsBalance.DodgeCancel.Cooldown or 1.0
+local DEFAULT_ENDLAG = PhysicsBalance.DodgeCancel.Endlag or 0.15
 
 function DodgeCancel.BuildMetadata(Entity: Entity, _InputData: { [string]: any }?): ActionMetadata?
 	local ActiveContext = ActionExecutor.GetActiveContext(Entity)

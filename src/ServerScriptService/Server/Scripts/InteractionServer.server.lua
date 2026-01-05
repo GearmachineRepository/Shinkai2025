@@ -3,8 +3,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
 
 local Packets = require(ReplicatedStorage.Shared.Networking.Packets)
-local Formulas = require(ReplicatedStorage.Shared.General.Formulas)
-local DebugLogger = require(ReplicatedStorage.Shared.Debug.DebugLogger)
+local Formulas = require(ReplicatedStorage.Shared.Utility.Formulas)
+local DebugLogger = require(ReplicatedStorage.Shared.Utility.DebugLogger)
 
 local INTERACTABLES_FOLDER = ServerScriptService.Server.Game:WaitForChild("Interactables")
 local INTERACTION_DISTANCE = 12

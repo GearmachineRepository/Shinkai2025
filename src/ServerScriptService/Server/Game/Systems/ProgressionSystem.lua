@@ -6,9 +6,12 @@ local ServerScriptService = game:GetService("ServerScriptService")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Server = ServerScriptService:WaitForChild("Server")
 
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
 local StatSystem = require(Server.Game.Systems.StatSystem)
-local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
+local FatigueBalance = require(Shared.Config.Body.FatigueBalance)
+local BodyBalance = require(Shared.Config.Body.BodyBalance)
+local HungerBalance = require(Shared.Config.Body.HungerBalance)
+local ProgressionBalance = require(Shared.Config.Balance.ProgressionBalance)
 
 local ProgressionSystem = {}
 
@@ -34,29 +37,29 @@ function ProgressionSystem.GetFatiguePenalty(PlayerData: any): number
 		return 0
 	end
 
-	if FatiguePercent < TrainingBalance.FatigueSystem.TRAINING_LOCKOUT_PERCENT then
+	if FatiguePercent < FatigueBalance.Fatigue.TrainingLockoutPercent then
 		return 1.0
 	end
 
-	local ExcessFatigue = FatiguePercent - TrainingBalance.FatigueSystem.TRAINING_LOCKOUT_PERCENT
-	local MaxExcess = 100 - TrainingBalance.FatigueSystem.TRAINING_LOCKOUT_PERCENT
+	local ExcessFatigue = FatiguePercent - FatigueBalance.Fatigue.TrainingLockoutPercent
+	local MaxExcess = 100 - FatigueBalance.Fatigue.TrainingLockoutPercent
 	local PenaltyRatio = ExcessFatigue / MaxExcess
 
 	return 1.0 - PenaltyRatio
 end
 
 function ProgressionSystem.AwardTrainingXP(PlayerData: any, StatType: string, BaseXP: number, Entity: any?): number
-	local XPMultiplier = TrainingBalance.XPRates.BASE_RATE
+	local XPMultiplier = ProgressionBalance.XPRates.BaseRate
 
 	if Entity and Entity.IsPlayer and Entity.Player then
 		local IsPremium = Entity.Player.MembershipType == Enum.MembershipType.Premium
 		if IsPremium then
-			XPMultiplier *= TrainingBalance.XPRates.PREMIUM_MULTIPLIER
+			XPMultiplier *= ProgressionBalance.XPRates.PremiumMultiplier
 		end
 	end
 
 	if StatSystem.IsAboveSoftCap(PlayerData) then
-		XPMultiplier *= TrainingBalance.XPRates.AFTER_SOFT_CAP_MULTIPLIER
+		XPMultiplier *= ProgressionBalance.XPRates.AfterSoftCapMultiplier
 	end
 
 	local FatiguePenalty = ProgressionSystem.GetFatiguePenalty(PlayerData)
@@ -68,7 +71,7 @@ function ProgressionSystem.AwardTrainingXP(PlayerData: any, StatType: string, Ba
 		PlayerData.Stats[StatType .. "_XP"] = (PlayerData.Stats[StatType .. "_XP"] or 0) + FinalXP
 
 		if Entity and Entity.Stats then
-			local FatigueGain = FinalXP * TrainingBalance.FatigueSystem.XP_TO_FATIGUE_RATIO
+			local FatigueGain = FinalXP * FatigueBalance.Fatigue.XPToFatigueRatio
 			local CurrentFatigue = Entity.Stats:GetStat(StatTypes.BODY_FATIGUE) or 0
 			local NewFatigue = math.min(100, CurrentFatigue + FatigueGain)
 			Entity.Stats:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
@@ -91,8 +94,8 @@ function ProgressionSystem.ProcessHunger(_: any, DeltaTime: number, CharacterCon
 	local CurrentHunger = CharacterController.StatManager:GetStat(StatTypes.HUNGER)
 	local CurrentMuscle = CharacterController.StatManager:GetStat(StatTypes.MUSCLE)
 
-	if CurrentHunger < TrainingBalance.HungerSystem.MUSCLE_LOSS_THRESHOLD then
-		local MuscleLoss = TrainingBalance.HungerSystem.MUSCLE_LOSS_RATE_PER_SECOND * DeltaTime
+	if CurrentHunger < HungerBalance.MuscleLoss.Threshold then
+		local MuscleLoss = HungerBalance.MuscleLoss.RatePerSecond * DeltaTime
 		local NewMuscle = math.max(0, CurrentMuscle - MuscleLoss)
 		CharacterController.StatManager:SetStat(StatTypes.MUSCLE, NewMuscle)
 	end
@@ -125,7 +128,7 @@ function ProgressionSystem.ProcessMuscleTraining(
 		return false
 	end
 
-	local FatRequired = MuscleXP * TrainingBalance.HungerSystem.FAT_TO_MUSCLE_CONVERSION
+	local FatRequired = MuscleXP * HungerBalance.MuscleLoss.FatToMuscleConversion
 
 	if CurrentFat < FatRequired then
 		return false
@@ -149,19 +152,19 @@ function ProgressionSystem.ProcessFat(_: any, DeltaTime: number, CharacterContro
 	local HungerPercent = (CurrentHunger / MaxHunger) * 100
 
 	-- Gain fat when above X% hunger
-	if HungerPercent >= TrainingBalance.FatSystem.FAT_GAIN_THRESHOLD_PERCENT then
-		local MaxFat = TrainingBalance.FatSystem.MAX_FAT
+	if HungerPercent >= BodyBalance.Fat.GainThresholdPercent then
+		local MaxFat = BodyBalance.Fat.MaxFat
 		-- TODO: Check for Jigoro clan, set MaxFat = 750 if they have it
 
 		if CurrentFat < MaxFat then
-			local FatGain = TrainingBalance.FatSystem.FAT_GAIN_RATE_PER_SECOND * DeltaTime
+			local FatGain = BodyBalance.Fat.GainRatePerSecond * DeltaTime
 			local NewFat = math.min(MaxFat, CurrentFat + FatGain)
 			CharacterController.StatManager:SetStat(StatTypes.FAT, NewFat)
 		end
 		-- Lose fat when below X% hunger
 	else
 		if CurrentFat > 0 then
-			local FatLoss = TrainingBalance.FatSystem.FAT_LOSS_RATE_PER_SECOND * DeltaTime
+			local FatLoss = BodyBalance.Fat.LossRatePerSecond * DeltaTime
 			local NewFat = math.max(0, CurrentFat - FatLoss)
 			CharacterController.StatManager:SetStat(StatTypes.FAT, NewFat)
 		end

@@ -9,8 +9,9 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
 
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local HungerBalance = require(Shared.Config.Body.HungerBalance)
+local BodyBalance = require(Shared.Config.Body.BodyBalance)
 
 local HungerComponent = {}
 HungerComponent.__index = HungerComponent
@@ -30,14 +31,14 @@ function HungerComponent.new(Entity: Types.Entity, _Context: Types.EntityContext
 		Maid = Ensemble.Maid.new(),
 	}, HungerComponent) :: any
 
-	Entity.Character:SetAttribute("HungerThreshold", TrainingBalance.HungerSystem.STAT_GAIN_THRESHOLD / 100)
-	Entity.Character:SetAttribute("MaxFat", TrainingBalance.FatSystem.MAX_FAT)
+	Entity.Character:SetAttribute("HungerThreshold", HungerBalance.Hunger.StatGainThreshold / 100)
+	Entity.Character:SetAttribute("MaxFat", BodyBalance.Fat.MaxFat)
 
 	return self
 end
 
 function HungerComponent.Update(self: Self, DeltaTime: number)
-	local DecayRate = TrainingBalance.HungerSystem.DECAY_RATE
+	local DecayRate = HungerBalance.Hunger.DecayRate
 
 	local Sweat = self.Entity:GetComponent("Sweat") :: any
 	if Sweat then
@@ -49,7 +50,7 @@ function HungerComponent.Update(self: Self, DeltaTime: number)
 
 	self.Entity.Stats:SetStat(StatTypes.HUNGER, NewHunger)
 
-	if NewHunger < TrainingBalance.HungerSystem.CRITICAL_THRESHOLD then
+	if NewHunger < HungerBalance.Hunger.CriticalThreshold then
 		Ensemble.Events.Publish("HungerCritical", {
 			Entity = self.Entity,
 			HungerPercent = HungerComponent.GetHungerPercent(self),
@@ -77,7 +78,7 @@ function HungerComponent.GetHungerPercent(self: Self): number
 end
 
 function HungerComponent.ConsumeHungerForStamina(self: Self, StaminaUsed: number)
-	local HungerCost = StaminaUsed * TrainingBalance.HungerSystem.STAMINA_TO_HUNGER_RATIO
+	local HungerCost = StaminaUsed * HungerBalance.Hunger.StaminaToHungerRatio
 	local CurrentHunger = self.Entity.Stats:GetStat(StatTypes.HUNGER)
 	local NewHunger = math.max(0, CurrentHunger - HungerCost)
 
@@ -85,16 +86,16 @@ function HungerComponent.ConsumeHungerForStamina(self: Self, StaminaUsed: number
 end
 
 function HungerComponent.IsStarving(self: Self): boolean
-	return HungerComponent.GetHungerPercent(self) < TrainingBalance.HungerSystem.CRITICAL_THRESHOLD
+	return HungerComponent.GetHungerPercent(self) < HungerBalance.Hunger.CriticalThreshold
 end
 
 function HungerComponent.GetStatGainMultiplier(self: Self): number
 	local HungerPercent = HungerComponent.GetHungerPercent(self)
 
-	if HungerPercent >= TrainingBalance.HungerSystem.STAT_GAIN_THRESHOLD then
-		return TrainingBalance.HungerSystem.STAT_GAIN_MULTIPLIER_NORMAL
+	if HungerPercent >= HungerBalance.Hunger.StatGainThreshold then
+		return HungerBalance.Hunger.StatGainMultiplierNormal
 	else
-		return TrainingBalance.HungerSystem.STAT_GAIN_MULTIPLIER_STARVING
+		return HungerBalance.Hunger.StatGainMultiplierStarving
 	end
 end
 

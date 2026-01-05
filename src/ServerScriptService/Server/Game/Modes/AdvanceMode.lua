@@ -3,9 +3,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local ModeBalance = require(Shared.Configurations.Balance.ModeBalance)
-local ModeData = require(Shared.Configurations.Data.ModeData)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local ModeBalance = require(Shared.Config.Modes.ModeBalance)
+local ModeData = require(Shared.Config.Data.ModeData)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
 
 local AdvanceMode = {}
 AdvanceMode.__index = AdvanceMode
@@ -62,7 +62,7 @@ function AdvanceMode:ApplyStatBoosts()
 	local PlayerData = self.Controller.StateManager:GetData()
 	local Config = ModeBalance.Advance
 
-	for StatName, StarBoost in Config.StatBoosts do
+	for StatName, StarBoost in pairs(Config.StatBoosts) do
 		PlayerData.Stats[StatName] = (PlayerData.Stats[StatName] or 0) + StarBoost
 	end
 
@@ -119,7 +119,7 @@ function AdvanceMode:RemoveStatBoosts()
 	local PlayerData = self.Controller.StateManager:GetData()
 	local Config = ModeBalance.Advance
 
-	for StatName, StarBoost in Config.StatBoosts do
+	for StatName, StarBoost in pairs(Config.StatBoosts) do
 		PlayerData.Stats[StatName] = (PlayerData.Stats[StatName] or 0) - StarBoost
 	end
 end

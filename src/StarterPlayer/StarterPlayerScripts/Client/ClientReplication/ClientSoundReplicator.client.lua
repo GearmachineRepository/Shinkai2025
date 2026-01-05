@@ -4,7 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
-local SoundPlayer = require(Shared.General.SoundPlayer)
+local SoundPlayer = require(Shared.Audio.SoundPlayer)
 
 Packets.PlaySoundReplicate.OnClientEvent:Connect(function(SenderUser: Player | Instance | number, SoundName: string)
 	local SenderCharacter: Model? = nil

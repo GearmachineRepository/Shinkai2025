@@ -9,15 +9,15 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Ensemble = require(Server.Ensemble)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
+local StateTypes = require(Shared.Config.Enums.StateTypes)
+local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 
 local StunManager = {}
 
 local ActiveStuns: { [any]: thread } = {}
 
 local STUN_MODIFIER_ID = "Stunned"
-local STUN_SPEED_MULTIPLIER = CombatBalance.Stunned.MOVEMENT_SPEED_MULTIPLIER or 0.3
+local STUN_SPEED_MULTIPLIER = CombatBalance.Stunned.MovementSpeedMultiplier or 0.3
 
 function StunManager.ApplyStun(Entity: any, Duration: number, Source: string?)
 	if not Entity or not Entity.States then

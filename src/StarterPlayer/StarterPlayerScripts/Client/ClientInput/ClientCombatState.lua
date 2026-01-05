@@ -5,9 +5,9 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
-local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
-local DashBalance = require(Shared.Configurations.Balance.DashBalance)
+local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
+local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 
 local Player = Players.LocalPlayer
 
@@ -285,7 +285,7 @@ function ClientCombatState.StartDodgeCooldown()
 
 	local CurrentTime = os.clock()
 	local CooldownSecondsAttribute = Character:GetAttribute("DodgeCooldownSeconds") :: number?
-	local CooldownSeconds = CooldownSecondsAttribute or (DashBalance.CooldownSeconds :: number?) or 0
+	local CooldownSeconds = CooldownSecondsAttribute or (PhysicsBalance.Dash.CooldownSeconds :: number?) or 0
 
 	if CooldownSeconds > 0 then
 		LocalCooldown.DodgeEndTime = math.max(LocalCooldown.DodgeEndTime, CurrentTime + CooldownSeconds)

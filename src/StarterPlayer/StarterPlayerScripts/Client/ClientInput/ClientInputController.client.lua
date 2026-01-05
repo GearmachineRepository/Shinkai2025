@@ -5,10 +5,10 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local InputBuffer = require(Shared.General.InputBuffer)
+local InputBuffer = require(Shared.Input.InputBuffer)
 local Packets = require(Shared.Networking.Packets)
-local ActionValidator = require(Shared.Utils.ActionValidator)
-local InputResolverShared = require(Shared.Combat.InputResolverShared)
+local ActionValidator = require(Shared.Utility.ActionValidator)
+local InputResolverShared = require(Shared.Input.InputResolverShared)
 local ClientDodgeHandler = require(script.Parent.ClientDodgeHandler)
 local ClientCombatState = require(script.Parent.ClientCombatState)
 local ClientSprintHandler = require(script.Parent.ClientSprintHandler)

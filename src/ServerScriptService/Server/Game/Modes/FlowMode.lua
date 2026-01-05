@@ -3,8 +3,8 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local ModeBalance = require(Shared.Configurations.Balance.ModeBalance)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local ModeBalance = require(Shared.Config.Modes.ModeBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
 
 local FlowMode = {}
 FlowMode.__index = FlowMode
@@ -61,7 +61,7 @@ function FlowMode:ApplyStatBoosts()
 	local PlayerData = self.Controller.StateManager:GetData()
 	local Config = ModeBalance.Flow
 
-	for StatName, StarBoost in Config.StatBoosts do
+	for StatName, StarBoost in pairs(Config.StatBoosts) do
 		PlayerData.Stats[StatName] = (PlayerData.Stats[StatName] or 0) + StarBoost
 	end
 
@@ -112,7 +112,7 @@ function FlowMode:RemoveStatBoosts()
 	local PlayerData = self.Controller.StateManager:GetData()
 	local Config = ModeBalance.Flow
 
-	for StatName, StarBoost in Config.StatBoosts do
+	for StatName, StarBoost in pairs(Config.StatBoosts) do
 		PlayerData.Stats[StatName] = (PlayerData.Stats[StatName] or 0) - StarBoost
 	end
 end

@@ -1,11 +1,8 @@
 --!strict
 
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local Packets = require(Shared.Networking.Packets)
 local VfxModules = Shared:WaitForChild("VFX"):WaitForChild("Modules")
 
 export type VfxInstance = {
@@ -13,10 +10,11 @@ export type VfxInstance = {
 	Stop: (() -> ())?,
 }
 
+export type ActiveVfxMap = { [Model]: { [string]: VfxInstance } }
+
 local VfxPlayer = {}
 
-local ActiveVfxByCharacter: { [Model]: { [string]: VfxInstance } } = {}
-local IsInitialized = false
+local ActiveVfxByCharacter: ActiveVfxMap = {}
 
 local function GetVfxModule(VfxName: string): any?
 	local VfxModule = VfxModules:FindFirstChild(VfxName)
@@ -34,16 +32,16 @@ local function GetVfxModule(VfxName: string): any?
 	return Result
 end
 
-function VfxPlayer.Play(Character: Model, VfxName: string, VfxData: any?): VfxInstance?
+function VfxPlayer.Play(Character: Model, VfxName: string, VfxData: unknown?): VfxInstance?
 	local VfxModule = GetVfxModule(VfxName)
-	if not VfxModule or not VfxModule.Play then
+	if not VfxModule or VfxModule.Play == nil then
 		return nil
 	end
 
 	VfxPlayer.Cleanup(Character, VfxName, false)
 
-	local VfxInstance = VfxModule.Play(Character, VfxData)
-	if not VfxInstance then
+	local VfxInstanceValue: VfxInstance? = VfxModule.Play(Character, VfxData)
+	if not VfxInstanceValue then
 		return nil
 	end
 
@@ -53,26 +51,8 @@ function VfxPlayer.Play(Character: Model, VfxName: string, VfxData: any?): VfxIn
 		ActiveVfxByCharacter[Character] = CharacterVfx
 	end
 
-	CharacterVfx[VfxName] = VfxInstance
-
-	return VfxInstance
-end
-
-function VfxPlayer.PlayLocal(VfxName: string, VfxData: any?): VfxInstance?
-	if not RunService:IsClient() then
-		warn("PlayLocal can only be called from client")
-		return nil
-	end
-
-	local Character = Players.LocalPlayer.Character
-	if not Character then
-		return nil
-	end
-
-	local VfxInstance = VfxPlayer.Play(Character, VfxName, VfxData)
-	Packets.PlayVfx:Fire(VfxName, VfxData)
-
-	return VfxInstance
+	CharacterVfx[VfxName] = VfxInstanceValue
+	return VfxInstanceValue
 end
 
 function VfxPlayer.Stop(Character: Model, VfxName: string)
@@ -81,13 +61,14 @@ function VfxPlayer.Stop(Character: Model, VfxName: string)
 		return
 	end
 
-	local VfxInstance = CharacterVfx[VfxName]
-	if not VfxInstance then
+	local VfxInstanceValue = CharacterVfx[VfxName]
+	if not VfxInstanceValue then
 		return
 	end
 
-	if VfxInstance.Stop then
-		VfxInstance.Stop()
+	local StopFunction = VfxInstanceValue.Stop
+	if StopFunction then
+		StopFunction()
 	end
 
 	CharacterVfx[VfxName] = nil
@@ -99,82 +80,38 @@ function VfxPlayer.Cleanup(Character: Model, VfxName: string, Rollback: boolean?
 		return
 	end
 
-	local VfxInstance = CharacterVfx[VfxName]
-	if not VfxInstance then
+	local VfxInstanceValue = CharacterVfx[VfxName]
+	if not VfxInstanceValue then
 		return
 	end
 
-	VfxInstance.Cleanup(Rollback)
+	VfxInstanceValue.Cleanup(Rollback)
 	CharacterVfx[VfxName] = nil
 end
 
-function VfxPlayer.CleanupAll(Character: Model)
+function VfxPlayer.CleanupAll(Character: Model, Rollback: boolean?)
 	local CharacterVfx = ActiveVfxByCharacter[Character]
 	if not CharacterVfx then
 		return
 	end
 
-	for _VfxName, VfxInstance in CharacterVfx do
-		VfxInstance.Cleanup(false)
+	for _, VfxInstanceValue in CharacterVfx do
+		VfxInstanceValue.Cleanup(Rollback)
 	end
 
 	ActiveVfxByCharacter[Character] = nil
 end
 
-function VfxPlayer.Init()
-	if IsInitialized then
-		warn("VfxPlayer already initialized")
-		return
+function VfxPlayer.HasActive(Character: Model, VfxName: string): boolean
+	local CharacterVfx = ActiveVfxByCharacter[Character]
+	if not CharacterVfx then
+		return false
 	end
+	return CharacterVfx[VfxName] ~= nil
+end
 
-	IsInitialized = true
-
-	if RunService:IsClient() then
-		local function OnVfxReplicated(SenderUserId: number | Instance, VfxName: string, VfxData: any?)
-			local CharacterToSend = SenderUserId :: Model
-
-			if typeof(SenderUserId) == "number" then
-				local SenderPlayer = Players:GetPlayerByUserId(SenderUserId)
-				if not SenderPlayer or not SenderPlayer.Character then
-					CharacterToSend = SenderPlayer.Character :: Model
-				end
-			end
-
-			if not CharacterToSend then return end
-
-			VfxPlayer.Play(CharacterToSend, VfxName, VfxData)
-		end
-
-		Packets.PlayVfxReplicate.OnClientEvent:Connect(OnVfxReplicated)
-	end
-
-	local function OnCharacterRemoving(Character: Model)
-		VfxPlayer.CleanupAll(Character)
-	end
-
-	local function SetupCharacterCleanup(Player: Player)
-		if Player.Character then
-			Player.Character.AncestryChanged:Connect(function(_, Parent)
-				if not Parent then
-					OnCharacterRemoving(Player.Character)
-				end
-			end)
-		end
-
-		Player.CharacterRemoving:Connect(OnCharacterRemoving)
-	end
-
-	Players.PlayerRemoving:Connect(function(Player: Player)
-		if Player.Character then
-			VfxPlayer.CleanupAll(Player.Character)
-		end
-	end)
-
-	for _, Player in Players:GetPlayers() do
-		SetupCharacterCleanup(Player)
-	end
-
-	Players.PlayerAdded:Connect(SetupCharacterCleanup)
+function VfxPlayer.GetActiveMap(): ActiveVfxMap
+	return ActiveVfxByCharacter
 end
 
 return VfxPlayer

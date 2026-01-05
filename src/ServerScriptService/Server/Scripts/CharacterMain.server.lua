@@ -11,10 +11,10 @@ local Server = ServerScriptService:WaitForChild("Server")
 local Ensemble = require(Server.Ensemble)
 local ArchTypes = require(Server.Ensemble.Types)
 
-local PlayerDataTemplate = require(Shared.Configurations.Data.PlayerDataTemplate)
+local PlayerDataTemplate = require(Shared.Config.Data.PlayerDataTemplate)
 local DataModule = require(Server.Game.Data.DataModule)
 
-local CombatValidationConfig = require(Shared.Configurations.CombatValidationConfig)
+local CombatValidationConfig = require(Shared.Config.CombatValidationConfig)
 
 local StatConfig = require(Server.Game.Configs.StatConfig)
 local EventConfig = require(Server.Game.Configs.EventConfig)

@@ -8,21 +8,20 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local Types = require(Server.Ensemble.Types)
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local StateTypes = require(Shared.Configurations.Enums.StateTypes)
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
-local StaminaBalance = require(Shared.Configurations.Balance.StaminaBalance)
-local TrainingBalance = require(Shared.Configurations.Balance.TrainingBalance)
-local Formulas = require(Shared.General.Formulas)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local StateTypes = require(Shared.Config.Enums.StateTypes)
+local CharacterBalance = require(Shared.Config.Balance.CharacterBalance)
+local TrainingBalance = require(Shared.Config.Body.TrainingTypesBalance)
+local Formulas = require(Shared.Utility.Formulas)
 
 local MovementComponent = {}
 MovementComponent.__index = MovementComponent
 
 MovementComponent.ComponentName = "Movement"
 MovementComponent.Dependencies = { "Stats", "Stamina" }
-MovementComponent.UpdateRate = 1 / 60
+MovementComponent.UpdateRate = 1 / 30
 
 local WALKSPEED_UPDATE_THROTTLE = 0.05
 
@@ -61,7 +60,7 @@ function MovementComponent.new(Entity: Types.Entity, _Context: Types.EntityConte
 end
 
 function MovementComponent.GetWalkSpeed(_self: Self): number
-	return StatBalance.MovementSpeeds.WalkSpeed
+	return CharacterBalance.Movement.WalkSpeed
 end
 
 function MovementComponent.GetTargetSprintSpeed(self: Self, Mode: string?): number
@@ -73,10 +72,10 @@ function MovementComponent.GetTargetSprintSpeed(self: Self, Mode: string?): numb
 	end
 
 	if CurrentMode == "jog" then
-		return RunSpeedStat * StatBalance.MovementSpeeds.JogSpeedPercent
+		return RunSpeedStat * CharacterBalance.Movement.JogSpeedPercent
 	end
 
-	return StatBalance.MovementSpeeds.WalkSpeed
+	return CharacterBalance.Movement.WalkSpeed
 end
 
 function MovementComponent.GetSprintRampProgress(self: Self): number
@@ -86,7 +85,7 @@ function MovementComponent.GetSprintRampProgress(self: Self): number
 
 	local CurrentTime = os.clock()
 	local TimeSinceStart = CurrentTime - self.SprintStartTime
-	local RampDuration = StaminaBalance.Sprint.RAMP_DURATION_SECONDS
+	local RampDuration = CharacterBalance.Sprint.RampDurationSeconds
 
 	return math.clamp(TimeSinceStart / RampDuration, 0, 1)
 end
@@ -131,7 +130,7 @@ end
 
 function MovementComponent.IsOnSprintCooldown(self: Self): boolean
 	local CurrentTime = os.clock()
-	local CooldownDuration = StaminaBalance.Sprint.COOLDOWN_SECONDS
+	local CooldownDuration = CharacterBalance.Sprint.CooldownSeconds
 	local TimeSinceEnd = CurrentTime - self.LastSprintEndTime
 
 	return TimeSinceEnd < CooldownDuration
@@ -139,7 +138,7 @@ end
 
 function MovementComponent.GetSprintCooldownRemaining(self: Self): number
 	local CurrentTime = os.clock()
-	local CooldownDuration = StaminaBalance.Sprint.COOLDOWN_SECONDS
+	local CooldownDuration = CharacterBalance.Sprint.CooldownSeconds
 	local TimeSinceEnd = CurrentTime - self.LastSprintEndTime
 
 	return math.max(0, CooldownDuration - TimeSinceEnd)
@@ -296,15 +295,15 @@ function MovementComponent.UpdateStaminaAndTraining(self: Self, DeltaTime: numbe
 	if CanContinue and IsMoving and Training then
 		if CurrentMode == "run" then
 			local RunSpeedXP = (
-				TrainingBalance.TrainingTypes.RunSpeed.BaseXPPerSecond
-				* TrainingBalance.TrainingTypes.RunSpeed.NonmachineMultiplier
+				TrainingBalance.RunSpeed.BaseXPPerSecond
+				* TrainingBalance.RunSpeed.NonmachineMultiplier
 			) * DeltaTime
 			local FatigueGain = 0.35
 			Training:GrantStatGain(StatTypes.RUN_SPEED, RunSpeedXP, FatigueGain)
 		elseif CurrentMode == "jog" then
 			local StaminaXP = (
-				TrainingBalance.TrainingTypes.Stamina.BaseXPPerSecond
-				* TrainingBalance.TrainingTypes.Stamina.NonmachineMultiplier
+				TrainingBalance.Stamina.BaseXPPerSecond
+				* TrainingBalance.Stamina.NonmachineMultiplier
 			) * DeltaTime
 			local FatigueGain = 0.4
 			Training:GrantStatGain(StatTypes.MAX_STAMINA, StaminaXP, FatigueGain)

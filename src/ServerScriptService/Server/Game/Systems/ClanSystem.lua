@@ -3,7 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local ClanData = require(Shared.Configurations.Data.ClanData)
+local ClanData = require(Shared.Config.Data.ClanData)
 
 local ClanSystem = {}
 

@@ -3,9 +3,9 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local UpdateService = require(Shared.Networking.UpdateService)
+local UpdateService = require(Shared.Utility.UpdateService)
 local Packets = require(Shared.Networking.Packets)
-local HudBinder = require(Shared.Utils.HudBinder)
+local HudBinder = require(Shared.Utility.HudBinder)
 
 local Player = Players.LocalPlayer
 local PlayerGui = Player:WaitForChild("PlayerGui")
@@ -56,8 +56,11 @@ local function GetOrCreateCooldownFrame(CooldownId: string): Frame?
 	end
 
 	local NewFrame = Template:Clone()
+	local NewBar = NewFrame:FindFirstChild("Bar") :: Frame?
+	if not NewBar then return end
+
 	NewFrame.Name = CooldownId
-	NewFrame.Bar.Size = UDim2.fromScale(0, 1)
+	NewBar.Size = UDim2.fromScale(0, 1)
 	NewFrame.Visible = true
 	NewFrame.Parent = Root
 	return NewFrame

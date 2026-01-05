@@ -5,7 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
-local InputBindings = require(Shared.Combat.InputBindings)
+local InputBindings = require(Shared.Input.InputBindings)
 
 type Entity = CombatTypes.Entity
 

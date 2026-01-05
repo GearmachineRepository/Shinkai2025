@@ -5,67 +5,67 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Types = require(ServerScriptService.Server.Ensemble.Types)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local StatDefaults = require(Shared.Config.Balance.StatDefaults)
 
 type StatConfig = Types.StatConfig
 
 local Config: StatConfig = {
 	Stats = {
 		[StatTypes.HEALTH] = {
-			Default = StatBalance.Defaults.Health,
+			Default = StatDefaults.Health,
 			Min = 0,
-			Max = StatBalance.Defaults.MaxHealth,
+			Max = StatDefaults.MaxHealth,
 			Replication = "All",
 		},
 
 		[StatTypes.MAX_HEALTH] = {
-			Default = StatBalance.Defaults.MaxHealth,
+			Default = StatDefaults.MaxHealth,
 			Min = 1,
 			Replication = "All",
 		},
 
 		[StatTypes.STUNDURATION] = {
-			Default = StatBalance.Defaults.StunDuration,
+			Default = StatDefaults.StunDuration,
 			Min = 0,
 			Replication = "All",
 		},
 
 		[StatTypes.STAMINA] = {
-			Default = StatBalance.Defaults.Stamina,
+			Default = StatDefaults.Stamina,
 			Min = 0,
-			Max = StatBalance.Defaults.MaxStamina,
+			Max = StatDefaults.MaxStamina,
 			Replication = "Owner",
 		},
 
 		[StatTypes.MAX_STAMINA] = {
-			Default = StatBalance.Defaults.MaxStamina,
+			Default = StatDefaults.MaxStamina,
 			Min = 1,
 			Replication = "Owner",
 		},
 
 		[StatTypes.HUNGER] = {
-			Default = StatBalance.Defaults.Hunger,
+			Default = StatDefaults.Hunger,
 			Min = 0,
-			Max = StatBalance.Defaults.MaxHunger,
+			Max = StatDefaults.MaxHunger,
 			Replication = "Owner",
 		},
 
 		[StatTypes.MAX_HUNGER] = {
-			Default = StatBalance.Defaults.MaxHunger,
+			Default = StatDefaults.MaxHunger,
 			Min = 1,
 			Replication = "Owner",
 		},
 
 		[StatTypes.BODY_FATIGUE] = {
-			Default = StatBalance.Defaults.BodyFatigue,
+			Default = StatDefaults.BodyFatigue,
 			Min = 0,
-			Max = StatBalance.Defaults.MaxBodyFatigue,
+			Max = StatDefaults.MaxBodyFatigue,
 			Replication = "Owner",
 		},
 
 		[StatTypes.MAX_BODY_FATIGUE] = {
-			Default = StatBalance.Defaults.MaxBodyFatigue,
+			Default = StatDefaults.MaxBodyFatigue,
 			Min = 1,
 			Replication = "None",
 		},
@@ -101,7 +101,7 @@ local Config: StatConfig = {
 		},
 
 		[StatTypes.FAT] = {
-			Default = StatBalance.Defaults.Fat,
+			Default = StatDefaults.Fat,
 			Min = 0,
 			Replication = "All",
 		},

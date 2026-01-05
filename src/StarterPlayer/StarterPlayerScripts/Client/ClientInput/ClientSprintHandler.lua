@@ -5,7 +5,7 @@ local Players = game:GetService("Players")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
-local StaminaBalance = require(Shared.Configurations.Balance.StaminaBalance)
+local StaminaBalance = require(Shared.Config.Balance.CharacterBalance)
 
 local Player = Players.LocalPlayer
 
@@ -34,7 +34,7 @@ end
 
 local function IsOnSprintCooldown(): boolean
 	local CurrentTime = os.clock()
-	local CooldownDuration = StaminaBalance.Sprint.COOLDOWN_SECONDS
+	local CooldownDuration = StaminaBalance.Sprint.CooldownSeconds
 	return (CurrentTime - LastSprintEndTime) < CooldownDuration
 end
 

@@ -9,8 +9,8 @@ local TreadmillUI: Frame? = nil
 local MaxStaminaButton: TextButton? = nil
 local RunSpeedButton: TextButton? = nil
 
-local Maid = require(Shared.General.Maid)
-local HudBinder = require(Shared.Utils.HudBinder)
+local Maid = require(Shared.Utility.Maid)
+local HudBinder = require(Shared.Utility.HudBinder)
 
 local UiMaid = Maid.new() :: any
 

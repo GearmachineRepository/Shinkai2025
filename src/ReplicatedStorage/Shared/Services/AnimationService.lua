@@ -2,7 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+local AnimationDatabase = require(Shared.Config.Data.AnimationDatabase)
 
 local DEFAULT_FADE_TIME = 0.1
 

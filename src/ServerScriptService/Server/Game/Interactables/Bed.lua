@@ -8,10 +8,10 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Entity = require(Server.Framework.Core.Entity)
 local InteractableBase = require(Server.Game.Interactables.InteractableBase)
-local FatigueBalance = require(Shared.Configurations.Balance.FatigueBalance)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local FatigueBalance = require(Shared.Config.Balance.FatigueBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
 local Packets = require(Shared.Networking.Packets)
-local UpdateService = require(Shared.Networking.UpdateService)
+local UpdateService = require(Shared.Utility.UpdateService)
 
 export type InteractableModule = {
 	OnInteract: (Player: Player, BedModel: Model) -> (),

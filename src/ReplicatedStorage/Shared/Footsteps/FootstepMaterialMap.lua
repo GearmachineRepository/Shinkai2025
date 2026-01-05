@@ -1,5 +1,4 @@
 --!strict
--- Shared/Footsteps/FootstepMaterialMap.lua
 
 local FootstepMaterialMap = {}
 

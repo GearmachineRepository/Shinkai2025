@@ -63,6 +63,7 @@ local CombatEvents = {
 
 	ComboAdvanced = "ComboAdvanced",
 	ComboReset = "ComboReset",
+	ComboFinished = "ComboFinished"
 }
 
 return CombatEvents

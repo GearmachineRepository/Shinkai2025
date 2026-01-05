@@ -11,7 +11,7 @@ local Types = require(Server.Ensemble.Types)
 
 local StatSystem = require(Server.Game.Systems.StatSystem)
 local ProgressionSystem = require(Server.Game.Systems.ProgressionSystem)
-local StatBalance = require(Shared.Configurations.Balance.StatBalance)
+local StatDefaults = require(Shared.Config.Balance.StatDefaults)
 
 local TrainingComponent = {}
 TrainingComponent.__index = TrainingComponent
@@ -107,7 +107,7 @@ function TrainingComponent.AllocateStatPoint(self: Self, StatName: string): bool
 	end
 
 	local NewStars = self.PlayerData.Stats[StatName .. "_Stars"]
-	local BaseValue = StatBalance.Defaults[StatName] or 0
+	local BaseValue = StatDefaults[StatName] or 0
 	local NewStatValue = StatSystem.CalculateStatValue(BaseValue, NewStars, StatName)
 
 	self.Entity.Stats:SetStat(StatName, NewStatValue)

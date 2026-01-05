@@ -12,11 +12,11 @@ local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
+local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
-local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
-local AnimationSets = require(Shared.Configurations.Data.AnimationSets)
-local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
+local CombatBalance = require(Shared.Config.Balance.CombatBalance)
+local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
@@ -27,11 +27,11 @@ local Counter = {}
 
 Counter.ActionName = "Counter"
 Counter.WindowType = "Counter"
-Counter.Duration = CombatBalance.Counter.WINDOW_SECONDS
-Counter.Cooldown = CombatBalance.Counter.COOLDOWN_SECONDS
-Counter.SpamCooldown = CombatBalance.Counter.SPAM_COOLDOWN_SECONDS
-Counter.StaggerDuration = CombatBalance.Counter.STAGGER_DURATION
-Counter.MaxAngle = CombatBalance.Counter.MAX_ANGLE
+Counter.Duration = CombatBalance.Counter.WindowSeconds
+Counter.Cooldown = CombatBalance.Counter.CooldownSeconds
+Counter.SpamCooldown = CombatBalance.Counter.SpamCooldownSeconds
+Counter.StaggerDuration = CombatBalance.Counter.StaggerDuration
+Counter.MaxAngle = CombatBalance.Counter.MaxAngle
 
 local DAMAGE_MULTIPLIER = 0.8
 

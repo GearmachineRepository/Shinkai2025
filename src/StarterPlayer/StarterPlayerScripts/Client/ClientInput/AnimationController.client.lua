@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
 local AnimationService = require(Shared.Services.AnimationService)
-local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+local AnimationDatabase = require(Shared.Config.Data.AnimationDatabase)
 
 local Player = Players.LocalPlayer
 

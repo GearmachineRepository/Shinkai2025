@@ -5,7 +5,7 @@ local Workspace = game:GetService("Workspace")
 local Debris = game:GetService("Debris")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
-local SoundPlayer = require(Shared.General.SoundPlayer)
+local SoundPlayer = require(Shared.Audio.SoundPlayer)
 
 local Assets = ReplicatedStorage:WaitForChild("Assets")
 local VfxAssets = Assets:WaitForChild("VFXAssets")

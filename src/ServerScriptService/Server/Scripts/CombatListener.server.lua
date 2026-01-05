@@ -9,7 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Combat = require(Server.Combat)
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
-local AnimationDatabase = require(Shared.Configurations.Data.AnimationDatabase)
+local AnimationDatabase = require(Shared.Config.Data.AnimationDatabase)
 
 Combat.Init({
 	ActionsFolder = Server.Combat.Actions,

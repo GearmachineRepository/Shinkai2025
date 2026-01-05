@@ -3,9 +3,9 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local ModeBalance = require(Shared.Configurations.Balance.ModeBalance)
-local ModeData = require(Shared.Configurations.Data.ModeData)
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
+local ModeBalance = require(Shared.Config.Modes.ModeBalance)
+local ModeData = require(Shared.Config.Data.ModeData)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
 
 local RemovalMode = {}
 RemovalMode.__index = RemovalMode
@@ -63,10 +63,11 @@ end
 function RemovalMode:ApplyStatBoosts()
 	local PlayerData = self.Controller.StateManager:GetData()
 	local Config = ModeBalance.Removal
+	local RemovalPercent = self.RemovalPercent :: number
 
-	local PercentMultiplier = self.RemovalPercent / 100
+	local PercentMultiplier = RemovalPercent / 100
 
-	for StatName, StarBoost in Config.StatBoosts do
+	for StatName, StarBoost: number in pairs(Config.StatBoosts) do
 		local ScaledBoost = StarBoost * PercentMultiplier
 		PlayerData.Stats[StatName] = (PlayerData.Stats[StatName] or 0) + ScaledBoost
 	end
@@ -115,10 +116,11 @@ end
 function RemovalMode:RemoveStatBoosts()
 	local PlayerData = self.Controller.StateManager:GetData()
 	local Config = ModeBalance.Removal
+	local RemovalPercent = self.RemovalPercent :: number
 
-	local PercentMultiplier = self.RemovalPercent / 100
+	local PercentMultiplier = RemovalPercent / 100
 
-	for StatName, StarBoost in Config.StatBoosts do
+	for StatName, StarBoost: number in pairs(Config.StatBoosts) do
 		local ScaledBoost = StarBoost * PercentMultiplier
 		PlayerData.Stats[StatName] = (PlayerData.Stats[StatName] or 0) - ScaledBoost
 	end
@@ -137,13 +139,14 @@ end
 function RemovalMode:TrainRemoval(AmountGained: number)
 	local Config = ModeBalance.Removal.TrainablePercent
 	local MaxPercent = Config.MaxPercentRegular
+	local RemovalPercent = self.RemovalPercent :: number
 
 	local ClanName = self.Controller.StateManager:GetData().Clan.ClanName
 	if ClanName == "Wu" then
 		MaxPercent = Config.MaxPercentWu
 	end
 
-	self.RemovalPercent = math.min(MaxPercent, self.RemovalPercent + AmountGained)
+	self.RemovalPercent = math.min(MaxPercent, RemovalPercent + AmountGained)
 end
 
 function RemovalMode:Destroy()

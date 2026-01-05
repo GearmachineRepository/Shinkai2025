@@ -10,7 +10,7 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 
-local ActionValidator = require(Shared.Utils.ActionValidator)
+local ActionValidator = require(Shared.Utility.ActionValidator)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity

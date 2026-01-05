@@ -8,8 +8,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Types = require(Server.Ensemble.Types)
 
-local ItemDatabase = require(Shared.Configurations.Data.ItemDatabase)
-local ItemInstance = require(Shared.Configurations.Data.ItemInstance)
+local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
+local ItemInstance = require(Shared.Config.Data.ItemInstance)
 local Packets = require(Shared.Networking.Packets)
 
 local InventoryComponent = {}

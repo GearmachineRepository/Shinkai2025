@@ -8,8 +8,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Types = require(Server.Ensemble.Types)
 
-local StatTypes = require(Shared.Configurations.Enums.StatTypes)
-local BodyScalingBalance = require(Shared.Configurations.Balance.BodyScalingBalance)
+local StatTypes = require(Shared.Config.Enums.StatTypes)
+local BodyBalance = require(Shared.Config.Body.BodyBalance)
 
 local BodyScalingComponent = {}
 BodyScalingComponent.__index = BodyScalingComponent
@@ -42,13 +42,13 @@ function BodyScalingComponent.UpdateBodyScale(self: Self)
 	local MuscleValue = MuscleStars * 12
 	local Fat = self.Entity.Stats:GetStat(StatTypes.FAT)
 
-	local MuscleScale = MuscleValue * BodyScalingBalance.Multipliers.MUSCLE_SCALE
-	local FatScale = Fat * BodyScalingBalance.Multipliers.FAT_SCALE
+	local MuscleScale = MuscleValue * BodyBalance.BodyScaling.MuscleScaleMultiplier
+	local FatScale = Fat * BodyBalance.BodyScaling.FatScaleMultiplier
 
 	local TotalDepthScale =
-		math.clamp(self.BaseDepth + MuscleScale + FatScale, BodyScalingBalance.Scale.MIN, BodyScalingBalance.Scale.MAX)
+		math.clamp(self.BaseDepth + MuscleScale + FatScale, BodyBalance.BodyScaling.ScaleMin, BodyBalance.BodyScaling.ScaleMax)
 	local TotalWidthScale =
-		math.clamp(self.BaseWidth + MuscleScale + FatScale, BodyScalingBalance.Scale.MIN, BodyScalingBalance.Scale.MAX)
+		math.clamp(self.BaseWidth + MuscleScale + FatScale, BodyBalance.BodyScaling.ScaleMin, BodyBalance.BodyScaling.ScaleMax)
 
 	local BodyDepthScale = self.Humanoid:FindFirstChild("BodyDepthScale") :: NumberValue
 	local BodyWidthScale = self.Humanoid:FindFirstChild("BodyWidthScale") :: NumberValue

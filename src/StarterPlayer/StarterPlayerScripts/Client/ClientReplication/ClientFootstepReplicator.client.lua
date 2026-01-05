@@ -4,7 +4,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
-local Maid = require(Shared.General.Maid)
+local Maid = require(Shared.Utility.Maid)
 local FootstepEngine = require(Shared.Footsteps.FootstepEngine)
 local FootstepMaterialMap = require(Shared.Footsteps.FootstepMaterialMap)
 

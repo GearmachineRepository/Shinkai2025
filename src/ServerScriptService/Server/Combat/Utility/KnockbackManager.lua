@@ -10,7 +10,7 @@ local Ensemble = require(Server.Ensemble)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 
 local Packets = require(Shared.Networking.Packets)
-local KnockbackBalance = require(Shared.Configurations.Balance.KnockbackBalance)
+local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 
 local KnockbackManager = {}
 
@@ -70,7 +70,7 @@ local function CheckForImpact(Entity: any, KnockbackData: KnockbackData)
 	if RayResult and RayResult.Instance then
 		KnockbackData.HasImpacted = true
 
-		local IFrameDuration = KnockbackBalance.ImpactIFrameDuration or 0.3
+		local IFrameDuration = PhysicsBalance.Knockback.ImpactIFrameDuration or 0.3
 		if IFrameDuration > 0 and Entity.States then
 			Entity.States:SetState("Invulnerable", true)
 
@@ -165,15 +165,15 @@ function KnockbackManager.Apply(Target: any, Attacker: any, Speed: number?, Dura
 		KnockbackDirection = GetFlatDirection(ToTarget)
 	end
 
-	local VerticalComponent = KnockbackBalance.VerticalComponent or 0
+	local VerticalComponent = PhysicsBalance.Knockback.VerticalComponent or 0
 	if VerticalComponent > 0 then
 		KnockbackDirection = (KnockbackDirection + Vector3.new(0, VerticalComponent, 0)).Unit
 	end
 
 	CleanupKnockback(Target)
 
-	local FinalSpeed = Speed or KnockbackBalance.DefaultSpeed
-	local FinalDuration = Duration or KnockbackBalance.DefaultDuration
+	local FinalSpeed = Speed or PhysicsBalance.Knockback.DefaultSpeed
+	local FinalDuration = Duration or PhysicsBalance.Knockback.DefaultDuration
 
 	local KnockbackInfo: KnockbackData = {
 		BodyVelocity = nil :: any,
@@ -191,7 +191,7 @@ function KnockbackManager.Apply(Target: any, Attacker: any, Speed: number?, Dura
 	else
 		local BodyVelocityInstance = Instance.new("BodyVelocity")
 		BodyVelocityInstance.Name = "KnockbackVelocity"
-		BodyVelocityInstance.MaxForce = Vector3.new(KnockbackBalance.MaxForce, 0, KnockbackBalance.MaxForce)
+		BodyVelocityInstance.MaxForce = Vector3.new(PhysicsBalance.Knockback.MaxForce, 0, PhysicsBalance.Knockback.MaxForce)
 		BodyVelocityInstance.Velocity = KnockbackDirection * FinalSpeed
 		BodyVelocityInstance.Parent = TargetRootPart
 		KnockbackInfo.BodyVelocity = BodyVelocityInstance
@@ -250,37 +250,13 @@ Packets.KnockbackImpact.OnServerEvent:Connect(function(Player: Player, ImpactPos
 	local TimeElapsed = os.clock() - KnockbackInfo.StartTime
 	local MaxTravelDistance = KnockbackInfo.Speed * TimeElapsed + 5
 	local ClaimedDistance = (ImpactPosition - KnockbackInfo.StartPosition).Magnitude
-	print(ClaimedDistance, MaxTravelDistance)
 	if ClaimedDistance > MaxTravelDistance then
 		return
 	end
 
-	-- local RayParams = RaycastParams.new()
-	-- RayParams.FilterType = Enum.RaycastFilterType.Exclude
-	-- RayParams.FilterDescendantsInstances = { Player.Character, workspace.Characters, workspace.Debris }
-
-	-- local RayOrigin = RootPart.Position
-	-- local RayDirection = KnockbackInfo.Direction * 6
-	-- local RayResult = workspace:Raycast(RayOrigin, RayDirection, RayParams)
-
-	-- local Distance = RayDirection.Magnitude
-    -- local DebugPart = Instance.new("Part")
-    -- DebugPart.Anchored = true
-    -- DebugPart.CanCollide = false
-    -- DebugPart.Material = Enum.Material.Neon
-    -- DebugPart.Parent = workspace.Debris
-    -- DebugPart.CanQuery = false
-    -- DebugPart.Size = Vector3.new(0.1, 0.1, Distance)
-    -- DebugPart.CFrame = CFrame.lookAt(RayOrigin, RayOrigin + RayDirection) * CFrame.new(0, 0, -Distance / 2)
-    -- game.Debris:AddItem(DebugPart, 2)
-
-	-- if not RayResult then
-	-- 	return
-	-- end
-
 	KnockbackInfo.HasImpacted = true
 
-	local IFrameDuration = KnockbackBalance.ImpactIFrameDuration or 0.3
+	local IFrameDuration = PhysicsBalance.Knockback.ImpactIFrameDuration or 0.3
 	if IFrameDuration > 0 and Entity.States then
 		Entity.States:SetState("Invulnerable", true)
 		task.delay(IFrameDuration, function()
