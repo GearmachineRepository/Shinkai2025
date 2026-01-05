@@ -10,6 +10,7 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
+local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
 
 local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local DodgeBalance = require(Shared.Configurations.Balance.DashBalance)
@@ -118,22 +119,31 @@ function Dodge.OnExecute(Context: ActionContext)
     local TotalDuration = GetDodgeDuration(AnimationId)
     local RecoveryTime = TotalDuration * DODGE_RECOVERY_PERCENT
 
-    Context.Entity.States:SetState("Invulnerable", true)
-
     Ensemble.Events.Publish(CombatEvents.DodgeIFramesStarted, {
         Entity = Context.Entity,
         Duration = IFramesDuration,
     })
 
-    ActionExecutor.ScheduleThread(Context, IFramesDuration, function()
-        Context.Entity.States:SetState("Invulnerable", false)
+	local States = Context.Entity:GetComponent("States")
+	if not States then return end
 
-        Ensemble.Events.Publish(CombatEvents.DodgeIFramesEnded, {
-            Entity = Context.Entity,
-        })
-    end, true)
+	local Blocking = States:GetState("Blocking")
+	if not Blocking then
+		local InputTimestamp = Context.InputData and Context.InputData.InputTimestamp
+		local Compensation = LatencyCompensation.GetCompensation(InputTimestamp)
+		local AdjustedIFrames = IFramesDuration + Compensation
 
-	--Reducing dodge time for testing purposes
+		Context.Entity.States:SetState("Invulnerable", true)
+
+		ActionExecutor.ScheduleThread(Context, AdjustedIFrames, function()
+			Context.Entity.States:SetState("Invulnerable", false)
+
+			Ensemble.Events.Publish(CombatEvents.DodgeIFramesEnded, {
+				Entity = Context.Entity,
+			})
+		end, true)
+	end
+
     task.wait(RecoveryTime)
 end
 

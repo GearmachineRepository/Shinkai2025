@@ -13,6 +13,7 @@ local Assets = ReplicatedStorage:WaitForChild("Assets")
 local Entities = Assets:WaitForChild("Entity")
 local TestDummyAttacker = Entities:WaitForChild("TestDummyAttacker")
 local TestDummyAttackingUnanchored = Entities:WaitForChild("TestDummyAttackingUnanchored")
+local TestDummyHeavyAttacker = Entities:WaitForChild("TestDummyAttackerHeavy")
 local TestDummyIdleUnanchored = Entities:WaitForChild("TestDummyIdleUnanchored")
 local TestDummyIdleAnchored = Entities:WaitForChild("TestDummyIdle")
 local TestDummyBlocker = Entities:WaitForChild("TestDummyBlocker")
@@ -25,6 +26,18 @@ local ATTACKING_DUMMY_CONFIG = {
 		AutoAttack = true,
 		AttackIntervalMin = 0.1,
 		AttackIntervalMax = 0.1,
+	},
+}
+
+local HEAVY_ATTACKING_DUMMY_CONFIG = {
+	Combat = {
+		ToolId = "Karate",
+		AttackRange = 6,
+		AggroRange = 30,
+		AutoAttack = true,
+		AttackIntervalMin = 0.1,
+		AttackIntervalMax = 0.1,
+		HeavyAttack = true
 	},
 }
 
@@ -144,7 +157,7 @@ local function SpawnIdleDummy()
 			Ensemble.DestroyEntity(DummyCharacter)
 			DummyCharacter:Destroy()
 
-			SpawnAttackingUnanchoredDummy()
+			SpawnIdleDummy()
 
 			DummyDie:Disconnect()
 		end)
@@ -170,7 +183,32 @@ local function SpawnIdleDummyAnchored()
 			Ensemble.DestroyEntity(DummyCharacter)
 			DummyCharacter:Destroy()
 
-			SpawnAttackingUnanchoredDummy()
+			SpawnIdleDummyAnchored()
+
+			DummyDie:Disconnect()
+		end)
+	end
+end
+
+local function SpawnHeavyAttackingDummy()
+	local DummyCharacter = TestDummyHeavyAttacker:Clone()
+	DummyCharacter.Parent = workspace.Characters
+
+	local DummyEntity = Ensemble.CreateEntity(DummyCharacter, HEAVY_ATTACKING_DUMMY_CONFIG)
+		:WithArchetype("Entity")
+		:Build()
+
+	if not DummyEntity then
+		return
+	end
+
+	local DummyDie do
+		DummyDie = DummyEntity.Humanoid.Died:Once(function()
+			task.wait(2)
+			Ensemble.DestroyEntity(DummyCharacter)
+			DummyCharacter:Destroy()
+
+			SpawnHeavyAttackingDummy()
 
 			DummyDie:Disconnect()
 		end)
@@ -182,3 +220,4 @@ SpawnAttackingUnanchoredDummy()
 SpawnBlockingDummy()
 SpawnIdleDummy()
 SpawnIdleDummyAnchored()
+SpawnHeavyAttackingDummy()

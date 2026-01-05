@@ -15,6 +15,7 @@ local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local Block = require(script.Parent.Parent.Actions.Block)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
+local HitValidation = require(script.Parent.Parent.Utility.HitValidation)
 
 local EntityAnimator = require(Server.Ensemble.Utilities.EntityAnimator)
 local CombatBalance = require(Shared.Configurations.Balance.CombatBalance)
@@ -29,6 +30,8 @@ type ActionContext = CombatTypes.ActionContext
 local AttackBase = {}
 
 AttackBase.Debug = false
+
+local DefenderGraceWindow = 0.05
 
 local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacter: Model): Vector3?
 	local TargetPivot = TargetCharacter:GetPivot()
@@ -125,10 +128,17 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 				HitPosition = GetFallbackHitPosition(RootPart, TargetCharacter)
 			end
 
+			local ValidationResult = HitValidation.ValidateHit(Context :: any, TargetEntity, HitPosition)
+			if not ValidationResult.IsValid then
+				continue
+			end
+
+			local FinalHitPosition = ValidationResult.RewindedPosition or HitPosition
+
 			Context.CustomData.HasHit = true
 			Context.CustomData.LastHitTarget = TargetEntity
-			Context.CustomData.LastHitPosition = HitPosition
-			OnHitCallback(TargetEntity, HitPosition)
+			Context.CustomData.LastHitPosition = FinalHitPosition
+			OnHitCallback(TargetEntity, FinalHitPosition)
 			break
 		end
 	end)
@@ -248,6 +258,16 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 	local TargetIsInvulnerable = Target.States:GetState("Invulnerable")
 
 	if TargetIsInvulnerable then
+		Ensemble.Events.Publish(CombatEvents.DamageDodged, {
+			Entity = Target,
+			Attacker = AttackerContext.Entity,
+			Damage = Damage,
+			HitPosition = HitPosition,
+		})
+		return true
+	end
+
+	if HitValidation.ShouldFavorDefender(Target, DefenderGraceWindow) then
 		Ensemble.Events.Publish(CombatEvents.DamageDodged, {
 			Entity = Target,
 			Attacker = AttackerContext.Entity,

@@ -303,6 +303,11 @@ local function IsBlockAngleValid(Context: ActionContext, Attacker: Entity): bool
 end
 
 function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?, HitPosition: Vector3?): boolean
+	if ActionExecutor.TriggerWindow(Context, Attacker) then
+		StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
+		return true
+	end
+
 	if not IsBlockAngleValid(Context, Attacker) then
 		Ensemble.Events.Publish(CombatEvents.BlockMissed, {
 			Entity = Context.Entity,

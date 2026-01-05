@@ -244,6 +244,15 @@ local function OnCharacterAdded(Character: Model)
 			ClientCombatState.SetState("Dodging", false)
 		end
 	end)
+
+	Character:GetAttributeChangedSignal("Stunned"):Connect(function()
+		local IsStunned = Character:GetAttribute("Stunned") == true
+		if not IsStunned and InputBuffer.IsHeld("Block") then
+			task.defer(function()
+				TryExecuteAction("Block")
+			end)
+		end
+	end)
 end
 
 Player.CharacterAdded:Connect(OnCharacterAdded)

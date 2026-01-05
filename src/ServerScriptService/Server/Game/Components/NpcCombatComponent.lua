@@ -20,6 +20,7 @@ type CombatConfig = {
 	AttackRange: number?,
 	AggroRange: number?,
 	AutoAttack: boolean?,
+	HeavyAttack: boolean?,
 	AttackIntervalMin: number?,
 	AttackIntervalMax: number?,
 }
@@ -49,6 +50,7 @@ function NpcCombatComponent.new(Entity: Types.Entity, Context: Types.EntityConte
         AutoAttack = Config.AutoAttack or false,
         AttackIntervalMin = Config.AttackIntervalMin or 2.0,
         AttackIntervalMax = Config.AttackIntervalMax or 4.0,
+		IsHeavy = Config.HeavyAttack or false,
         Target = nil,
         IsRunning = false,
         NextAttackTime = 0,
@@ -82,6 +84,11 @@ function NpcCombatComponent:Update(DeltaTime: number)
 		+ math.random() * (AttackIntervalMax - AttackIntervalMin)
 
 	self.NextAttackTime = Interval
+
+	if self.IsHeavy then
+		self:HeavyAttack()
+		return
+	end
 
 	self:LightAttack()
 end

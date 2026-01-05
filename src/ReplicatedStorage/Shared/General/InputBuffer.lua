@@ -2,7 +2,7 @@
 
 local UserInputService = game:GetService("UserInputService")
 
-local INPUT_BUFFER_WINDOW = 0.3
+local INPUT_BUFFER_WINDOW = 0.25
 local INPUT_LOOP_INTERVAL = 0.15
 
 type InputState = {
