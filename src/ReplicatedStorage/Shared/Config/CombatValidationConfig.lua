@@ -146,6 +146,17 @@ CombatValidationConfig.States = {
 		Default = false,
 		Replication = "All",
 	},
+
+	[StateTypes.DASH_EXHAUSTED] = {
+		Default = false,
+		Replication = "All",
+		ForceWalk = true,
+	},
+
+	[StateTypes.IN_COMBAT] = {
+		Default = false,
+		Replication = "All",
+	},
 }
 
 CombatValidationConfig.Actions = {
@@ -235,6 +246,7 @@ CombatValidationConfig.Actions = {
 			StateTypes.ATTACKING,
 			StateTypes.DODGING,
 			StateTypes.GUARD_BROKEN,
+			StateTypes.DASH_EXHAUSTED,
 		},
 	},
 
@@ -258,6 +270,7 @@ CombatValidationConfig.Actions = {
 			StateTypes.DOWNED,
 			StateTypes.DODGING,
 			StateTypes.GUARD_BROKEN,
+			StateTypes.DASH_EXHAUSTED,
 		},
 	},
 
@@ -270,6 +283,7 @@ CombatValidationConfig.Actions = {
 			StateTypes.DOWNED,
 			StateTypes.DODGING,
 			StateTypes.GUARD_BROKEN,
+			StateTypes.DASH_EXHAUSTED,
 		},
 	},
 

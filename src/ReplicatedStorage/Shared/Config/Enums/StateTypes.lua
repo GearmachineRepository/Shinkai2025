@@ -34,6 +34,8 @@ local StateTypes = {
 	MOVEMENT_LOCKED = "MovementLocked",
 	PERFECT_GUARD_WINDOW = "PerfectGuardWindow",
 	COUNTER_WINDOW = "CounterWindow",
+	DASH_EXHAUSTED = "DashExhausted",
+	IN_COMBAT = "InCombat"
 }
 
 return StateTypes

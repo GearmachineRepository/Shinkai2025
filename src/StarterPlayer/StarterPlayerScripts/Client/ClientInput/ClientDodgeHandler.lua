@@ -9,6 +9,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 local AnimationService = require(Shared.Services.AnimationService)
 local AnimationDatabase = require(Shared.Config.Data.AnimationDatabase)
+local ClientCombatState = require(script.Parent.ClientCombatState)
 
 local Player = Players.LocalPlayer
 
@@ -25,6 +26,7 @@ type DodgeState = {
 }
 
 local ActiveDodge: DodgeState? = nil
+local LastDodgeDirection: string? = nil
 
 local DODGE_SPEED = PhysicsBalance.Dash.Speed
 local DODGE_DURATION = PhysicsBalance.Dash.Duration
@@ -227,6 +229,10 @@ function ClientDodgeHandler.Init()
 	end)
 end
 
+function ClientDodgeHandler.GetLastDirection(): string?
+	return LastDodgeDirection
+end
+
 function ClientDodgeHandler.StartDodge(Steerable: boolean?): boolean
 	if ActiveDodge and ActiveDodge.IsActive then
 		return false
@@ -245,6 +251,13 @@ function ClientDodgeHandler.StartDodge(Steerable: boolean?): boolean
 	end
 
 	local DirectionName, CardinalDirection = GetCardinalFromMove(FlatForward, FlatRight, FlatMove)
+
+	if not ClientCombatState.CanDodgeDirection(DirectionName) then
+		return false
+	end
+
+	LastDodgeDirection = DirectionName
+
 	local AnimationKey = GetAnimationKeyForDirection(DirectionName)
 
 	local BodyVelocityInstance = CreateBodyVelocity(CardinalDirection)

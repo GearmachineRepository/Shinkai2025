@@ -30,7 +30,32 @@ local LocalState = {
 
 local LocalCooldown = {
 	DodgeEndTime = 0,
+	DashCount = 0,
+	LastDirection = nil :: string?,
+	LastDashTime = 0,
 }
+
+local CONSECUTIVE_DASHES = PhysicsBalance.Dash.ConsecutiveDashes
+local CONSECUTIVE_COOLDOWN = PhysicsBalance.Dash.ConsecutiveCooldown
+local EXHAUSTED_COOLDOWN = PhysicsBalance.Dash.ExhaustedCooldown
+local COMBO_RESET_TIME = PhysicsBalance.Dash.ComboResetTime
+
+local function CheckComboExpiry()
+	if LocalCooldown.DashCount == 0 then
+		return
+	end
+
+	local TimeSinceLastDash = os.clock() - LocalCooldown.LastDashTime
+	if TimeSinceLastDash >= COMBO_RESET_TIME then
+		LocalCooldown.DashCount = 0
+		LocalCooldown.LastDirection = nil
+	end
+end
+
+function ClientCombatState.CanDodgeDirection(Direction: string): boolean
+	CheckComboExpiry()
+	return LocalCooldown.LastDirection ~= Direction
+end
 
 function ClientCombatState.GetCharacter(): Model?
 	return Player.Character
@@ -230,65 +255,44 @@ function ClientCombatState.GetStaminaCost(ResolvedAction: string): number?
 	return 0
 end
 
-local function GetCooldownEndTimeFromAttribute(Character: Model): number?
-	local DodgeCooldownEndTime = Character:GetAttribute("DodgeCooldownEndTime") :: number?
-	if DodgeCooldownEndTime then
-		return DodgeCooldownEndTime
-	end
-
-	local DodgeCooldownEnd = Character:GetAttribute("DodgeCooldownEnd") :: number?
-	if DodgeCooldownEnd then
-		return DodgeCooldownEnd
-	end
-
-	local DodgeCooldownUntil = Character:GetAttribute("DodgeCooldownUntil") :: number?
-	if DodgeCooldownUntil then
-		return DodgeCooldownUntil
-	end
-
-	local DodgeCooldown = Character:GetAttribute("DodgeCooldown") :: number?
-	if DodgeCooldown then
-		local CurrentTime = os.clock()
-		if DodgeCooldown > CurrentTime then
-			return DodgeCooldown
-		end
-		if DodgeCooldown > 0 then
-			return CurrentTime + DodgeCooldown
-		end
-	end
-
-	return nil
-end
-
 function ClientCombatState.IsDodgeOnCooldown(): boolean
-	local Character = ClientCombatState.GetCharacter()
-	if not Character then
+	local CurrentTime = os.clock()
+
+	if CurrentTime < LocalCooldown.DodgeEndTime then
 		return true
 	end
 
-	local CurrentTime = os.clock()
-	local AttributeEndTime = GetCooldownEndTimeFromAttribute(Character)
-	local EndTime = LocalCooldown.DodgeEndTime
+	CheckComboExpiry()
 
-	if AttributeEndTime then
-		EndTime = math.max(EndTime, AttributeEndTime)
+	if LocalCooldown.DashCount >= CONSECUTIVE_DASHES then
+		return true
 	end
 
-	return CurrentTime < EndTime
+	return false
 end
 
-function ClientCombatState.StartDodgeCooldown()
-	local Character = ClientCombatState.GetCharacter()
-	if not Character then
-		return
-	end
+function ClientCombatState.ResetDashCombo()
+	LocalCooldown.DashCount = 0
+	LocalCooldown.LastDirection = nil
+end
 
+function ClientCombatState.StartDodgeCooldown(Direction: string?)
 	local CurrentTime = os.clock()
-	local CooldownSecondsAttribute = Character:GetAttribute("DodgeCooldownSeconds") :: number?
-	local CooldownSeconds = CooldownSecondsAttribute or (PhysicsBalance.Dash.CooldownSeconds :: number?) or 0
 
-	if CooldownSeconds > 0 then
-		LocalCooldown.DodgeEndTime = math.max(LocalCooldown.DodgeEndTime, CurrentTime + CooldownSeconds)
+	CheckComboExpiry()
+
+	LocalCooldown.DashCount = LocalCooldown.DashCount + 1
+	LocalCooldown.LastDashTime = CurrentTime
+	LocalCooldown.LastDirection = Direction
+
+	local IsLastDash = LocalCooldown.DashCount >= CONSECUTIVE_DASHES
+
+	if IsLastDash then
+		LocalCooldown.DodgeEndTime = CurrentTime + EXHAUSTED_COOLDOWN
+		LocalCooldown.DashCount = 0
+		LocalCooldown.LastDirection = nil
+	else
+		LocalCooldown.DodgeEndTime = CurrentTime + CONSECUTIVE_COOLDOWN
 	end
 end
 
@@ -310,6 +314,11 @@ function ClientCombatState.Reset()
 	end
 
 	LocalState.LastStaminaSync = os.clock()
+
+	LocalCooldown.DodgeEndTime = 0
+	LocalCooldown.DashCount = 0
+	LocalCooldown.LastDirection = nil
+	LocalCooldown.LastDashTime = 0
 end
 
 return ClientCombatState

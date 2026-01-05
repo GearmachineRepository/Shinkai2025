@@ -93,10 +93,11 @@ local function TryExecuteAction(RawInput: string)
 
 	if ResolvedAction == "Dodge" then
 		local Started = ClientDodgeHandler.StartDodge(STEERABLE_DODGE)
-		if Started then
-			ClientCombatState.SetState("Dodging", true)
-			IsPredicted = true
+		if not Started then
+			return
 		end
+		ClientCombatState.SetState("Dodging", true)
+		IsPredicted = true
 	elseif ResolvedAction == "M1" or ResolvedAction == "M2" then
 		ClientCombatState.SetState("Attacking", true)
 	end
@@ -109,7 +110,14 @@ local function TryExecuteAction(RawInput: string)
 	}
 
 	local InputTimestamp = workspace:GetServerTimeNow()
-	Packets.PerformAction:Fire(RawInput, InputTimestamp)
+	local InputData: { [string]: any }? = nil
+
+	if ResolvedAction == "Dodge" then
+		local Direction = ClientDodgeHandler.GetLastDirection()
+		InputData = { Direction = Direction }
+	end
+
+	Packets.PerformAction:Fire(RawInput, InputTimestamp, InputData)
 end
 
 local function TryExecuteBufferedAction()
@@ -206,7 +214,8 @@ Packets.ActionApproved.OnClientEvent:Connect(function(ActionName: string)
 	end
 
 	if ActionName == "Dodge" then
-		ClientCombatState.StartDodgeCooldown()
+		local Direction = ClientDodgeHandler.GetLastDirection()
+		ClientCombatState.StartDodgeCooldown(Direction)
 	end
 
 	TryExecuteBufferedAction()

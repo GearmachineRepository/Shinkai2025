@@ -9,11 +9,18 @@ local Types = require(script.Parent.Parent.Types)
 type StateConfig = Types.StateConfig
 type Connection = Types.Connection
 
+type TimedStateData = {
+	StartTime: number,
+	Duration: number,
+	Cancelled: boolean,
+}
+
 type StateComponentInternal = Types.StateComponent & {
 	Entity: Types.Entity,
 	Config: StateConfig,
 	CurrentStates: { [string]: boolean },
 	StateSignals: { [string]: Types.Signal<boolean> },
+	StateTimers: { [string]: TimedStateData },
 	Maid: Types.Maid,
 }
 
@@ -36,6 +43,7 @@ function StateComponent.new(Entity: Types.Entity): Types.StateComponent
 		Config = ActiveConfig,
 		CurrentStates = {},
 		StateSignals = {},
+		StateTimers = {},
 		Maid = Maid.new(),
 	}, StateComponent) :: any
 
@@ -70,6 +78,8 @@ function StateComponent:SetState(StateName: string, Value: boolean)
 				self:SetState(ConflictState, false)
 			end
 		end
+	else
+		self:ClearTimedState(StateName)
 	end
 
 	self.CurrentStates[StateName] = Value
@@ -91,6 +101,45 @@ function StateComponent:SetState(StateName: string, Value: boolean)
 		Value = Value,
 		Replication = Replication,
 	})
+end
+
+function StateComponent:SetStateWithDuration(StateName: string, Duration: number)
+	self:ClearTimedState(StateName)
+	self:SetState(StateName, true)
+
+	local TimerData: TimedStateData = {
+		StartTime = workspace:GetServerTimeNow(),
+		Duration = Duration,
+		Cancelled = false,
+	}
+
+	self.StateTimers[StateName] = TimerData
+
+	task.delay(Duration, function()
+		if not TimerData.Cancelled and self.StateTimers[StateName] == TimerData then
+			self:SetState(StateName, false)
+		end
+	end)
+end
+
+function StateComponent:GetStateTimeRemaining(StateName: string): number
+	local TimerData = self.StateTimers[StateName] :: TimedStateData
+	if not TimerData then
+		return 0
+	end
+
+	local Elapsed = workspace:GetServerTimeNow() - TimerData.StartTime
+	return math.max(0, TimerData.Duration - Elapsed)
+end
+
+function StateComponent:ClearTimedState(StateName: string)
+	local TimerData = self.StateTimers[StateName]
+	if not TimerData then
+		return
+	end
+
+	TimerData.Cancelled = true
+	self.StateTimers[StateName] = nil
 end
 
 function StateComponent:OnStateChanged(StateName: string, Callback: (Value: boolean) -> ()): Connection
@@ -118,9 +167,14 @@ function StateComponent:LocksMovement(): boolean
 end
 
 function StateComponent:Destroy()
+	for StateName in pairs(self.StateTimers) do
+		self:ClearTimedState(StateName)
+	end
+
 	self.Maid:DoCleaning()
 	table.clear(self.CurrentStates)
 	table.clear(self.StateSignals)
+	table.clear(self.StateTimers)
 end
 
 return StateComponent

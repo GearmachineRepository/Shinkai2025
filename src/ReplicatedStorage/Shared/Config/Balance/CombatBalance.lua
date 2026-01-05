@@ -1,6 +1,10 @@
 --!strict
 
 local CombatBalance = {
+	InCombat = {
+		Duration = 60,
+	},
+
 	Blocking = {
 		DamageReduction = 0.95,
 		StaminaDrainOnHit = 5,

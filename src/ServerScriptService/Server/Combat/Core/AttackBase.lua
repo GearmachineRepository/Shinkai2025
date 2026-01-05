@@ -18,6 +18,7 @@ local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensa
 local HitValidation = require(script.Parent.Parent.Utility.HitValidation)
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
+local StateTypes = require(Shared.Config.Enums.StateTypes)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local ActionValidator = require(Shared.Utility.ActionValidator)
 local Ensemble = require(Server.Ensemble)
@@ -52,6 +53,31 @@ local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacte
 	)
 
 	return TargetPivot:PointToWorldSpace(ClampedLocalPoint)
+end
+
+local function CheckLineOfSight(AttackerRootPart: BasePart, TargetCharacter: Model): boolean
+	if not AttackerRootPart or not AttackerRootPart.Parent then return false end
+
+	local TargetRootPart = TargetCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
+		or TargetCharacter:FindFirstChild("Torso") :: BasePart?
+		or TargetCharacter:FindFirstChild("UpperTorso") :: BasePart?
+
+	if not TargetRootPart then
+		return false
+	end
+
+	local Origin = AttackerRootPart.Position
+	local Direction = (TargetRootPart.Position - Origin).Unit
+	local Distance = (TargetRootPart.Position - Origin).Magnitude
+
+	local RaycastParams = RaycastParams.new()
+	RaycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	RaycastParams.FilterDescendantsInstances = { workspace.Characters, workspace.Debris }
+	RaycastParams.IgnoreWater = true
+
+	local RaycastResult = workspace:Raycast(Origin, Direction * Distance, RaycastParams)
+
+	return RaycastResult == nil
 end
 
 local function HandleClash(ContextA: ActionContext, ContextB: ActionContext, HitPosition: Vector3?)
@@ -130,6 +156,10 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 
 			local ValidationResult = HitValidation.ValidateHit(Context :: any, TargetEntity, HitPosition)
 			if not ValidationResult.IsValid then
+				continue
+			end
+
+			if not CheckLineOfSight(RootPart, TargetCharacter) then
 				continue
 			end
 
@@ -344,6 +374,16 @@ function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosit
 	local DamageComponent = Target:GetComponent("Damage")
 	if DamageComponent then
 		DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character)
+	end
+
+	local SelfState = Context.Entity:GetComponent("States")
+	local TargetState = Target:GetComponent("States")
+
+	if SelfState then
+		SelfState:SetStateWithDuration(StateTypes.IN_COMBAT, CombatBalance.InCombat.Duration)
+	end
+	if TargetState then
+		TargetState:SetStateWithDuration(StateTypes.IN_COMBAT, CombatBalance.InCombat.Duration)
 	end
 
 	Ensemble.Events.Publish(CombatEvents.DamageDealt, {
