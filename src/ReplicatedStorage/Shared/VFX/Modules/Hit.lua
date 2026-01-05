@@ -55,20 +55,33 @@ function HitVFX.Play(_Character: Model, VfxData: any?): VfxInstance?
 		OnHitFolder = HitAssets:FindFirstChild("OnHitBleed", true)
 	end
 
+	local SweatFolder: Instance? = HitAssets:findFirstChild("SweatImpact")
+
 	SoundPlayer.Play(Target, PunchHits:GetChildren()[math.random(1, #PunchHits:GetChildren())].Name)
 
 	if not OnHitFolder then
 		return nil
 	end
 
+	local SweatPlayback = nil :: any
+	if SweatFolder and Target:GetAttribute("Sweating")  then
+		SweatPlayback = VfxEmitter.PlayFromTemplateFolder(Target, SweatFolder, DEFAULT_VFX_LIFETIME_SECONDS, HitPosition)
+	end
+
 	local Playback = VfxEmitter.PlayFromTemplateFolder(Target, OnHitFolder, DEFAULT_VFX_LIFETIME_SECONDS, HitPosition)
 
 	local function Stop()
 		Playback.Cleanup()
+		if SweatPlayback then
+			SweatPlayback.Cleanup()
+		end
 	end
 
 	local function Cleanup(_Rollback: boolean?)
 		Playback.Cleanup()
+		if SweatPlayback then
+			SweatPlayback.Cleanup()
+		end
 	end
 
 	return {
