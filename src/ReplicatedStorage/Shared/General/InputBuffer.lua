@@ -28,11 +28,12 @@ local ReleaseCallbacks: { (ActionName: string) -> () } = {}
 
 local InputBuffer = {}
 
-local DEFAULT_KEYBINDS : Keybinds = {
+local DEFAULT_KEYBINDS: Keybinds = {
 	[Enum.UserInputType.MouseButton1] = { ActionName = "M1", CanLoop = true, IsHoldAction = false },
 	[Enum.UserInputType.MouseButton2] = { ActionName = "M2", CanLoop = false, IsHoldAction = false },
 	[Enum.KeyCode.F] = { ActionName = "Block", CanLoop = false, IsHoldAction = true },
 	[Enum.KeyCode.Q] = { ActionName = "Dodge", CanLoop = true, IsHoldAction = false },
+	[Enum.KeyCode.W] = { ActionName = "Sprint", CanLoop = false, IsHoldAction = true },
 	[Enum.KeyCode.C] = { ActionName = "Skill1", CanLoop = false, IsHoldAction = false },
 	[Enum.KeyCode.E] = { ActionName = "Skill2", CanLoop = false, IsHoldAction = false },
 	[Enum.KeyCode.U] = { ActionName = "Skill3", CanLoop = false, IsHoldAction = false },
@@ -124,6 +125,21 @@ function InputBuffer.IsHeld(ActionName: string): boolean
 		if Entry.ActionName == ActionName then
 			local State = InputStates[Input]
 			return State and State.IsHeld or false
+		end
+	end
+	return false
+end
+
+function InputBuffer.IsBuffered(ActionName: string): boolean
+	for Input, Entry in Keybinds do
+		if Entry.ActionName == ActionName then
+			local State = InputStates[Input]
+			if not State then
+				return false
+			end
+
+			local TimeSinceBuffer = os.clock() - State.BufferedAt
+			return TimeSinceBuffer <= INPUT_BUFFER_WINDOW and State.BufferedAt > 0
 		end
 	end
 	return false

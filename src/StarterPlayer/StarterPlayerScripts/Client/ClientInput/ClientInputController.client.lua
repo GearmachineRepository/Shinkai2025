@@ -11,6 +11,7 @@ local ActionValidator = require(Shared.Utils.ActionValidator)
 local InputResolverShared = require(Shared.Combat.InputResolverShared)
 local ClientDodgeHandler = require(script.Parent.ClientDodgeHandler)
 local ClientCombatState = require(script.Parent.ClientCombatState)
+local ClientSprintHandler = require(script.Parent.ClientSprintHandler)
 
 local Player = Players.LocalPlayer
 
@@ -126,6 +127,22 @@ local function TryExecuteBufferedAction()
 	end
 end
 
+local function TryExecuteBufferedSprint()
+	if not ClientSprintHandler.IsSprintIntentActive() then
+		return
+	end
+
+	if not InputBuffer.IsHeld("Sprint") then
+		return
+	end
+
+	if not ClientSprintHandler.CanStartSprint() then
+		return
+	end
+
+	ClientSprintHandler.StartSprint()
+end
+
 local function RollbackPrediction()
 	if not PendingAction then
 		return
@@ -150,6 +167,16 @@ local function RollbackPrediction()
 end
 
 InputBuffer.OnAction(function(ActionName: string)
+	if ActionName == "Sprint" then
+		local IsDoubleTap = ClientSprintHandler.OnWPress()
+		if IsDoubleTap then
+			if ClientSprintHandler.CanStartSprint() then
+				ClientSprintHandler.StartSprint()
+			end
+		end
+		return
+	end
+
 	if not ClientCombatState.GetCharacter() then
 		return
 	end
@@ -165,6 +192,11 @@ InputBuffer.OnAction(function(ActionName: string)
 end)
 
 InputBuffer.OnRelease(function(ActionName: string)
+	if ActionName == "Sprint" then
+		ClientSprintHandler.OnWRelease()
+		return
+	end
+
 	Packets.ReleaseAction:Fire(ActionName)
 end)
 
@@ -219,6 +251,7 @@ end)
 
 local function OnCharacterAdded(Character: Model)
 	ClientCombatState.Reset()
+	ClientSprintHandler.Reset()
 	PendingAction = nil
 	InputBuffer.ClearAllBuffers()
 	ClientDodgeHandler.Rollback()
@@ -245,13 +278,35 @@ local function OnCharacterAdded(Character: Model)
 		end
 	end)
 
+	Character:GetAttributeChangedSignal("MovementMode"):Connect(function()
+		local ServerMode = Character:GetAttribute("MovementMode") :: string?
+		if ServerMode then
+			ClientSprintHandler.SyncFromServer(ServerMode)
+		end
+	end)
+
 	Character:GetAttributeChangedSignal("Stunned"):Connect(function()
 		local IsStunned = Character:GetAttribute("Stunned") == true
-		if not IsStunned and InputBuffer.IsHeld("Block") then
+		if IsStunned then
+			return
+		end
+
+		if InputBuffer.IsHeld("Block") then
 			task.defer(function()
 				TryExecuteAction("Block")
 			end)
 		end
+
+		task.defer(TryExecuteBufferedSprint)
+	end)
+
+	Character:GetAttributeChangedSignal("Exhausted"):Connect(function()
+		local IsExhausted = Character:GetAttribute("Exhausted") == true
+		if IsExhausted then
+			return
+		end
+
+		task.defer(TryExecuteBufferedSprint)
 	end)
 end
 

@@ -112,7 +112,7 @@ local Sets: { [string]: AnimationSet } = {
 				Damage = 4,
 				StaminaCost = 4,
 				HitStun = 0.8,
-				Knockback = 50,
+				Knockback = 60,
 			},
 		},
 
@@ -122,8 +122,8 @@ local Sets: { [string]: AnimationSet } = {
 				Hitbox = { Size = Vector3.new(4, 4, 5), Offset = Vector3.new(0, 0, -3) },
 				Damage = 8,
 				StaminaCost = 4,
-				HitStun = 0.9,
-				Knockback = 60,
+				HitStun = 0.65,
+				Knockback = 80,
 				Flag = "GuardBreak",
 			}
 		},
