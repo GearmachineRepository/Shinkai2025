@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
@@ -41,14 +42,6 @@ local function GetCharacter(): Model?
 	return Player.Character
 end
 
-local function GetHumanoid(): Humanoid?
-	local Character = GetCharacter()
-	if not Character then
-		return nil
-	end
-	return Character:FindFirstChildOfClass("Humanoid")
-end
-
 local function GetRootPart(): BasePart?
 	local Character = GetCharacter()
 	if not Character then
@@ -57,14 +50,14 @@ local function GetRootPart(): BasePart?
 	return Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function GetFlatCameraBasis(): (Vector3, Vector3)
-	local CurrentCamera = workspace.CurrentCamera
-	if not CurrentCamera then
+local function GetFlatCharacterBasis(): (Vector3, Vector3)
+	local RootPart = GetRootPart()
+	if not RootPart then
 		return Vector3.new(0, 0, -1), Vector3.new(1, 0, 0)
 	end
 
-	local CameraLook = CurrentCamera.CFrame.LookVector
-	local FlatForward = Vector3.new(CameraLook.X, 0, CameraLook.Z)
+	local CharacterLook = RootPart.CFrame.LookVector
+	local FlatForward = Vector3.new(CharacterLook.X, 0, CharacterLook.Z)
 	if FlatForward.Magnitude < 0.001 then
 		FlatForward = Vector3.new(0, 0, -1)
 	else
@@ -75,19 +68,42 @@ local function GetFlatCameraBasis(): (Vector3, Vector3)
 	return FlatForward, FlatRight
 end
 
-local function GetFlatMoveDirection(): Vector3
-	local Humanoid = GetHumanoid()
-	if not Humanoid then
+local function GetCharacterRelativeMoveDirection(): Vector3
+	local RootPart = GetRootPart()
+	if not RootPart then
 		return Vector3.zero
 	end
 
-	local MoveDirection = Humanoid.MoveDirection
-	local FlatMove = Vector3.new(MoveDirection.X, 0, MoveDirection.Z)
-	if FlatMove.Magnitude < 0.1 then
+	local CharacterForward = RootPart.CFrame.LookVector
+	local FlatForward = Vector3.new(CharacterForward.X, 0, CharacterForward.Z)
+	if FlatForward.Magnitude < 0.001 then
+		FlatForward = Vector3.new(0, 0, -1)
+	else
+		FlatForward = FlatForward.Unit
+	end
+
+	local FlatRight = Vector3.new(-FlatForward.Z, 0, FlatForward.X)
+
+	local MoveVector = Vector3.zero
+
+	if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+		MoveVector = MoveVector + FlatForward
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+		MoveVector = MoveVector - FlatForward
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+		MoveVector = MoveVector - FlatRight
+	end
+	if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+		MoveVector = MoveVector + FlatRight
+	end
+
+	if MoveVector.Magnitude < 0.1 then
 		return Vector3.zero
 	end
 
-	return FlatMove.Unit
+	return MoveVector.Unit
 end
 
 local function GetCardinalFromMove(FlatForward: Vector3, FlatRight: Vector3, FlatMove: Vector3): (string, Vector3)
@@ -153,7 +169,7 @@ local function UpdateDodgeVelocity()
 		return
 	end
 
-	local FlatMove = GetFlatMoveDirection()
+	local FlatMove = GetCharacterRelativeMoveDirection()
 
 	if FlatMove.Magnitude < 0.1 then
 		BodyVelocityInstance.Velocity = CurrentDodge.LastSteerDirection * DODGE_SPEED
@@ -221,11 +237,11 @@ function ClientDodgeHandler.StartDodge(Steerable: boolean?): boolean
 		return false
 	end
 
-	local FlatForward, FlatRight = GetFlatCameraBasis()
-	local FlatMove = GetFlatMoveDirection()
+	local FlatForward, FlatRight = GetFlatCharacterBasis()
+	local FlatMove = GetCharacterRelativeMoveDirection()
 
 	if FlatMove.Magnitude < 0.1 then
-		FlatMove = FlatForward
+		FlatMove = -FlatForward
 	end
 
 	local DirectionName, CardinalDirection = GetCardinalFromMove(FlatForward, FlatRight, FlatMove)

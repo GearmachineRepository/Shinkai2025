@@ -97,9 +97,6 @@ local COMBAT_SFX: { [string]: (EventData: any) -> (string?, Vector3?, any?) } = 
 	[CombatEvents.HitWindowOpened] = function(_EventData)
 		return "Swing", nil, Sounds.Swings
 	end,
-	[CombatEvents.ParrySuccess] = function(_EventData)
-		return "Parry", nil
-	end,
 }
 
 local DEFAULT_JUMP_POWER = CharacterBalance.Movement.JumpPower or 25

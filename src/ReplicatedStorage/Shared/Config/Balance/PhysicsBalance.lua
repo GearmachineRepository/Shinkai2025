@@ -2,6 +2,7 @@
 
 local PhysicsBalance = {
 	Dash = {
+		ConsecutiveDashes = 3,
 		StaminaCost = 8,
 		CooldownSeconds = 2,
 		IFrameWindow = 0.225,
