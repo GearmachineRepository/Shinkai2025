@@ -1,7 +1,6 @@
 --!nonstrict
 
 -- Services
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- Character references
@@ -41,7 +40,6 @@ Humanoid.JumpPower = CharacterBalance.Movement.JumpPower
 local JUMP_COOLDOWN_SECONDS: number = CharacterBalance.Movement.JumpCooldownSeconds
 local SMALL_BUT_NOT_ZERO: number = 0.0001
 
-local EMOTE_TRANSITION_TIME: number = 0.1
 local MOVEMENT_TRANSITION_TIME: number = 0.2
 
 local FALL_TRANSITION_TIME: number = 0.2
@@ -426,8 +424,6 @@ function SwitchToAnim(Anim: Animation, AnimName: string, TransitionTime: number,
 		return
 	end
 
-    if not CurrentAnimTrack then return end
-
 	if CurrentAnimTrack ~= nil then
 		CurrentAnimTrack:Stop(TransitionTime)
 		CurrentAnimTrack:Destroy()
@@ -449,9 +445,9 @@ function SwitchToAnim(Anim: Animation, AnimName: string, TransitionTime: number,
 
 	CurrentAnimSpeed = 1.0
 
-	CurrentAnimTrack = Animator:LoadAnimation(Anim)
-	CurrentAnimTrack.Priority = Enum.AnimationPriority.Core
-	CurrentAnimTrack:Play(TransitionTime)
+	local UpdatedCurrentAnimTrack = Animator:LoadAnimation(Anim)
+	UpdatedCurrentAnimTrack.Priority = Enum.AnimationPriority.Core
+	UpdatedCurrentAnimTrack:Play(TransitionTime)
 
 	CurrentAnim = AnimName
 	CurrentAnimInstance = Anim
@@ -459,7 +455,9 @@ function SwitchToAnim(Anim: Animation, AnimName: string, TransitionTime: number,
 	if CurrentAnimKeyframeHandler ~= nil then
 		CurrentAnimKeyframeHandler:Disconnect()
 	end
-	CurrentAnimKeyframeHandler = CurrentAnimTrack.KeyframeReached:Connect(KeyFrameReachedFunc)
+	CurrentAnimKeyframeHandler = UpdatedCurrentAnimTrack.KeyframeReached:Connect(KeyFrameReachedFunc)
+
+	CurrentAnimTrack = UpdatedCurrentAnimTrack
 end
 
 function PlayAnimation(AnimName: string, TransitionTime: number, TargetHumanoid: Humanoid)
@@ -467,11 +465,6 @@ function PlayAnimation(AnimName: string, TransitionTime: number, TargetHumanoid:
 	local Anim = AnimTable[AnimName][Index].anim
 	SwitchToAnim(Anim, AnimName, TransitionTime, TargetHumanoid)
 	CurrentlyPlayingEmote = false
-end
-
-local function PlayEmote(EmoteAnim: Animation, TransitionTime: number, TargetHumanoid: Humanoid)
-	SwitchToAnim(EmoteAnim, EmoteAnim.Name, TransitionTime, TargetHumanoid)
-	CurrentlyPlayingEmote = true
 end
 
 local function GetEquippedAnimationSetName(): string?
@@ -735,46 +728,6 @@ Humanoid.Jumping:Connect(function(Jumped)
 		Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
 	end
 end)
-
--- Chat emotes
-local LocalPlayer = Players.LocalPlayer
-if LocalPlayer then
-	LocalPlayer.Chatted:Connect(function(Message: string)
-		local Emote = ""
-		if string.sub(Message, 1, 3) == "/e " then
-			Emote = string.sub(Message, 4)
-		elseif string.sub(Message, 1, 7) == "/emote " then
-			Emote = string.sub(Message, 8)
-		end
-
-		if Pose == "Standing" and EmoteNames[Emote] ~= nil then
-			PlayAnimation(Emote, EMOTE_TRANSITION_TIME, Humanoid)
-		end
-	end)
-end
-
--- BindableFunction
-local PlayEmoteBindable = Instance.new("BindableFunction")
-PlayEmoteBindable.Name = "PlayEmote"
-PlayEmoteBindable.Parent = script
-
-PlayEmoteBindable.OnInvoke = function(Emote: unknown)
-	if Pose ~= "Standing" then
-		return false
-	end
-
-	if typeof(Emote) == "string" and EmoteNames[Emote] ~= nil then
-		PlayAnimation(Emote, EMOTE_TRANSITION_TIME, Humanoid)
-		return true, CurrentAnimTrack
-	end
-
-	if typeof(Emote) == "Instance" and Emote:IsA("Animation") then
-		PlayEmote(Emote, EMOTE_TRANSITION_TIME, Humanoid)
-		return true, CurrentAnimTrack
-	end
-
-	return false
-end
 
 -- Init
 for Name, FileList in pairs(AnimNames) do
