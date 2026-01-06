@@ -22,8 +22,10 @@ export type PlayOptions = {
 local EntityAnimator = {}
 
 local ActiveTracks: { [Model]: { [string]: AnimationTrack } } = {}
+local TrackSpeeds: { [AnimationTrack]: number } = {}
 
 local DEFAULT_FADE_TIME = 0.15
+local DEFAULT_SPEED = 1
 
 local function GetAnimator(Character: Model): Animator?
 	local Humanoid = Character:FindFirstChildOfClass("Humanoid")
@@ -94,9 +96,12 @@ function EntityAnimator.Play(Character: Model, AnimationNameOrId: string, Option
 		Cache[LoadedResolvedId] = Track
 	end
 
+	local AppliedSpeed = DEFAULT_SPEED
+
 	if Options then
 		if Options.Speed then
-			Track:AdjustSpeed(Options.Speed)
+			AppliedSpeed = Options.Speed
+			Track:AdjustSpeed(AppliedSpeed)
 		end
 		if Options.Priority then
 			Track.Priority = Options.Priority
@@ -109,8 +114,46 @@ function EntityAnimator.Play(Character: Model, AnimationNameOrId: string, Option
 		end
 	end
 
+	TrackSpeeds[Track] = AppliedSpeed
 	Track:Play(Options and Options.FadeTime or DEFAULT_FADE_TIME)
 	return Track
+end
+
+function EntityAnimator.GetSpeed(Character: Model, AnimationNameOrId: string): number?
+	local ResolvedAnimationId = ResolveAnimationId(AnimationNameOrId)
+	if not ResolvedAnimationId then
+		return nil
+	end
+
+	local Cache = ActiveTracks[Character]
+	if not Cache then
+		return nil
+	end
+
+	local Track = Cache[ResolvedAnimationId]
+	if not Track then
+		return nil
+	end
+
+	return TrackSpeeds[Track] or DEFAULT_SPEED
+end
+
+function EntityAnimator.SetSpeed(Character: Model, AnimationNameOrId: string, Speed: number)
+	local ResolvedAnimationId = ResolveAnimationId(AnimationNameOrId)
+	if not ResolvedAnimationId then
+		return
+	end
+
+	local Cache = ActiveTracks[Character]
+	if not Cache then
+		return
+	end
+
+	local Track = Cache[ResolvedAnimationId]
+	if Track then
+		Track:AdjustSpeed(Speed)
+		TrackSpeeds[Track] = Speed
+	end
 end
 
 function EntityAnimator.Stop(Character: Model, AnimationNameOrId: string, FadeTime: number?)
@@ -164,10 +207,11 @@ function EntityAnimator.Pause(Character: Model, AnimationNameOrId: string, Durat
 
 	for _, Track in Animator:GetPlayingAnimationTracks() do
 		if Track.Animation and Track.Animation.Name == AnimationNameOrId then
+			local OriginalSpeed = TrackSpeeds[Track] or DEFAULT_SPEED
 			Track:AdjustSpeed(0)
 			task.delay(Duration, function()
 				if Track.IsPlaying then
-					Track:AdjustSpeed(1)
+					Track:AdjustSpeed(OriginalSpeed)
 				end
 			end)
 			break
@@ -188,7 +232,9 @@ function EntityAnimator.Resume(Character: Model, AnimationNameOrId: string, Spee
 
 	local Track = Cache[ResolvedAnimationId]
 	if Track then
-		Track:AdjustSpeed(Speed or 1)
+		local NewSpeed = Speed or TrackSpeeds[Track] or DEFAULT_SPEED
+		Track:AdjustSpeed(NewSpeed)
+		TrackSpeeds[Track] = NewSpeed
 	end
 end
 
@@ -215,6 +261,7 @@ function EntityAnimator.Cleanup(Character: Model)
 
 	for _, Track in Cache do
 		Track:Stop(0)
+		TrackSpeeds[Track] = nil
 		Track:Destroy()
 	end
 

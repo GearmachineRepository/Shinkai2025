@@ -62,17 +62,23 @@ local function GetDataByNameOrId(AnimationNameOrId: string): AnimationData?
 	return CacheByAnimationId[AnimationId]
 end
 
-function AnimationTimingCache.GetMarkerTime(AnimationNameOrId: string, MarkerName: string): number?
+function AnimationTimingCache.GetMarkerTime(AnimationNameOrId: string, MarkerName: string, Speed: number?): number?
 	local Data = GetDataByNameOrId(AnimationNameOrId)
 	if Data and Data.Markers[MarkerName] then
-		return Data.Markers[MarkerName].Time
+		local RawTime = Data.Markers[MarkerName].Time
+		local EffectiveSpeed = Speed or 1
+		return RawTime / EffectiveSpeed
 	end
 	return nil
 end
 
-function AnimationTimingCache.GetLength(AnimationNameOrId: string): number?
+function AnimationTimingCache.GetLength(AnimationNameOrId: string, Speed: number?): number?
 	local Data = GetDataByNameOrId(AnimationNameOrId)
-	return if Data then Data.Length else nil
+	if Data then
+		local EffectiveSpeed = Speed or 1
+		return Data.Length / EffectiveSpeed
+	end
+	return nil
 end
 
 function AnimationTimingCache.GetAllMarkers(AnimationNameOrId: string): { [string]: MarkerData }?
@@ -85,15 +91,16 @@ function AnimationTimingCache.IsLoaded(AnimationNameOrId: string): boolean
 	return CacheByAnimationId[AnimationId] ~= nil
 end
 
-function AnimationTimingCache.GetTiming(AnimationName: string, TimingName: string, FallbackValue: number?): number?
+function AnimationTimingCache.GetTiming(AnimationName: string, TimingName: string, FallbackValue: number?, Speed: number?): number?
+	local EffectiveSpeed = Speed or 1
 	local CachedTime = AnimationTimingCache.GetMarkerTime(AnimationName, TimingName)
 
 	if CachedTime then
-		return CachedTime
+		return CachedTime / EffectiveSpeed
 	end
 
 	if typeof(FallbackValue) == "number" then
-		return FallbackValue
+		return FallbackValue / EffectiveSpeed
 	end
 
 	return nil
