@@ -1,0 +1,180 @@
+--!strict
+
+local Signal = require(script.Parent.Parent.Utilities.Signal)
+local Maid = require(script.Parent.Parent.Utilities.Maid)
+local EventBus = require(script.Parent.Parent.Utilities.EventBus)
+local StateSchema = require(script.Parent.Parent.Schemas.StateSchema)
+local Types = require(script.Parent.Parent.Types)
+
+type StateConfig = Types.StateConfig
+type Connection = Types.Connection
+
+type TimedStateData = {
+	StartTime: number,
+	Duration: number,
+	Cancelled: boolean,
+}
+
+type StateComponentInternal = Types.StateComponent & {
+	Entity: Types.Entity,
+	Config: StateConfig,
+	CurrentStates: { [string]: boolean },
+	StateSignals: { [string]: Types.Signal<boolean> },
+	StateTimers: { [string]: TimedStateData },
+	Maid: Types.Maid,
+}
+
+local StateComponent = {}
+StateComponent.__index = StateComponent
+
+local ActiveConfig: StateConfig? = nil
+
+function StateComponent.SetConfig(Config: StateConfig)
+	ActiveConfig = Config
+end
+
+function StateComponent.new(Entity: Types.Entity): Types.StateComponent
+	if not ActiveConfig then
+		error(Types.EngineName .. " StateComponent.SetConfig must be called before creating entities")
+	end
+
+	local self: StateComponentInternal = setmetatable({
+		Entity = Entity,
+		Config = ActiveConfig,
+		CurrentStates = {},
+		StateSignals = {},
+		StateTimers = {},
+		Maid = Maid.new(),
+	}, StateComponent) :: any
+
+	for StateName in ActiveConfig.States do
+		self.CurrentStates[StateName] = StateSchema.GetDefault(ActiveConfig, StateName)
+		self.StateSignals[StateName] = Signal.new()
+		self.Maid:GiveTask(self.StateSignals[StateName])
+	end
+
+	return self
+end
+
+function StateComponent:GetState(StateName: string): boolean
+	return self.CurrentStates[StateName] or false
+end
+
+function StateComponent:SetState(StateName: string, Value: boolean)
+	local Definition = self.Config.States[StateName]
+	if not Definition then
+		warn(string.format(Types.EngineName .. " Unknown state: '%s'", StateName))
+		return
+	end
+
+	if self.CurrentStates[StateName] == Value then
+		return
+	end
+
+	if Value then
+		local Conflicts = StateSchema.GetConflicts(self.Config, StateName)
+		for _, ConflictState in Conflicts do
+			if self.CurrentStates[ConflictState] then
+				self:SetState(ConflictState, false)
+			end
+		end
+	else
+		self:ClearTimedState(StateName)
+	end
+
+	self.CurrentStates[StateName] = Value
+
+	local Replication = StateSchema.GetReplication(self.Config, StateName)
+	if Replication ~= "None" and self.Entity.Character then
+		self.Entity.Character:SetAttribute(StateName, Value)
+	end
+
+	local StateSignal = self.StateSignals[StateName]
+	if StateSignal then
+		StateSignal:Fire(Value)
+	end
+
+	EventBus.Publish("StateChanged", {
+		Entity = self.Entity,
+		Character = self.Entity.Character,
+		StateName = StateName,
+		Value = Value,
+		Replication = Replication,
+	})
+end
+
+function StateComponent:SetStateWithDuration(StateName: string, Duration: number)
+	self:ClearTimedState(StateName)
+	self:SetState(StateName, true)
+
+	local TimerData: TimedStateData = {
+		StartTime = workspace:GetServerTimeNow(),
+		Duration = Duration,
+		Cancelled = false,
+	}
+
+	self.StateTimers[StateName] = TimerData
+
+	task.delay(Duration, function()
+		if not TimerData.Cancelled and self.StateTimers[StateName] == TimerData then
+			self:SetState(StateName, false)
+		end
+	end)
+end
+
+function StateComponent:GetStateTimeRemaining(StateName: string): number
+	local TimerData = self.StateTimers[StateName] :: TimedStateData
+	if not TimerData then
+		return 0
+	end
+
+	local Elapsed = workspace:GetServerTimeNow() - TimerData.StartTime
+	return math.max(0, TimerData.Duration - Elapsed)
+end
+
+function StateComponent:ClearTimedState(StateName: string)
+	local TimerData = self.StateTimers[StateName]
+	if not TimerData then
+		return
+	end
+
+	TimerData.Cancelled = true
+	self.StateTimers[StateName] = nil
+end
+
+function StateComponent:OnStateChanged(StateName: string, Callback: (Value: boolean) -> ()): Connection
+	local StateSignal = self.StateSignals[StateName]
+	if not StateSignal then
+		StateSignal = Signal.new()
+		self.StateSignals[StateName] = StateSignal
+		self.Maid:GiveTask(StateSignal)
+	end
+
+	return StateSignal:Connect(Callback)
+end
+
+function StateComponent:GetAllStates(): { [string]: boolean }
+	return table.clone(self.CurrentStates)
+end
+
+function StateComponent:LocksMovement(): boolean
+	for StateName, IsActive in self.CurrentStates do
+		if IsActive and StateSchema.LocksMovement(self.Config, StateName) then
+			return true
+		end
+	end
+	return false
+end
+
+function StateComponent:Destroy()
+	for StateName in pairs(self.StateTimers) do
+		self:ClearTimedState(StateName)
+	end
+
+	self.Maid:DoCleaning()
+	table.clear(self.CurrentStates)
+	table.clear(self.StateSignals)
+	table.clear(self.StateTimers)
+end
+
+return StateComponent

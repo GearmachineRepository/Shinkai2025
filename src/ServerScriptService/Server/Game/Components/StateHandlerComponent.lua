@@ -1,0 +1,321 @@
+--!strict
+
+local ServerScriptService = game:GetService("ServerScriptService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Server = ServerScriptService:WaitForChild("Server")
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+
+local Assets = ReplicatedStorage:WaitForChild("Assets")
+local Sounds = Assets:WaitForChild("Sounds")
+
+local Ensemble = require(Server.Ensemble)
+local Types = require(Server.Ensemble.Types)
+local CombatEvents = require(Server.Combat.CombatEvents)
+local EntityAnimator = require(Server.Combat.Utility.EntityAnimator)
+
+local StateTypes = require(Shared.Config.Enums.StateTypes)
+local Packets = require(Shared.Networking.Packets)
+local CharacterBalance = require(Shared.Config.Balance.CharacterBalance)
+local CombatValidationConfig = require(Shared.Config.CombatValidationConfig)
+
+local StateHandlerComponent = {}
+StateHandlerComponent.__index = StateHandlerComponent
+
+StateHandlerComponent.ComponentName = "StateHandler"
+StateHandlerComponent.Dependencies = { "States" }
+
+type Self = {
+	Entity: Types.Entity,
+	Maid: Types.Maid,
+}
+
+local STATE_ANIMATIONS = {
+	[StateTypes.RAGDOLLED] = {
+		AnimationName = "Ragdoll",
+		FadeTime = 0.1,
+		Priority = Enum.AnimationPriority.Action4,
+		Looped = false,
+	},
+}
+
+local STATE_VFX = {
+	[StateTypes.PARRIED] = "ParryFlash",
+}
+
+local STATE_SFX = {}
+
+local COMBAT_VFX: { [string]: (EventData: any) -> (string?, Model?, Vector3?, any) } = {
+	[CombatEvents.AttackHit] = function(EventData)
+		return "Hit", EventData.Target and EventData.Target.Character, EventData.HitPosition
+	end,
+	[CombatEvents.BlockHit] = function(EventData)
+		return "BlockHit", EventData.Entity and EventData.Entity.Character, EventData.HitPosition
+	end,
+	[CombatEvents.ParrySuccess] = function(EventData)
+		return "ParryFlash", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.PerfectGuardSuccess] = function(EventData)
+		return "PerfectGuardFlash", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.CounterInitiated] = function(EventData)
+		return "CounterInitiate", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.PerfectGuardInitiated] = function(EventData)
+		return "PerfectGuardinitiate", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.CounterHit] = function(EventData)
+		return "Hit", EventData.Target and EventData.Target.Character, nil
+	end,
+	[CombatEvents.GuardBroken] = function(EventData)
+		return "GuardBroken", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.ClashOccurred] = function(EventData)
+		return "Clash", EventData.EntityA and EventData.EntityA.Character, EventData.HitPosition
+	end,
+	[CombatEvents.FeintExecuted] = function(EventData)
+		return "FeintSmoke", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.DodgeStarted] = function(EventData)
+		return "DodgeVfx", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.KnockbackStarted] = function(EventData)
+		return "DodgeVfx", EventData.Entity and EventData.Entity.Character, nil
+	end,
+	[CombatEvents.KnockbackImpact] = function(EventData)
+		local Target = EventData.Entity and EventData.Entity.Character
+		return "KnockbackImpact", Target, nil, {
+			ImpactPosition = EventData.ImpactPosition,
+			ImpactNormal = EventData.ImpactNormal,
+			KnockbackSpeed = EventData.KnockbackSpeed,
+			KnockbackDirection = EventData.KnockbackDirection,
+		}
+	end,
+}
+
+local COMBAT_SFX: { [string]: (EventData: any) -> (string?, Vector3?, any?) } = {
+	[CombatEvents.HitWindowOpened] = function(_EventData)
+		return "Swing", nil, Sounds.Swings
+	end,
+}
+
+local DEFAULT_JUMP_POWER = CharacterBalance.Movement.JumpPower or 25
+
+local function CanJump(Entity: Types.Entity, IsLocked: boolean)
+	local JumpPower = IsLocked and 0 or DEFAULT_JUMP_POWER
+	local Humanoid = Entity.Character and Entity.Character:FindFirstChildOfClass("Humanoid")
+	if Humanoid then
+		Humanoid.JumpPower = JumpPower
+	end
+end
+
+local function SetupMovementLocking(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	local function UpdateMovementLock()
+		local IsLocked = false
+
+		for _, StateName in CombatValidationConfig.GetMovementBlockingStates() do
+			if Entity.States:GetState(StateName) then
+				IsLocked = true
+				break
+			end
+		end
+
+		CanJump(Entity, IsLocked)
+		Entity.States:SetState(StateTypes.MOVEMENT_LOCKED, IsLocked)
+	end
+
+	for _, StateName in CombatValidationConfig.GetMovementBlockingStates() do
+		local Connection = Entity.States:OnStateChanged(StateName, UpdateMovementLock)
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
+local function SetupForceWalk(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	local function UpdateForceWalk()
+		local ShouldForceWalk = false
+
+		for _, StateName in CombatValidationConfig.GetForceWalkStates() do
+			if Entity.States:GetState(StateName) then
+				ShouldForceWalk = true
+				break
+			end
+		end
+
+		CanJump(Entity, ShouldForceWalk)
+		if ShouldForceWalk then
+			local CurrentMode = Entity.Character:GetAttribute("MovementMode")
+			if CurrentMode == "jog" or CurrentMode == "run" then
+				Entity.Character:SetAttribute("MovementMode", "walk")
+			end
+		end
+	end
+
+	for _, StateName in CombatValidationConfig.GetForceWalkStates() do
+		local Connection = Entity.States:OnStateChanged(StateName, UpdateForceWalk)
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
+local function SetupStateAnimations(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	for StateName, AnimationData in STATE_ANIMATIONS do
+		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
+			local Player = Entity.Player
+			local Character = Entity.Character
+
+			if Player then
+				if Enabled then
+					Packets.PlayAnimation:FireClient(Player, AnimationData.AnimationName)
+				else
+					Packets.StopAnimation:FireClient(Player, AnimationData.AnimationName, AnimationData.FadeTime or 0.1)
+				end
+			elseif Character then
+				if Enabled then
+					EntityAnimator.Play(Character, AnimationData.AnimationName)
+				else
+					EntityAnimator.Stop(Character, AnimationData.AnimationName, AnimationData.FadeTime or 0.1)
+				end
+			end
+		end)
+
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
+local function SetupStateVfx(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	for StateName, VfxName in STATE_VFX do
+		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
+			if not Enabled then
+				return
+			end
+
+			Packets.PlayVfxReplicate:Fire(Entity.Player or Entity.Character, VfxName, {
+				Target = Entity.Character,
+			})
+		end)
+
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
+local function SetupStateSfx(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	for StateName, SfxName in pairs(STATE_SFX) do
+		local Connection = Entity.States:OnStateChanged(StateName, function(Enabled: boolean)
+			if not Enabled then
+				return
+			end
+
+			local RootPart = Entity.Character and Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			local Position = RootPart and RootPart.Position
+
+			Packets.PlaySoundReplicate:Fire(Entity.Player or Entity.Character, SfxName, {
+				Position = Position,
+			})
+		end)
+
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
+local function SetupCombatEventReactions(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	for EventName, VfxGetter in COMBAT_VFX do
+		local Connection = Ensemble.Events.Subscribe(EventName, function(EventData: any)
+			local EventEntity = EventData.Entity or EventData.EntityA
+			if EventEntity ~= Entity then
+				return
+			end
+
+			local VfxName, TargetCharacter, Position, ExtraData = VfxGetter(EventData)
+			if not VfxName then
+				return
+			end
+
+			local Payload = {
+				Target = TargetCharacter,
+				HitPosition = Position,
+			}
+
+			if ExtraData then
+				for Key, Value in ExtraData do
+					Payload[Key] = Value
+				end
+			end
+
+			Packets.PlayVfxReplicate:Fire(Entity.Player or Entity.Character, VfxName, Payload)
+		end)
+
+		ComponentMaid:GiveTask(Connection)
+	end
+
+	for EventName, SfxGetter in COMBAT_SFX do
+		local Connection = Ensemble.Events.Subscribe(EventName, function(EventData: any)
+			local EventEntity = EventData.Entity or EventData.EntityA
+			if EventEntity ~= Entity then
+				return
+			end
+
+			local SfxName, Position, RandomFolder = SfxGetter(EventData)
+			if not SfxName then
+				return
+			end
+
+			if RandomFolder and typeof(RandomFolder) == "Instance" and #RandomFolder:GetChildren() > 0 then
+				SfxName = RandomFolder:GetChildren()[math.random(1, # RandomFolder:GetChildren())].Name
+			end
+
+			if not Position then
+				local RootPart = Entity.Character and Entity.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				Position = RootPart and RootPart.Position
+			end
+
+			Packets.PlaySoundReplicate:Fire(Entity.Player or Entity.Character, SfxName, {
+				Position = Position,
+			})
+		end)
+
+		ComponentMaid:GiveTask(Connection)
+	end
+end
+
+local function SetupForceField(Entity: Types.Entity, ComponentMaid: Types.Maid)
+	local Connection = Entity.States:OnStateChanged(StateTypes.INVULNERABLE, function(IsInvulnerable: boolean)
+		if IsInvulnerable then
+			if not Entity.Character:FindFirstChildOfClass("ForceField") then
+				local ForceField = Instance.new("ForceField")
+				ForceField.Visible = false
+				ForceField.Parent = Entity.Character
+			end
+		else
+			local ForceField = Entity.Character:FindFirstChildOfClass("ForceField")
+			if ForceField then
+				ForceField:Destroy()
+			end
+		end
+	end)
+
+	ComponentMaid:GiveTask(Connection)
+end
+
+function StateHandlerComponent.new(Entity: Types.Entity, _Context: any): Self
+	local ComponentMaid = Ensemble.Maid.new()
+
+	SetupMovementLocking(Entity, ComponentMaid)
+	SetupForceWalk(Entity, ComponentMaid)
+	SetupStateAnimations(Entity, ComponentMaid)
+	SetupStateVfx(Entity, ComponentMaid)
+	SetupStateSfx(Entity, ComponentMaid)
+	SetupCombatEventReactions(Entity, ComponentMaid)
+	SetupForceField(Entity, ComponentMaid)
+
+	local self: Self = setmetatable({
+		Entity = Entity,
+		Maid = ComponentMaid,
+	}, StateHandlerComponent) :: any
+
+	return self
+end
+
+function StateHandlerComponent:Destroy()
+	self.Maid:DoCleaning()
+end
+
+return StateHandlerComponent

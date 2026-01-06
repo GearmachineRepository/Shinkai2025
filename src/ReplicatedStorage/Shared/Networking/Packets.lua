@@ -1,0 +1,82 @@
+--!strict
+
+local Packet = require(script.Parent.Parent:WaitForChild("Packages"):WaitForChild("Packet"))
+
+return {
+	-- Animations
+	PlayAnimation = Packet("PlayAnimation", Packet.String, Packet.Any),
+	StopAnimation = Packet("StopAnimation", Packet.String, Packet.NumberF32),
+	PauseAnimation = Packet("PauseAnimation", Packet.String, Packet.NumberF32),
+
+	-- Equipment
+	EquipItem = Packet("EquipItem", Packet.NumberU16, Packet.String),
+	UnequipItem = Packet("UnequipItem", Packet.String),
+
+	-- Passives
+	TogglePassive = Packet("TogglePassive", Packet.String, Packet.Boolean8),
+
+	-- State Replication
+	StateChanged = Packet("StateChanged", Packet.Instance, Packet.String, Packet.Any),
+	EventFired = Packet("EventFired", Packet.Instance, Packet.String, Packet.Any),
+
+	-- Footsteps
+	Footplanted = Packet("Footplanted", Packet.NumberU8),
+	FootplantedReplicate = Packet("FootplantedReplicate", Packet.NumberF64, Packet.NumberU8),
+
+	-- Movement
+	MovementStateChanged = Packet("MovementStateChanged", Packet.String),
+
+	-- Food
+	ConsumeFood = Packet("ConsumeFood", Packet.NumberF32, Packet.Any),
+
+	-- Stats
+	AllocateStatPoint = Packet("AllocateStatPoint", Packet.String),
+
+	-- Treadmill
+	TreadmillModeSelected = Packet("TreadmillModeSelected", Packet.Boolean8),
+	SelectTreadmillMode = Packet("SelectTreadmillMode", Packet.String),
+
+	-- Interactions
+	InteractRequest = Packet("InteractRequest", Packet.Instance, Packet.Boolean8),
+
+	-- Tools
+	EquippedTool = Packet("EquippedTool", Packet.NumberU8),
+	UnequippedTool = Packet("UnequippedTool", Packet.NumberU8),
+
+	-- Hotbar Sync
+	RequestHotbarSync = Packet("RequestHotbarSync"),
+	HotbarUpdate = Packet("HotbarUpdate", Packet.Any),
+	EquippedToolUpdate = Packet("EquippedToolUpdate", Packet.Any),
+
+	-- Cooldown
+	StartCooldown = Packet("StartCooldown", Packet.String, Packet.NumberF64, Packet.NumberF64),
+	ClearCooldown = Packet("ClearCooldown", Packet.String),
+
+	-- Combat Actions
+	PerformAction = Packet("PerformAction", Packet.String, Packet.NumberF64, Packet.Any),
+	ReleaseAction = Packet("ReleaseAction", Packet.String),
+	ActionApproved = Packet("ActionApproved", Packet.String),
+	ActionDenied = Packet("ActionDenied", Packet.String),
+	ActionCompleted = Packet("ActionCompleted", Packet.Instance, Packet.String),
+	ActionInterrupted = Packet("ActionInterrupted", Packet.Instance, Packet.String, Packet.String),
+	InterruptAction = Packet("InterruptAction", Packet.String),
+
+	-- Knockback
+	ApplyKnockback = Packet("ApplyKnockback", Packet.Vector3F24, Packet.NumberF32, Packet.NumberF32),
+	KnockbackImpact = Packet("KnockbackImpact", Packet.Vector3F24, Packet.Vector3F24),
+
+	-- Sounds
+	PlaySound = Packet("PlaySound", Packet.Any, Packet.Any),
+	PlaySoundReplicate = Packet("PlaySoundReplicate", Packet.Any, Packet.String, Packet.Any),
+
+	-- VFX
+	PlayVfx = Packet("PlayVfx", Packet.String, Packet.Any),
+	PlayVfxReplicate = Packet("PlayVfxReplicate", Packet.Any, Packet.String, Packet.Any),
+
+	-- Damage indicator
+	ShowDamageIndicator = Packet("ShowDamageIndicator", Packet.Instance, Packet.NumberF32, Packet.Vector3F24, Packet.String),
+
+	-- Network
+	NetworkPing = Packet("NetworkPing", Packet.NumberF32),
+	NetworkPong = Packet("NetworkPong", Packet.NumberF32),
+}
