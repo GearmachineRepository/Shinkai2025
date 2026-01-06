@@ -1,100 +1,70 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local AnimationDatabase = require(Shared.Config.Data.AnimationDatabase)
 
-local DEFAULT_FADE_TIME = 0.1
-
 export type PlayOptions = {
 	FadeTime: number?,
-	Weight: number?,
 	Speed: number?,
-	Looped: boolean?,
 	Priority: Enum.AnimationPriority?,
+	Looped: boolean?,
+	Weight: number?,
 }
 
-type TrackCache = { [string]: AnimationTrack }
-type AnimationCache = { [string]: Animation }
-
-type CharacterState = {
-	Animator: Animator,
-	Tracks: TrackCache,
-	Animations: AnimationCache,
-}
-
-type AnimationReference = {
+export type AnimationReference = {
 	AnimationId: string,
 	AnimationName: string?,
 }
 
+type CharacterState = {
+	Animator: Animator,
+	Tracks: { [string]: AnimationTrack },
+	Animations: { [string]: Animation },
+	TrackSpeeds: { [AnimationTrack]: number },
+}
+
+local AnimationService = {}
+
 local CharacterStates: { [Humanoid]: CharacterState } = {}
 
-local function NormalizeAnimationId(AnimationId: string): string?
-	if string.find(AnimationId, "rbxassetid://") == 1 then
-		return AnimationId
-	end
-
-	local AnimationNumber = tonumber(AnimationId)
-	if AnimationNumber ~= nil then
-		return "rbxassetid://" .. tostring(AnimationNumber)
-	end
-
-	return nil
-end
-
-local function BuildAnimationLookup(Database: { [string]: string }): ({ [string]: string }, { [string]: string })
-	local NameToId: { [string]: string } = {}
-	local IdToName: { [string]: string } = {}
-
-	for AnimationName, AnimationId in pairs(Database) do
-		local NormalizedId = NormalizeAnimationId(AnimationId) or AnimationId
-		NameToId[AnimationName] = NormalizedId
-		IdToName[NormalizedId] = AnimationName
-	end
-
-	return NameToId, IdToName
-end
-
-local NameToIdLookup, IdToNameLookup = BuildAnimationLookup(AnimationDatabase)
-
-local function ResolveAnimationReference(AnimationKey: string): AnimationReference?
-	local NormalizedFromKey = NormalizeAnimationId(AnimationKey)
-	if NormalizedFromKey ~= nil then
-		return {
-			AnimationId = NormalizedFromKey,
-			AnimationName = IdToNameLookup[NormalizedFromKey],
-		}
-	end
-
-	local DatabaseId = NameToIdLookup[AnimationKey]
-	if DatabaseId ~= nil then
-		return {
-			AnimationId = DatabaseId,
-			AnimationName = AnimationKey,
-		}
-	end
-
-	return nil
-end
+local DEFAULT_FADE_TIME = 0.15
+local DEFAULT_SPEED = 1
 
 local function GetHumanoidFromPlayer(Player: Player): Humanoid?
 	local Character = Player.Character
 	if not Character then
 		return nil
 	end
+
 	return Character:FindFirstChildOfClass("Humanoid")
 end
 
-local function GetOrCreateAnimator(Humanoid: Humanoid): Animator
-	local ExistingAnimator = Humanoid:FindFirstChildOfClass("Animator")
-	if ExistingAnimator then
-		return ExistingAnimator
+local function ResolveAnimationReference(AnimationKey: string): AnimationReference?
+	if string.find(AnimationKey, "rbxassetid://") then
+		return {
+			AnimationId = AnimationKey,
+			AnimationName = AnimationKey,
+		}
 	end
 
-	local NewAnimator = Instance.new("Animator")
-	NewAnimator.Parent = Humanoid
-	return NewAnimator
+	if string.find(AnimationKey, "http://") or string.find(AnimationKey, "https://") then
+		return {
+			AnimationId = AnimationKey,
+			AnimationName = AnimationKey,
+		}
+	end
+
+	local ResolvedId = AnimationDatabase[AnimationKey]
+	if typeof(ResolvedId) == "string" then
+		return {
+			AnimationId = ResolvedId,
+			AnimationName = AnimationKey,
+		}
+	end
+
+	return nil
 end
 
 local function GetOrCreateState(Humanoid: Humanoid): CharacterState
@@ -103,17 +73,31 @@ local function GetOrCreateState(Humanoid: Humanoid): CharacterState
 		return ExistingState
 	end
 
-	local NewState: CharacterState = {
-		Animator = GetOrCreateAnimator(Humanoid),
+	local Animator = Humanoid:FindFirstChildOfClass("Animator")
+	if not Animator then
+		local NewAnimator = Instance.new("Animator")
+		NewAnimator.Parent = Humanoid
+
+		Animator = NewAnimator
+	end
+
+	local NewState = {
+		Animator = Animator,
 		Tracks = {},
 		Animations = {},
-	}
+		TrackSpeeds = {},
+	} :: CharacterState
 
 	CharacterStates[Humanoid] = NewState
+
+	Humanoid.Destroying:Connect(function()
+		CharacterStates[Humanoid] = nil
+	end)
+
 	return NewState
 end
 
-local function ApplyOptions(Track: AnimationTrack, Options: PlayOptions?)
+local function ApplyOptions(Track: AnimationTrack, Options: PlayOptions?, State: CharacterState)
 	if not Options then
 		return
 	end
@@ -132,6 +116,7 @@ local function ApplyOptions(Track: AnimationTrack, Options: PlayOptions?)
 
 	if Options.Speed ~= nil then
 		Track:AdjustSpeed(Options.Speed)
+		State.TrackSpeeds[Track] = Options.Speed
 	end
 end
 
@@ -158,7 +143,25 @@ local function GetOrLoadTrack(Humanoid: Humanoid, Reference: AnimationReference)
 	return NewTrack
 end
 
-local AnimationService = {}
+local function GetTrackByKey(Player: Player, AnimationKey: string): (AnimationTrack?, CharacterState?)
+	local Humanoid = GetHumanoidFromPlayer(Player)
+	if not Humanoid then
+		return nil, nil
+	end
+
+	local State = CharacterStates[Humanoid]
+	if not State then
+		return nil, nil
+	end
+
+	local Reference = ResolveAnimationReference(AnimationKey)
+	if not Reference then
+		return nil, nil
+	end
+
+	local Track = State.Tracks[Reference.AnimationId]
+	return Track, State
+end
 
 function AnimationService.Preload(Player: Player, Animations: { [string]: string })
 	local Humanoid = GetHumanoidFromPlayer(Player)
@@ -186,34 +189,20 @@ function AnimationService.Play(Player: Player, AnimationKey: string, Options: Pl
 		return nil
 	end
 
+	local State = GetOrCreateState(Humanoid)
 	local Track = GetOrLoadTrack(Humanoid, Reference)
 	if not Track then
 		return nil
 	end
 
-	ApplyOptions(Track, Options)
+	ApplyOptions(Track, Options, State)
 	Track:Play(Options and Options.FadeTime or DEFAULT_FADE_TIME)
 
 	return Track
 end
 
 function AnimationService.Stop(Player: Player, AnimationKey: string, FadeTime: number?)
-	local Humanoid = GetHumanoidFromPlayer(Player)
-	if not Humanoid then
-		return
-	end
-
-	local State = CharacterStates[Humanoid]
-	if not State then
-		return
-	end
-
-	local Reference = ResolveAnimationReference(AnimationKey)
-	if not Reference then
-		return
-	end
-
-	local Track = State.Tracks[Reference.AnimationId]
+	local Track, _ = GetTrackByKey(Player, AnimationKey)
 	if Track then
 		Track:Stop(FadeTime or DEFAULT_FADE_TIME)
 	end
@@ -230,9 +219,70 @@ function AnimationService.StopAll(Player: Player, FadeTime: number?)
 		return
 	end
 
-	for _, Track in pairs(State.Tracks) do
+	for _, Track in State.Tracks do
 		Track:Stop(FadeTime or DEFAULT_FADE_TIME)
 	end
+end
+
+function AnimationService.Pause(Player: Player, AnimationKey: string, Duration: number?)
+	local Track, State = GetTrackByKey(Player, AnimationKey)
+	if not Track or not State then
+		return
+	end
+
+	local OriginalSpeed = State.TrackSpeeds[Track] or DEFAULT_SPEED
+	Track:AdjustSpeed(0)
+
+	if Duration and Duration > 0 then
+		task.delay(Duration, function()
+			if Track.IsPlaying then
+				Track:AdjustSpeed(OriginalSpeed)
+			end
+		end)
+	end
+end
+
+function AnimationService.Resume(Player: Player, AnimationKey: string)
+	local Track, State = GetTrackByKey(Player, AnimationKey)
+	if not Track or not State then
+		return
+	end
+
+	local Speed = State.TrackSpeeds[Track] or DEFAULT_SPEED
+	Track:AdjustSpeed(Speed)
+end
+
+function AnimationService.SetSpeed(Player: Player, AnimationKey: string, Speed: number)
+	local Track, State = GetTrackByKey(Player, AnimationKey)
+	if not Track or not State then
+		return
+	end
+
+	Track:AdjustSpeed(Speed)
+	State.TrackSpeeds[Track] = Speed
+end
+
+function AnimationService.GetSpeed(Player: Player, AnimationKey: string): number
+	local Track, State = GetTrackByKey(Player, AnimationKey)
+	if not Track or not State then
+		return DEFAULT_SPEED
+	end
+
+	return State.TrackSpeeds[Track] or DEFAULT_SPEED
+end
+
+function AnimationService.IsPlaying(Player: Player, AnimationKey: string): boolean
+	local Track, _ = GetTrackByKey(Player, AnimationKey)
+	if not Track then
+		return false
+	end
+
+	return Track.IsPlaying
+end
+
+function AnimationService.GetTrack(Player: Player, AnimationKey: string): AnimationTrack?
+	local Track, _ = GetTrackByKey(Player, AnimationKey)
+	return Track
 end
 
 return AnimationService

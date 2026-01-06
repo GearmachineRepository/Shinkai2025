@@ -9,15 +9,14 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local WindowManager = require(script.Parent.Parent.Core.WindowManager)
+local MetadataBuilders = require(script.Parent.Parent.Core.MetadataBuilders)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
-local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
-local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
+local CombatAnimator = require(script.Parent.Parent.Utility.CombatAnimator)
 
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
-local StyleConfig = require(Shared.Config.Styles.StyleConfig)
-local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
-local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -35,85 +34,35 @@ Counter.MaxAngle = CombatBalance.Counter.MaxAngle
 
 local DAMAGE_MULTIPLIER = 1.0
 
-local function GetCounterData(Entity: Entity): { [string]: any }?
-	local ToolComponent = Entity:GetComponent("Tool")
-	local ItemId = nil
-
-	if ToolComponent then
-		local EquippedTool = ToolComponent:GetEquippedTool()
-		if EquippedTool and EquippedTool.ToolId then
-			ItemId = EquippedTool.ToolId
-		end
-	end
-
-	local StyleName = "Fists"
-	if ItemId then
-		local ItemData = ItemDatabase.GetItem(ItemId)
-		if ItemData and ItemData.Style then
-			StyleName = ItemData.Style
-		end
-	end
-
-	local ComboLength = StyleConfig.GetComboLength(StyleName, "M1")
-	local LastM1Data = StyleConfig.GetAttack(StyleName, "M1", ComboLength)
-
-	if not LastM1Data then
-		LastM1Data = StyleConfig.GetAttack("Fists", "M1", 4)
-	end
-
-	if not LastM1Data then
-		return nil
-	end
-
-	local Timing = StyleConfig.GetTiming(StyleName)
-
-	return {
-		AnimationId = LastM1Data.AnimationId,
-		Damage = math.floor((LastM1Data.Damage or 10) * DAMAGE_MULTIPLIER),
-		HitStun = LastM1Data.HitStun or 0.4,
-		Knockback = LastM1Data.Knockback or 40,
-		HitboxSize = LastM1Data.Hitbox and LastM1Data.Hitbox.Size or Vector3.new(6, 5, 7),
-		HitboxOffset = LastM1Data.Hitbox and LastM1Data.Hitbox.Offset or Vector3.new(0, 0, -4),
-		FallbackHitStart = Timing.FallbackHitStart or 0.2,
-		FallbackHitEnd = Timing.FallbackHitEnd or 0.5,
-		FallbackLength = Timing.FallbackLength or 1.0,
-	}
-end
+local GetCounterData = MetadataBuilders.CounterAttack("Counter", DAMAGE_MULTIPLIER)
 
 local function ExecuteCounterAttack(Entity: Entity, Attacker: Entity)
-	local CounterData = GetCounterData(Entity)
+	local CounterData = GetCounterData(Entity, nil)
 	if not CounterData then
 		return
 	end
 
 	Entity.States:SetState("Attacking", true)
 
-	local Player = Entity.Player
-	local Character = Entity.Character
 	local AnimationId = CounterData.AnimationId
+	if not AnimationId then return end
 
-	if AnimationId then
-		if Player then
-			Packets.PlayAnimation:FireClient(Player, AnimationId)
-		elseif Character then
-			EntityAnimator.Play(Character, AnimationId)
-		end
-	end
+	CombatAnimator.Play(Entity, AnimationId)
 
-	local AnimationLength = AnimationTimingCache.GetLength(AnimationId) or CounterData.FallbackLength
-	local HitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", CounterData.FallbackHitStart)
+	local AnimationLength = AnimationTimingCache.GetLength(AnimationId) or CounterData.FallbackLength or 1.0  :: number
+	local HitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", CounterData.FallbackHitStart or 0.2) :: number
 
 	task.spawn(function()
 		task.wait(HitStartTime)
 
-		local Damage = CounterData.Damage
+		local Damage = CounterData.Damage or 10
 
 		local DamageComponent = Attacker:GetComponent("Damage")
 		if DamageComponent then
 			DamageComponent:DealDamage(Damage, Entity.Player or Entity.Character)
 		end
 
-		StunManager.ApplyStun(Attacker, CounterData.HitStun, "Counter")
+		StunManager.ApplyStun(Attacker, CounterData.HitStun or 0.4, "Counter")
 
 		local Knockback = CounterData.Knockback
 		if Knockback and Knockback > 0 then
@@ -158,7 +107,7 @@ local function OnExpire(Context: ActionContext)
 end
 
 function Counter.Register()
-	ActionExecutor.RegisterWindow({
+	WindowManager.Register({
 		WindowType = Counter.WindowType,
 		Duration = Counter.Duration,
 		Cooldown = Counter.Cooldown,

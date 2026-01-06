@@ -9,10 +9,10 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
+local WindowManager = require(script.Parent.Parent.Core.WindowManager)
 local StunManager = require(script.Parent.Parent.Utility.StunManager)
-local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+local CombatAnimator = require(script.Parent.Parent.Utility.CombatAnimator)
 
-local Packets = require(Shared.Networking.Packets)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local Ensemble = require(Server.Ensemble)
 
@@ -28,25 +28,19 @@ PerfectGuard.Cooldown = CombatBalance.PerfectBlock.CooldownSeconds
 PerfectGuard.SpamCooldown = CombatBalance.PerfectBlock.SpamCooldownSeconds
 PerfectGuard.StaggerDuration = CombatBalance.PerfectBlock.StaggerDuration
 PerfectGuard.MaxAngle = CombatBalance.PerfectBlock.MaxAngle
-PerfectGuard.StaggerPauseDivisor = 1.5
+
+local STAGGER_PAUSE_DIVISOR = 1.5
 
 local function OnTrigger(Context: ActionContext, Attacker: Entity)
 	local AttackerContext = ActionExecutor.GetActiveContext(Attacker)
 	local AttackerAnimationId = AttackerContext and AttackerContext.Metadata.AnimationId
 
-	if AttackerAnimationId  then
-		if Attacker.Player then
-			Packets.PauseAnimation:FireClient(Attacker.Player, AttackerAnimationId, PerfectGuard.StaggerDuration/PerfectGuard.StaggerPauseDivisor)
-		else
-			EntityAnimator.Pause(Attacker.Character, AttackerAnimationId, PerfectGuard.StaggerDuration/PerfectGuard.StaggerPauseDivisor)
-		end
+	if AttackerAnimationId then
+		local PauseDuration = PerfectGuard.StaggerDuration / STAGGER_PAUSE_DIVISOR
+		CombatAnimator.Pause(Attacker, AttackerAnimationId, PauseDuration)
 
 		task.delay(PerfectGuard.StaggerDuration, function()
-			if Attacker.Player then
-				Packets.StopAnimation:FireClient(Attacker.Player, AttackerAnimationId, 0.15)
-			elseif Attacker.Character then
-				EntityAnimator.Stop(Attacker.Character, AttackerAnimationId, 0.15)
-			end
+			CombatAnimator.Stop(Attacker, AttackerAnimationId, 0.15)
 		end)
 	end
 
@@ -68,7 +62,7 @@ local function OnExpire(Context: ActionContext)
 end
 
 function PerfectGuard.Register()
-	ActionExecutor.RegisterWindow({
+	WindowManager.Register({
 		WindowType = PerfectGuard.WindowType,
 		Duration = PerfectGuard.Duration,
 		Cooldown = PerfectGuard.Cooldown,

@@ -12,14 +12,13 @@ local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
 local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
-local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+local StyleResolver = require(script.Parent.Parent.Utility.StyleResolver)
+local CombatAnimator = require(script.Parent.Parent.Utility.CombatAnimator)
 
 local StyleConfig = require(Shared.Config.Styles.StyleConfig)
-local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local StateTypes = require(Shared.Config.Enums.StateTypes)
 local ActionValidator = require(Shared.Utility.ActionValidator)
-local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -30,41 +29,6 @@ local Block = {}
 
 Block.ActionName = "Block"
 Block.ActionType = "Defensive"
-
-Block.DefaultMetadata = {
-	ActionName = "Block",
-	ActionType = "Defensive",
-	DamageReduction = CombatBalance.Blocking.DamageReduction,
-	StaminaDrainOnHit = CombatBalance.Blocking.StaminaDrainOnHit,
-}
-
-local function PlayAnimation(Context: ActionContext, AnimationId: string?)
-	if not AnimationId then
-		return
-	end
-
-	local Player = Context.Entity.Player
-	local Character = Context.Entity.Character
-	if Player then
-		Packets.PlayAnimation:FireClient(Player, AnimationId)
-	elseif Character then
-		EntityAnimator.Play(Character, AnimationId)
-	end
-end
-
-local function StopAnimation(Context: ActionContext, AnimationId: string?, FadeTime: number?)
-	if not AnimationId then
-		return
-	end
-
-	local Player = Context.Entity.Player
-	local Character = Context.Entity.Character
-	if Player then
-		Packets.StopAnimation:FireClient(Player, AnimationId, FadeTime or 0.15)
-	elseif Character then
-		EntityAnimator.Stop(Character, AnimationId)
-	end
-end
 
 local function ApplyGuardBreakState(Context: ActionContext)
 	local Entity = Context.Entity
@@ -122,21 +86,16 @@ local function HandleStaminaDepletedGuardBreak(Context: ActionContext, Attacker:
 		Context = Context,
 	})
 
-	StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
-	StopAnimation(Context, "BlockHit", 0.1)
+	local AnimationId = Context.Metadata.AnimationId :: string
+
+	CombatAnimator.Stop(Context.Entity, AnimationId, 0.1)
+	CombatAnimator.Stop(Context.Entity, "BlockHit", 0.1)
 
 	ActionExecutor.Interrupt(Context.Entity, "GuardBreak")
 end
 
 local function PlayBlockHitEffects(Context: ActionContext)
-	local Player = Context.Entity.Player
-	local Character = Context.Entity.Character
-
-	if Player then
-		Packets.PlayAnimation:FireClient(Player, "BlockHit")
-	elseif Character then
-		EntityAnimator.Play(Character, "BlockHit")
-	end
+	CombatAnimator.Play(Context.Entity, "BlockHit")
 end
 
 local function ApplyBlockHitState(Context: ActionContext)
@@ -216,33 +175,26 @@ local function HandleBlockedHit(Context: ActionContext, Attacker: Entity, Incomi
 	})
 end
 
+local function IsBlockAngleValid(Context: ActionContext, Attacker: Entity): boolean
+	local MaxAngle = CombatBalance.Blocking.BlockAngle or 180
+	local HalfAngle = MaxAngle / 2
+
+	if not Context.Entity.Character or not Attacker.Character then
+		return true
+	end
+
+	return AngleValidator.IsWithinAngle(Context.Entity.Character, Attacker.Character, HalfAngle)
+end
+
 function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
-	local ItemId = InputData and InputData.ItemId
-	local StyleName = "Fists"
-
-	if not ItemId then
-		local ToolComponent = Entity:GetComponent("Tool")
-		if ToolComponent then
-			local EquippedTool = ToolComponent:GetEquippedTool()
-			if EquippedTool and EquippedTool.ToolId then
-				ItemId = EquippedTool.ToolId
-			end
-		end
-	end
-
-	if ItemId then
-		local ItemData = ItemDatabase.GetItem(ItemId)
-		if ItemData and ItemData.Style then
-			StyleName = ItemData.Style
-		end
-	end
+	local StyleName = StyleResolver.GetEntityStyleOrDefault(Entity, InputData)
 
 	local AnimationId = StyleConfig.GetAnimation(StyleName, "Block")
 	if not AnimationId then
 		AnimationId = StyleConfig.GetAnimation("Fists", "Block")
 	end
 
-	local Metadata: ActionMetadata = {
+	return {
 		ActionName = "Block",
 		ActionType = "Defensive",
 		AnimationSet = StyleName,
@@ -251,8 +203,6 @@ function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 		StaminaDrainScalar = CombatBalance.Blocking.StaminaDrainScalar,
 		AnimationId = AnimationId,
 	}
-
-	return Metadata
 end
 
 function Block.CanExecute(Context: ActionContext): (boolean, string?)
@@ -277,7 +227,9 @@ function Block.OnStart(Context: ActionContext)
 end
 
 function Block.OnExecute(Context: ActionContext)
-	PlayAnimation(Context, Context.Metadata.AnimationId)
+	local AnimationId = Context.Metadata.AnimationId :: string
+
+	CombatAnimator.Play(Context.Entity, AnimationId)
 
 	while not Context.Interrupted do
 		task.wait(0.1)
@@ -288,20 +240,11 @@ function Block.OnExecute(Context: ActionContext)
 	end
 end
 
-local function IsBlockAngleValid(Context: ActionContext, Attacker: Entity): boolean
-	local MaxAngle = CombatBalance.Blocking.BlockAngle or 180
-	local HalfAngle = MaxAngle / 2
-
-	if not Context.Entity.Character or not Attacker.Character then
-		return true
-	end
-
-	return AngleValidator.IsWithinAngle(Context.Entity.Character, Attacker.Character, HalfAngle)
-end
-
 function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: number, Flags: { string }?, HitPosition: Vector3?): boolean
+	local AnimationId = Context.Metadata.AnimationId :: string
+
 	if ActionExecutor.TriggerWindow(Context, Attacker) then
-		StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
+		CombatAnimator.Stop(Context.Entity, AnimationId, 0.1)
 		return true
 	end
 
@@ -310,7 +253,7 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 	end
 
 	if ActionExecutor.TriggerWindow(Context, Attacker) then
-		StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
+		CombatAnimator.Stop(Context.Entity, AnimationId, 0.1)
 		return true
 	end
 
@@ -323,7 +266,8 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 end
 
 function Block.OnInterrupt(Context: ActionContext)
-	StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
+	local AnimationId = Context.Metadata.AnimationId :: string
+	CombatAnimator.Stop(Context.Entity, AnimationId, 0.1)
 end
 
 function Block.OnCleanup(Context: ActionContext)

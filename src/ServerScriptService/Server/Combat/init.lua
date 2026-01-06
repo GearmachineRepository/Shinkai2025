@@ -37,7 +37,7 @@
 
 	5. WINDOW SYSTEM
 	   Actions can open timed windows (PerfectGuard, Counter) that trigger
-	   special behavior when hit. Managed centrally by ActionExecutor.
+	   special behavior when hit. Managed by WindowManager.
 
 	6. THREAD MANAGEMENT
 	   Use ActionExecutor.ScheduleThread() for delayed callbacks that
@@ -49,13 +49,20 @@
 	2. Add new input bindings via InputResolver.AddBinding()
 	3. Subscribe to combat events for passive/hook effects
 	4. Use AttackBase for shared attack logic
-	5. Register new windows via ActionExecutor.RegisterWindow()
+	5. Register new windows via WindowManager.Register()
 ]]
 
 local ActionRegistry = require(script.Core.ActionRegistry)
 local ActionExecutor = require(script.Core.ActionExecutor)
 local InputResolver = require(script.Core.InputResolver)
 local AttackBase = require(script.Core.AttackBase)
+
+local ComboTracker = require(script.Core.ComboTracker)
+local CooldownManager = require(script.Core.CooldownManager)
+local WindowManager = require(script.Core.WindowManager)
+local ThreadScheduler = require(script.Core.ThreadScheduler)
+local MetadataBuilders = require(script.Core.MetadataBuilders)
+
 local CombatTypes = require(script.CombatTypes)
 local CombatEvents = require(script.CombatEvents)
 
@@ -63,6 +70,8 @@ local PerfectGuard = require(script.Actions.PerfectGuard)
 local Counter = require(script.Actions.Counter)
 
 local AnimationTimingCache = require(script.Utility.AnimationTimingCache)
+local StyleResolver = require(script.Utility.StyleResolver)
+local CombatAnimator = require(script.Utility.CombatAnimator)
 
 export type Entity = CombatTypes.Entity
 export type ActionContext = CombatTypes.ActionContext
@@ -77,12 +86,22 @@ Combat.ActionRegistry = ActionRegistry
 Combat.ActionExecutor = ActionExecutor
 Combat.InputResolver = InputResolver
 Combat.AttackBase = AttackBase
+
+Combat.ComboTracker = ComboTracker
+Combat.CooldownManager = CooldownManager
+Combat.WindowManager = WindowManager
+Combat.ThreadScheduler = ThreadScheduler
+Combat.MetadataBuilders = MetadataBuilders
+
 Combat.CombatTypes = CombatTypes
 Combat.CombatEvents = CombatEvents
 
+Combat.StyleResolver = StyleResolver
+Combat.CombatAnimator = CombatAnimator
+
 export type InitConfig = {
 	ActionsFolder: Instance?,
-	AnimationDatabase: {[string]: any}?,
+	AnimationDatabase: { [string]: any }?,
 	CustomBindings: { InputResolver.InputBinding }?,
 }
 
@@ -109,6 +128,7 @@ function Combat.Init(Config: InitConfig?)
 
 	print("[Combat] Framework initialized")
 	print("[Combat] Registered actions: " .. table.concat(ActionRegistry.GetAllNames(), ", "))
+	print("[Combat] Registered windows: " .. table.concat(WindowManager.GetAllRegisteredTypes(), ", "))
 end
 
 function Combat.Execute(Entity: Entity, RawInput: string, InputData: { [string]: any }?): (boolean, string?)
@@ -141,7 +161,7 @@ function Combat.RegisterAction(Definition: ActionDefinition)
 end
 
 function Combat.RegisterWindow(Definition: WindowDefinition)
-	ActionExecutor.RegisterWindow(Definition)
+	WindowManager.Register(Definition)
 end
 
 function Combat.OpenWindow(Entity: Entity, WindowType: string, InputTimestamp: number?): boolean

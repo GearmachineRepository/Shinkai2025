@@ -10,12 +10,10 @@ local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AttackBase = require(script.Parent.Parent.Core.AttackBase)
+local MetadataBuilders = require(script.Parent.Parent.Core.MetadataBuilders)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
-local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+local CombatAnimator = require(script.Parent.Parent.Utility.CombatAnimator)
 
-local Packets = require(Shared.Networking.Packets)
-local StyleConfig = require(Shared.Config.Styles.StyleConfig)
-local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local ActionValidator = require(Shared.Utility.ActionValidator)
 local Ensemble = require(Server.Ensemble)
@@ -28,6 +26,7 @@ local HeavyAttack = {}
 
 HeavyAttack.ActionName = "HeavyAttack"
 HeavyAttack.ActionType = "Attack"
+HeavyAttack.BuildMetadata = MetadataBuilders.SingleAttack("M2", "HeavyAttack")
 
 local COOLDOWN_ID = "HeavyAttack"
 
@@ -35,86 +34,6 @@ local PRESERVE_ANIMATION_INTERRUPTS = {
 	PerfectGuard = true,
 	Counter = true,
 }
-
-local function GetEquippedItemId(Entity: Entity, InputData: { [string]: any }?): string?
-	if InputData and InputData.ItemId then
-		return InputData.ItemId
-	end
-
-	local ToolComponent = Entity:GetComponent("Tool")
-	if ToolComponent then
-		local EquippedTool = ToolComponent:GetEquippedTool()
-		if EquippedTool and EquippedTool.ToolId then
-			return EquippedTool.ToolId
-		end
-	end
-
-	return nil
-end
-
-local function ApplyStatModifiers(BaseValue: number, Multiplier: number?): number
-	if Multiplier then
-		return BaseValue * Multiplier
-	end
-	return BaseValue
-end
-
-function HeavyAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
-	local ItemId = GetEquippedItemId(Entity, InputData)
-	if not ItemId then
-		return nil
-	end
-
-	local ItemData = ItemDatabase.GetItem(ItemId)
-	if not ItemData then
-		return nil
-	end
-
-	local StyleName = ItemData.Style
-	if not StyleName then
-		return nil
-	end
-
-	local AttackData = StyleConfig.GetAttack(StyleName, "M2", 1)
-	local Timing = StyleConfig.GetTiming(StyleName)
-
-	if not AttackData then
-		return nil
-	end
-
-	local Modifiers = ItemData.Modifiers
-
-	local Metadata: ActionMetadata = {
-		ActionName = "HeavyAttack",
-		ActionType = "Attack",
-		AnimationSet = StyleName,
-		AnimationId = AttackData.AnimationId,
-
-		Damage = ApplyStatModifiers(AttackData.Damage, Modifiers and Modifiers.DamageMultiplier),
-		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, Modifiers and Modifiers.StaminaCostMultiplier),
-		HitStun = AttackData.HitStun,
-
-		HitboxSize = AttackData.Hitbox and AttackData.Hitbox.Size,
-		HitboxOffset = AttackData.Hitbox and AttackData.Hitbox.Offset,
-
-		Feintable = Timing.Feintable,
-		FeintEndlag = Timing.FeintEndlag,
-		FeintCooldown = Timing.FeintCooldown,
-		ActionCooldown = Timing.HeavyAttackCooldown,
-		StaminaCostHitReduction = Timing.StaminaCostHitReduction,
-
-		Knockback = AttackData.Knockback,
-
-		FallbackHitStart = Timing.FallbackHitStart,
-		FallbackHitEnd = Timing.FallbackHitEnd,
-		FallbackLength = Timing.FallbackLength,
-
-		Flag = AttackData.Flag,
-		Flags = AttackData.Flags,
-	}
-
-	return Metadata
-end
 
 function HeavyAttack.CanExecute(Context: ActionContext): (boolean, string?)
 	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "HeavyAttack")
@@ -198,17 +117,13 @@ end
 
 function HeavyAttack.OnInterrupt(Context: ActionContext)
 	local AnimationId = Context.Metadata.AnimationId
-	local ShouldStopAnimation = not PRESERVE_ANIMATION_INTERRUPTS[Context.InterruptReason]
-	if not AnimationId then return end
+	if not AnimationId then
+		return
+	end
 
+	local ShouldStopAnimation = not PRESERVE_ANIMATION_INTERRUPTS[Context.InterruptReason]
 	if ShouldStopAnimation then
-		local Player = Context.Entity.Player
-		local Character = Context.Entity.Character
-		if Player then
-			Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
-		elseif Character then
-			EntityAnimator.Stop(Character, AnimationId, 0.15)
-		end
+		CombatAnimator.Stop(Context.Entity, AnimationId, 0.15)
 	end
 
 	if Context.InterruptReason == "Feint" then

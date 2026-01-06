@@ -38,14 +38,12 @@ function DodgeCancel.BuildMetadata(Entity: Entity, _InputData: { [string]: any }
 		return nil
 	end
 
-	local Metadata: ActionMetadata = {
+	return {
 		ActionName = "DodgeCancel",
 		ActionType = "Utility",
 		DodgeCancelCooldown = DEFAULT_COOLDOWN,
 		DodgeCancelEndlag = DEFAULT_ENDLAG,
 	}
-
-	return Metadata
 end
 
 function DodgeCancel.CanExecute(Context: ActionContext): (boolean, string?)

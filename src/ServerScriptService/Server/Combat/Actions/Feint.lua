@@ -33,14 +33,12 @@ function Feint.BuildMetadata(Entity: Entity, _InputData: { [string]: any }?): Ac
 		return nil
 	end
 
-	local Metadata: ActionMetadata = {
+	return {
 		ActionName = "Feint",
 		ActionType = "Utility",
 		FeintCooldown = ActiveContext.Metadata.FeintCooldown or DEFAULT_COOLDOWN,
 		FeintEndlag = ActiveContext.Metadata.FeintEndlag or DEFAULT_ENDLAG,
 	}
-
-	return Metadata
 end
 
 function Feint.CanExecute(Context: ActionContext): (boolean, string?)

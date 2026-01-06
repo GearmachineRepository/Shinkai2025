@@ -26,6 +26,14 @@
 	- "Movement" - Movement-based actions (Dodge, Dash)
 	- "Utility" - Support actions (Feint, Taunt)
 
+	METADATA BUILDERS:
+	Use MetadataBuilders for common patterns:
+	- MetadataBuilders.ComboAttack("M1", "ActionName") - For combo-based attacks
+	- MetadataBuilders.SingleAttack("M2", "ActionName") - For single attacks
+	- MetadataBuilders.CounterAttack("ActionName", multiplier) - For counter attacks
+	- MetadataBuilders.Static(metadata) - For static metadata
+	- MetadataBuilders.Extend(builder, extensions) - To extend existing builders
+
 	THREAD SCHEDULING:
 	Use ActionExecutor.ScheduleThread() instead of task.delay() for automatic cleanup:
 
@@ -36,12 +44,17 @@
 	For threads that MUST run even after interrupt (like state cleanup):
 	ActionExecutor.ScheduleThread(Context, Duration, Callback, true)
 
-	WINDOW SYSTEM:
-	To open a defensive window during an action:
-	ActionExecutor.OpenWindow(Entity, "PerfectGuard")
+	ANIMATION:
+	Use CombatAnimator for unified player/NPC animation handling:
+	- CombatAnimator.Play(Entity, AnimationId)
+	- CombatAnimator.Stop(Entity, AnimationId, FadeTime)
+	- CombatAnimator.Pause(Entity, AnimationId, Duration)
 
-	To check for window triggers when hit:
-	if ActionExecutor.TriggerWindow(Context, Attacker) then return end
+	STYLE RESOLUTION:
+	Use StyleResolver to get equipped style info:
+	- StyleResolver.GetEntityStyle(Entity, InputData)
+	- StyleResolver.GetEntityStyleOrDefault(Entity, InputData)
+	- StyleResolver.GetAttackData(Entity, ComboKey, ComboIndex, InputData)
 ]]
 
 local ServerScriptService = game:GetService("ServerScriptService")
@@ -53,10 +66,11 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
-local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+local MetadataBuilders = require(script.Parent.Parent.Core.MetadataBuilders)
+local CombatAnimator = require(script.Parent.Parent.Utility.CombatAnimator)
+local _StyleResolver = require(script.Parent.Parent.Utility.StyleResolver)
 
 local ActionValidator = require(Shared.Utility.ActionValidator)
-local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -70,25 +84,7 @@ ActionTemplate.ActionType = "Attack"
 
 local COOLDOWN_ID = "ActionTemplate"
 
-ActionTemplate.DefaultMetadata = {
-	ActionName = "ActionTemplate",
-	ActionType = "Attack",
-	ActionCooldown = 1.0,
-	Damage = 10,
-	StaminaCost = 5,
-	HitStun = 0.25,
-	AnimationId = "DefaultAnimation",
-	HitboxSize = Vector3.new(4, 4, 4),
-	HitboxOffset = Vector3.new(0, 0, -3),
-	Feintable = true,
-	FeintEndlag = 0.2,
-	FeintCooldown = 0.5,
-}
-
-function ActionTemplate.BuildMetadata(_Entity: Entity, _InputData: { [string]: any }?): ActionMetadata?
-	local Metadata: ActionMetadata = table.clone(ActionTemplate.DefaultMetadata)
-	return Metadata
-end
+ActionTemplate.BuildMetadata = MetadataBuilders.SingleAttack("M2", "ActionTemplate")
 
 function ActionTemplate.CanExecute(Context: ActionContext): (boolean, string?)
 	local CanPerform, Reason = ActionValidator.CanPerform(Context.Entity.States, "ActionTemplate")
@@ -96,16 +92,8 @@ function ActionTemplate.CanExecute(Context: ActionContext): (boolean, string?)
 		return false, Reason
 	end
 
-	local StatComponent = Context.Entity:GetComponent("Stats")
-	if StatComponent then
-		local StaminaCost = Context.Metadata.StaminaCost or 0
-		if StatComponent:GetStat("Stamina") < StaminaCost then
-			return false, "NoStamina"
-		end
-	end
-
-	local ActionCooldown = Context.Metadata.ActionCooldown or 0
-	if ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown) then
+	local CooldownSeconds = Context.Metadata.ActionCooldown or 0
+	if CooldownSeconds > 0 and ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, CooldownSeconds) then
 		return false, "OnCooldown"
 	end
 
@@ -113,30 +101,13 @@ function ActionTemplate.CanExecute(Context: ActionContext): (boolean, string?)
 end
 
 function ActionTemplate.OnStart(Context: ActionContext)
-	Context.CustomData.HitWindowOpen = false
-	Context.CustomData.HasHit = false
-	Context.CustomData.CanFeint = Context.Metadata.Feintable
-
 	Context.Entity.States:SetState("Attacking", true)
-
-	local ActionCooldown = Context.Metadata.ActionCooldown or 0
-	if ActionCooldown > 0 then
-		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown)
-	end
 end
 
 function ActionTemplate.OnExecute(Context: ActionContext)
-	local Player = Context.Entity.Player
-	local Character = Context.Entity.Character
-
 	local AnimationId = Context.Metadata.AnimationId
-
 	if AnimationId then
-		if Player then
-			Packets.PlayAnimation:FireClient(Player, AnimationId)
-		elseif Character then
-			EntityAnimator.Play(Character, AnimationId)
-		end
+		CombatAnimator.Play(Context.Entity, AnimationId)
 	end
 
 	Ensemble.Events.Publish(CombatEvents.AttackStarted, {
@@ -145,43 +116,23 @@ function ActionTemplate.OnExecute(Context: ActionContext)
 		Context = Context,
 	})
 
-	task.wait(1.0)
+	task.wait(1)
 end
 
-function ActionTemplate.OnHit(Context: ActionContext, Target: Entity, HitPosition: Vector3?, _HitIndex: number?)
-	if not Context.CustomData.HitWindowOpen or Context.CustomData.HasHit then
-		return
-	end
-
-	Context.CustomData.HasHit = true
-
-	local Damage = Context.Metadata.Damage or 10
-
-	Ensemble.Events.Publish(CombatEvents.AttackHit, {
-		Entity = Context.Entity,
-		Target = Target,
-		Damage = Damage,
-		HitPosition = HitPosition,
-		Context = Context,
-	})
+function ActionTemplate.OnHit(_Context: ActionContext, _Target: Entity, _HitPosition: Vector3?, _HitIndex: number?)
 end
 
 function ActionTemplate.OnComplete(Context: ActionContext)
-	Ensemble.Events.Publish(CombatEvents.ActionCompleted, {
-		Entity = Context.Entity,
-		ActionName = "ActionTemplate",
-		Context = Context,
-	})
+	local CooldownSeconds = Context.Metadata.ActionCooldown or 0
+	if CooldownSeconds > 0 then
+		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, CooldownSeconds)
+	end
 end
 
 function ActionTemplate.OnInterrupt(Context: ActionContext)
-	if Context.InterruptReason == "Feint" then
-		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
-
-		local FeintEndlag = Context.Metadata.FeintEndlag or 0
-		if FeintEndlag > 0 then
-			task.wait(FeintEndlag)
-		end
+	local AnimationId = Context.Metadata.AnimationId
+	if AnimationId then
+		CombatAnimator.Stop(Context.Entity, AnimationId, 0.15)
 	end
 end
 

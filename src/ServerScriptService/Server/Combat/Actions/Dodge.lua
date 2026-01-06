@@ -11,13 +11,11 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionExecutor = require(script.Parent.Parent.Core.ActionExecutor)
 local AnimationTimingCache = require(script.Parent.Parent.Utility.AnimationTimingCache)
 local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
---local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
-local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+local CombatAnimator = require(script.Parent.Parent.Utility.CombatAnimator)
 
 local StateTypes = require(Shared.Config.Enums.StateTypes)
 local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 local ActionValidator = require(Shared.Utility.ActionValidator)
-local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
 
 type Entity = CombatTypes.Entity
@@ -51,15 +49,6 @@ local COMBO_RESET_TIME = PhysicsBalance.Dash.ComboResetTime
 local EXHAUSTED_DURATION = PhysicsBalance.Dash.ExhaustedDuration
 
 local EntityDashStates: { [Entity]: DashComboState } = {}
-
-Dodge.DefaultMetadata = {
-	ActionName = "Dodge",
-	ActionType = "Movement",
-	StaminaCost = DEFAULT_STAMINA_COST,
-	IFramesDuration = DEFAULT_IFRAMES_DURATION,
-	Duration = DEFAULT_DURATION,
-	AnimationId = DEFAULT_ANIMATION,
-}
 
 local DIRECTION_TO_ANIMATION: { [string]: string } = {
 	Forward = "DashForward",
@@ -110,24 +99,7 @@ local function GetDodgeDuration(AnimationKey: string?): number
 	return DEFAULT_DURATION
 end
 
-local function StopDodgeAnimation(Context: ActionContext, FadeTime: number?)
-	local AnimationId = Context.Metadata.AnimationId
-	if not AnimationId then
-		return
-	end
-
-	local Player = Context.Entity.Player
-	local Character = Context.Entity.Character
-	local ActualFadeTime = FadeTime or 0.1
-
-	if Player then
-		Packets.StopAnimation:FireClient(Player, AnimationId, ActualFadeTime)
-	elseif Character then
-		EntityAnimator.Stop(Character, AnimationId, ActualFadeTime)
-	end
-end
-
-local function ApplyDashExhaustion(Context, Entity: Entity)
+local function ApplyDashExhaustion(Context: ActionContext, Entity: Entity)
 	Entity.States:SetState(StateTypes.DASH_EXHAUSTED, true)
 
 	local Multiplier = PhysicsBalance.Dash.MovementSpeedMultiplier
@@ -157,7 +129,7 @@ function Dodge.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 		return nil
 	end
 
-	local Metadata: ActionMetadata = {
+	return {
 		ActionName = "Dodge",
 		ActionType = "Movement",
 		StaminaCost = DEFAULT_STAMINA_COST,
@@ -166,8 +138,6 @@ function Dodge.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 		AnimationId = AnimationId,
 		Direction = Direction,
 	}
-
-	return Metadata
 end
 
 function Dodge.CanExecute(Context: ActionContext): (boolean, string?)
@@ -249,13 +219,9 @@ function Dodge.OnExecute(Context: ActionContext)
 
 	local Blocking = States:GetState(StateTypes.BLOCKING)
 	if not Blocking then
-		--local InputTimestamp = Context.InputData and Context.InputData.InputTimestamp
-		--local Compensation = LatencyCompensation.GetCompensation(InputTimestamp)
-		--local AdjustedIFrames = IFramesDuration + Compensation
-
 		Context.Entity.States:SetState(StateTypes.INVULNERABLE, true)
 
-		ActionExecutor.ScheduleThread(Context, IFramesDuration, function() -- AdjustedIFrames
+		ActionExecutor.ScheduleThread(Context, IFramesDuration, function()
 			Context.Entity.States:SetState(StateTypes.INVULNERABLE, false)
 
 			Ensemble.Events.Publish(CombatEvents.DodgeIFramesEnded, {
@@ -284,13 +250,17 @@ function Dodge.OnComplete(Context: ActionContext)
 end
 
 function Dodge.OnInterrupt(Context: ActionContext)
-	StopDodgeAnimation(Context, 0.1)
+	local AnimationId = Context.Metadata.AnimationId :: string
+	CombatAnimator.Stop(Context.Entity, AnimationId, 0.1)
 end
 
 function Dodge.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState(StateTypes.DODGING, false)
 	Context.Entity.States:SetState(StateTypes.INVULNERABLE, false)
-	StopDodgeAnimation(Context, 0.15)
+
+	local AnimationId = Context.Metadata.AnimationId :: string
+
+	CombatAnimator.Stop(Context.Entity, AnimationId, 0.15)
 end
 
 function Dodge.CleanupEntity(Entity: Entity)
