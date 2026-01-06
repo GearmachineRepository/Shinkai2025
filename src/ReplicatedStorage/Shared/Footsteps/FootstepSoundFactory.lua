@@ -33,6 +33,7 @@ function FootstepSoundFactory.CreateTemplateSound(
 	SoundInstance.Name = Name
 	SoundInstance.SoundId = SoundId
 	SoundInstance.Volume = FootstepConstants.TEMPLATE_VOLUME
+	SoundInstance.RollOffMode = Enum.RollOffMode.LinearSquare
 	SoundInstance.RollOffMinDistance = FootstepConstants.FOOTSTEP_ROLLOFF_MIN_DISTANCE
 	SoundInstance.RollOffMaxDistance = FootstepConstants.FOOTSTEP_ROLLOFF_MAX_DISTANCE
 	SoundInstance.SoundGroup = SoundGroupInstance

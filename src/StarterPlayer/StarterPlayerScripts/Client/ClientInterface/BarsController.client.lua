@@ -230,6 +230,14 @@ local function SetupCharacter(Character: Model)
 		BarInfo.Quantity.Text = tostring(math.floor(BarInfo.CurrentValue * 100)) .. "%"
 	end
 
+	Character:GetAttributeChangedSignal("InCombat"):Connect(function()
+		local Value = Character:GetAttribute("InCombat")
+		Player.PlayerGui.Hud.Frames.InCombat.Visible = Value or false
+	end)
+
+	local Value = Character:GetAttribute("InCombat")
+	Player.PlayerGui.Hud.Frames.InCombat.Visible = Value or false
+
 	local UpdateConnection = UpdateService.Register(function(DeltaTime: number)
 		local ActiveCharacter = CurrentCharacter
 		if ActiveCharacter == nil then

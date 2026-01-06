@@ -46,7 +46,7 @@ local DEFAULT_ANIMATION = "DashBack"
 
 local CONSECUTIVE_DASHES = PhysicsBalance.Dash.ConsecutiveDashes
 local CONSECUTIVE_COOLDOWN = PhysicsBalance.Dash.ConsecutiveCooldown
-local EXHAUSTED_COOLDOWN = PhysicsBalance.Dash.ExhaustedCooldown
+local COOLDOWN_SECONDS = PhysicsBalance.Dash.CooldownSeconds
 local COMBO_RESET_TIME = PhysicsBalance.Dash.ComboResetTime
 local EXHAUSTED_DURATION = PhysicsBalance.Dash.ExhaustedDuration
 
@@ -131,12 +131,12 @@ local function ApplyDashExhaustion(Context, Entity: Entity)
 	Entity.States:SetState(StateTypes.DASH_EXHAUSTED, true)
 
 	local Multiplier = PhysicsBalance.Dash.MovementSpeedMultiplier
-
 	MovementModifiers.SetModifier(Context.Entity, StateTypes.DASH_EXHAUSTED, Multiplier)
 
 	task.delay(EXHAUSTED_DURATION, function()
 		if Entity and Entity.States then
 			Entity.States:SetState(StateTypes.DASH_EXHAUSTED, false)
+			MovementModifiers.ClearModifier(Context.Entity, StateTypes.DASH_EXHAUSTED)
 		end
 	end)
 end
@@ -216,7 +216,7 @@ function Dodge.OnStart(Context: ActionContext)
 	State.LastDashTime = workspace:GetServerTimeNow()
 	State.LastDirection = Direction
 
-	ActionExecutor.StartCooldown(Context.Entity, CONSECUTIVE_COOLDOWN_ID, CONSECUTIVE_COOLDOWN)
+	ActionExecutor.StartCooldown(Context.Entity, CONSECUTIVE_COOLDOWN_ID .. tostring(State.DashCount), CONSECUTIVE_COOLDOWN)
 
 	local StaminaCost = Context.Metadata.StaminaCost or DEFAULT_STAMINA_COST
 	local StaminaComponent = Context.Entity:GetComponent("Stamina")
@@ -273,7 +273,7 @@ function Dodge.OnComplete(Context: ActionContext)
 
 	if IsLastDash then
 		ApplyDashExhaustion(Context, Context.Entity)
-		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, EXHAUSTED_COOLDOWN)
+		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, COOLDOWN_SECONDS)
 		ResetDashCombo(Context.Entity)
 	end
 
@@ -290,7 +290,6 @@ end
 function Dodge.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState(StateTypes.DODGING, false)
 	Context.Entity.States:SetState(StateTypes.INVULNERABLE, false)
-	MovementModifiers.ClearModifier(Context.Entity, StateTypes.DASH_EXHAUSTED)
 	StopDodgeAnimation(Context, 0.15)
 end
 

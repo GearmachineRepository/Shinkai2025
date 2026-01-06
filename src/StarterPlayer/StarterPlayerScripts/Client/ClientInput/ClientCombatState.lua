@@ -37,7 +37,7 @@ local LocalCooldown = {
 
 local CONSECUTIVE_DASHES = PhysicsBalance.Dash.ConsecutiveDashes
 local CONSECUTIVE_COOLDOWN = PhysicsBalance.Dash.ConsecutiveCooldown
-local EXHAUSTED_COOLDOWN = PhysicsBalance.Dash.ExhaustedCooldown
+local COOLDOWN_SECONDS = PhysicsBalance.Dash.CooldownSeconds
 local COMBO_RESET_TIME = PhysicsBalance.Dash.ComboResetTime
 
 local function CheckComboExpiry()
@@ -50,6 +50,11 @@ local function CheckComboExpiry()
 		LocalCooldown.DashCount = 0
 		LocalCooldown.LastDirection = nil
 	end
+end
+
+function ClientCombatState.GetDashCount(): number
+	CheckComboExpiry()
+	return LocalCooldown.DashCount
 end
 
 function ClientCombatState.CanDodgeDirection(Direction: string): boolean
@@ -288,7 +293,7 @@ function ClientCombatState.StartDodgeCooldown(Direction: string?)
 	local IsLastDash = LocalCooldown.DashCount >= CONSECUTIVE_DASHES
 
 	if IsLastDash then
-		LocalCooldown.DodgeEndTime = CurrentTime + EXHAUSTED_COOLDOWN
+		LocalCooldown.DodgeEndTime = CurrentTime + COOLDOWN_SECONDS
 		LocalCooldown.DashCount = 0
 		LocalCooldown.LastDirection = nil
 	else

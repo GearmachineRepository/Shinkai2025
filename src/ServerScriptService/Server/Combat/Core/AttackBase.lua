@@ -15,8 +15,8 @@ local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local Block = require(script.Parent.Parent.Actions.Block)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
-local HitValidation = require(script.Parent.Parent.Utility.HitValidation)
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
+--local HitValidation = require(script.Parent.Parent.Utility.HitValidation)
 
 local StateTypes = require(Shared.Config.Enums.StateTypes)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
@@ -32,7 +32,7 @@ local AttackBase = {}
 
 AttackBase.Debug = false
 
-local DefenderGraceWindow = 0.05
+--local DefenderGraceWindow = 0.05
 
 local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacter: Model): Vector3?
 	local TargetPivot = TargetCharacter:GetPivot()
@@ -154,16 +154,16 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 				HitPosition = GetFallbackHitPosition(RootPart, TargetCharacter)
 			end
 
-			local ValidationResult = HitValidation.ValidateHit(Context :: any, TargetEntity, HitPosition)
-			if not ValidationResult.IsValid then
-				continue
-			end
+			-- local ValidationResult = HitValidation.ValidateHit(Context :: any, TargetEntity, HitPosition)
+			-- if not ValidationResult.IsValid then
+			-- 	continue
+			-- end
 
 			if not CheckLineOfSight(RootPart, TargetCharacter) then
 				continue
 			end
 
-			local FinalHitPosition = ValidationResult.RewindedPosition or HitPosition
+			local FinalHitPosition = HitPosition --ValidationResult.RewindedPosition or HitPosition
 
 			Context.CustomData.HasHit = true
 			Context.CustomData.LastHitTarget = TargetEntity
@@ -297,15 +297,15 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 		return true
 	end
 
-	if HitValidation.ShouldFavorDefender(Target, DefenderGraceWindow) then
-		Ensemble.Events.Publish(CombatEvents.DamageDodged, {
-			Entity = Target,
-			Attacker = AttackerContext.Entity,
-			Damage = Damage,
-			HitPosition = HitPosition,
-		})
-		return true
-	end
+	-- if HitValidation.ShouldFavorDefender(Target, DefenderGraceWindow) then
+	-- 	Ensemble.Events.Publish(CombatEvents.DamageDodged, {
+	-- 		Entity = Target,
+	-- 		Attacker = AttackerContext.Entity,
+	-- 		Damage = Damage,
+	-- 		HitPosition = HitPosition,
+	-- 	})
+	-- 	return true
+	-- end
 
 	if TargetIsDodging then
 		ActionExecutor.Interrupt(Target, "Hit")

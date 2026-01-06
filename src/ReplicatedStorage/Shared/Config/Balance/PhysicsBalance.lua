@@ -2,19 +2,19 @@
 
 local PhysicsBalance = {
 	Dash = {
-		ConsecutiveDashes = 3,
 		StaminaCost = 8,
-		CooldownSeconds = 2,
+		CooldownSeconds = 4.0,
 		IFrameWindow = 0,
 		Duration = 0.25,
 		RecoveryPercent = 0.3,
-		Speed = 73,
+		Speed = 75,
 		MaxForce = 50000,
 
-		ConsecutiveCooldown = 0.35,
-		ExhaustedCooldown = 2.5,
+		ConsecutiveDashes = 3,
+		ConsecutiveDiminish = 0.20,
+		ConsecutiveCooldown = 0.30,
 		ComboResetTime = 2.0,
-		ExhaustedDuration = 0.25,
+		ExhaustedDuration = 0.5,
 		MovementSpeedMultiplier = 0.65,
 	},
 

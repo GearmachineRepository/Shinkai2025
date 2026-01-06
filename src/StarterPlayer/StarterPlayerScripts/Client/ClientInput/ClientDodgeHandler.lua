@@ -30,8 +30,10 @@ local LastDodgeDirection: string? = nil
 
 local DODGE_SPEED = PhysicsBalance.Dash.Speed
 local DODGE_DURATION = PhysicsBalance.Dash.Duration
-
+local DODGE_SPEED_DIMINISH = PhysicsBalance.Dash.ConsecutiveDiminish
 local DODGE_MAX_FORCE = Vector3.new(PhysicsBalance.Dash.MaxForce, 0, PhysicsBalance.Dash.MaxForce)
+
+local CurrentDodgeSpeed: number = DODGE_SPEED
 
 local DIRECTION_TO_ANIMATION: { [string]: string } = {
 	Forward = "DashForward",
@@ -150,7 +152,7 @@ local function CreateBodyVelocity(InitialDirection: Vector3): BodyVelocity?
 	local BodyVelocityInstance = Instance.new("BodyVelocity")
 	BodyVelocityInstance.Name = "ClientDodgeVelocity"
 	BodyVelocityInstance.MaxForce = DODGE_MAX_FORCE
-	BodyVelocityInstance.Velocity = InitialDirection * DODGE_SPEED
+	BodyVelocityInstance.Velocity = InitialDirection * CurrentDodgeSpeed
 	BodyVelocityInstance.Parent = RootPart
 
 	return BodyVelocityInstance
@@ -174,12 +176,12 @@ local function UpdateDodgeVelocity()
 	local FlatMove = GetCharacterRelativeMoveDirection()
 
 	if FlatMove.Magnitude < 0.1 then
-		BodyVelocityInstance.Velocity = CurrentDodge.LastSteerDirection * DODGE_SPEED
+		BodyVelocityInstance.Velocity = CurrentDodge.LastSteerDirection * CurrentDodgeSpeed
 		return
 	end
 
 	CurrentDodge.LastSteerDirection = FlatMove
-	BodyVelocityInstance.Velocity = FlatMove * DODGE_SPEED
+	BodyVelocityInstance.Velocity = FlatMove * CurrentDodgeSpeed
 end
 
 local function StartDodgeLoop()
@@ -259,6 +261,11 @@ function ClientDodgeHandler.StartDodge(Steerable: boolean?): boolean
 	LastDodgeDirection = DirectionName
 
 	local AnimationKey = GetAnimationKeyForDirection(DirectionName)
+
+	local DashCount = ClientCombatState.GetDashCount()
+	local SpeedMultiplier = 1.0 - (DashCount * DODGE_SPEED_DIMINISH)
+	local DiminishedSpeed = DODGE_SPEED * SpeedMultiplier
+	CurrentDodgeSpeed = DiminishedSpeed
 
 	local BodyVelocityInstance = CreateBodyVelocity(CardinalDirection)
 	if not BodyVelocityInstance then
