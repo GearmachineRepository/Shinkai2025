@@ -6,7 +6,7 @@ local Players = game:GetService("Players")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
-local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local StyleConfig = require(Shared.Config.Styles.StyleConfig)
 local PhysicsBalance = require(Shared.Config.Balance.PhysicsBalance)
 
 local Player = Players.LocalPlayer
@@ -86,29 +86,29 @@ end
 
 function ClientCombatState.SetState(StateName: string, Value: boolean)
 	if StateName == "Attacking" then
-        LocalState.IsAttacking = Value
-    end
+		LocalState.IsAttacking = Value
+	end
 	if StateName == "Blocking" then
-        LocalState.IsBlocking = Value
-    end
+		LocalState.IsBlocking = Value
+	end
 	if StateName == "Dodging" then
-        LocalState.IsDodging = Value
-    end
+		LocalState.IsDodging = Value
+	end
 	if StateName == "Stunned" then
-        LocalState.IsStunned = Value
-    end
+		LocalState.IsStunned = Value
+	end
 	if StateName == "GuardBroken" then
-        LocalState.IsGuardbroken = Value
-    end
+		LocalState.IsGuardbroken = Value
+	end
 	if StateName == "Exhausted" then
-        LocalState.IsExhausted = Value
-    end
+		LocalState.IsExhausted = Value
+	end
 	if StateName == "Downed" then
-        LocalState.IsDowned = Value
-    end
+		LocalState.IsDowned = Value
+	end
 	if StateName == "Ragdolled" then
-        LocalState.IsRagdolled = Value
-    end
+		LocalState.IsRagdolled = Value
+	end
 end
 
 function ClientCombatState.BuildStateTable(): { [string]: boolean }
@@ -181,7 +181,7 @@ local function GetEquippedItemId(Character: Model): string?
 	return Character:GetAttribute("EquippedItemId") :: string?
 end
 
-local function GetAnimationSetName(Character: Model): string?
+local function GetStyleName(Character: Model): string?
 	local ItemId = GetEquippedItemId(Character)
 	if not ItemId then
 		return nil
@@ -192,7 +192,7 @@ local function GetAnimationSetName(Character: Model): string?
 		return nil
 	end
 
-	return ItemData.AnimationSet
+	return ItemData.Style
 end
 
 local function GetStaminaCostMultiplier(Character: Model): number
@@ -206,9 +206,9 @@ local function GetStaminaCostMultiplier(Character: Model): number
 		return 1
 	end
 
-	local StatModifiers = Item["StatModifiers"]
-	if StatModifiers and StatModifiers.StaminaCostMultiplier then
-		return StatModifiers.StaminaCostMultiplier
+	local Modifiers = Item.Modifiers
+	if Modifiers and Modifiers.StaminaCostMultiplier then
+		return Modifiers.StaminaCostMultiplier
 	end
 
 	return 1
@@ -225,13 +225,13 @@ function ClientCombatState.GetStaminaCost(ResolvedAction: string): number?
 	end
 
 	if ResolvedAction == "M1" or ResolvedAction == "LightAttack" then
-		local AnimationSetName = GetAnimationSetName(Character)
-		if not AnimationSetName then
+		local StyleName = GetStyleName(Character)
+		if not StyleName then
 			return nil
 		end
 
 		local ComboCount = GetComboCount(Character)
-		local AttackData = AnimationSets.GetAttack(AnimationSetName, "M1", ComboCount)
+		local AttackData = StyleConfig.GetAttack(StyleName, "M1", ComboCount)
 		if not AttackData then
 			return nil
 		end
@@ -240,12 +240,12 @@ function ClientCombatState.GetStaminaCost(ResolvedAction: string): number?
 	end
 
 	if ResolvedAction == "M2" or ResolvedAction == "HeavyAttack" then
-		local AnimationSetName = GetAnimationSetName(Character)
-		if not AnimationSetName then
+		local StyleName = GetStyleName(Character)
+		if not StyleName then
 			return nil
 		end
 
-		local AttackData = AnimationSets.GetAttack(AnimationSetName, "M2", 1)
+		local AttackData = StyleConfig.GetAttack(StyleName, "M2", 1)
 		if not AttackData then
 			return nil
 		end

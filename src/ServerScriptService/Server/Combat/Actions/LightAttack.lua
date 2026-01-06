@@ -14,7 +14,7 @@ local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
 local Packets = require(Shared.Networking.Packets)
-local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local StyleConfig = require(Shared.Config.Styles.StyleConfig)
 local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local ActionValidator = require(Shared.Utility.ActionValidator)
@@ -70,48 +70,47 @@ function LightAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		return nil
 	end
 
-	local AnimationSetName = ItemData.AnimationSet
-	if not AnimationSetName then
+	local StyleName = ItemData.Style
+	if not StyleName then
 		return nil
 	end
 
 	local ComboIndex = ActionExecutor.GetComboCount(Entity, "LightAttack")
-	local AttackData = AnimationSets.GetAttack(AnimationSetName, "M1", ComboIndex)
-	local SetMetadata = AnimationSets.GetMetadata(AnimationSetName)
+	local AttackData = StyleConfig.GetAttack(StyleName, "M1", ComboIndex)
+	local Timing = StyleConfig.GetTiming(StyleName)
 
 	if not AttackData then
 		return nil
 	end
 
-	local StatModifiers = ItemData.StatModifiers
+	local Modifiers = ItemData.Modifiers
 
 	local Metadata: ActionMetadata = {
 		ActionName = "LightAttack",
 		ActionType = "Attack",
-		AnimationSet = AnimationSetName,
+		AnimationSet = StyleName,
 		AnimationId = AttackData.AnimationId,
 		ComboIndex = ComboIndex,
 
-		Damage = ApplyStatModifiers(AttackData.Damage, StatModifiers and StatModifiers.DamageMultiplier),
-		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, StatModifiers and StatModifiers.StaminaCostMultiplier),
+		Damage = ApplyStatModifiers(AttackData.Damage, Modifiers and Modifiers.DamageMultiplier),
+		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, Modifiers and Modifiers.StaminaCostMultiplier),
 		HitStun = AttackData.HitStun,
-		--PostureDamage = AttackData.PostureDamage,
 
 		HitboxSize = AttackData.Hitbox and AttackData.Hitbox.Size,
 		HitboxOffset = AttackData.Hitbox and AttackData.Hitbox.Offset,
 
 		Knockback = AttackData.Knockback,
 
-		Feintable = SetMetadata.Feintable,
-		FeintEndlag = SetMetadata.FeintEndlag,
-		FeintCooldown = SetMetadata.FeintCooldown,
-		ComboEndlag = SetMetadata.ComboEndlag,
-		ComboResetTime = SetMetadata.ComboResetTime,
-		StaminaCostHitReduction = SetMetadata.StaminaCostHitReduction,
+		Feintable = Timing.Feintable,
+		FeintEndlag = Timing.FeintEndlag,
+		FeintCooldown = Timing.FeintCooldown,
+		ComboEndlag = Timing.ComboEndlag,
+		ComboResetTime = Timing.ComboResetTime,
+		StaminaCostHitReduction = Timing.StaminaCostHitReduction,
 
-		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart,
-		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd,
-		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length,
+		FallbackHitStart = Timing.FallbackHitStart,
+		FallbackHitEnd = Timing.FallbackHitEnd,
+		FallbackLength = Timing.FallbackLength,
 
 		Flag = AttackData.Flag,
 		Flags = AttackData.Flags,
@@ -190,12 +189,12 @@ end
 
 function LightAttack.OnComplete(Context: ActionContext)
 	local Metadata = Context.Metadata
-	local AnimationSetName = Metadata.AnimationSet
-	if not AnimationSetName then
+	local StyleName = Metadata.AnimationSet
+	if not StyleName then
 		return
 	end
 
-	local ComboLength = AnimationSets.GetComboLength(AnimationSetName, "M1")
+	local ComboLength = StyleConfig.GetComboLength(StyleName, "M1")
 	local ComboIndex = Metadata.ComboIndex or 1
 
 	ActionExecutor.AdvanceCombo(Context.Entity, "LightAttack", ComboIndex, ComboLength)
@@ -208,7 +207,7 @@ function LightAttack.OnComplete(Context: ActionContext)
 
 		Ensemble.Events.Publish(CombatEvents.ComboFinished, {
 			Entity = Context.Entity,
-			ActionName = "HeavyAttack",
+			ActionName = "LightAttack",
 			Context = Context,
 		})
 	end

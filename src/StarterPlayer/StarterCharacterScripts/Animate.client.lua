@@ -24,7 +24,8 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Configurations = Shared:WaitForChild("Config")
 
 local CharacterBalance = require(Configurations.Balance.CharacterBalance)
-local AnimationSetsModule = require(Configurations.Data.AnimationSets)
+local StyleConfigModule = require(Configurations.Styles.StyleConfig)
+local ItemDatabase = require(Configurations.Data.ItemDatabase)
 local AnimationDatabase = require(Configurations.Data.AnimationDatabase)
 
 -- Animator
@@ -467,12 +468,18 @@ function PlayAnimation(AnimName: string, TransitionTime: number, TargetHumanoid:
 	CurrentlyPlayingEmote = false
 end
 
-local function GetEquippedAnimationSetName(): string?
+local function GetEquippedStyleName(): string?
 	local EquippedItemId = Character:GetAttribute("EquippedItemId")
 	if typeof(EquippedItemId) ~= "string" or EquippedItemId == "" then
 		return nil
 	end
-	return EquippedItemId
+
+	local ItemData = ItemDatabase.GetItem(EquippedItemId)
+	if not ItemData or not ItemData.Style then
+		return nil
+	end
+
+	return ItemData.Style
 end
 
 local function ApplyLocomotionAnimations()
@@ -480,20 +487,17 @@ local function ApplyLocomotionAnimations()
 	local WalkFileList = DEFAULT_WALK_FILE_LIST
 
 	if not IsBlocking() then
-		local SetName = GetEquippedAnimationSetName()
-		if SetName then
-			local AnimationSet = AnimationSetsModule.Get(SetName)
-			if AnimationSet then
-				local IdleKeyOrId = AnimationSet.Idle and AnimationSet.Idle.AnimationId
-				local WalkKeyOrId = AnimationSet.Walk and AnimationSet.Walk.AnimationId
+		local StyleName = GetEquippedStyleName()
+		if StyleName then
+			local IdleKeyOrId = StyleConfigModule.GetAnimation(StyleName, "Idle")
+			local WalkKeyOrId = StyleConfigModule.GetAnimation(StyleName, "Walk")
 
-				local ResolvedIdleId = ResolveAnimationId(IdleKeyOrId)
-				local ResolvedWalkId = ResolveAnimationId(WalkKeyOrId)
+			local ResolvedIdleId = ResolveAnimationId(IdleKeyOrId)
+			local ResolvedWalkId = ResolveAnimationId(WalkKeyOrId)
 
-				if ResolvedIdleId and ResolvedWalkId then
-					IdleFileList = BuildSingleAnimationFileList(ResolvedIdleId)
-					WalkFileList = BuildSingleAnimationFileList(ResolvedWalkId)
-				end
+			if ResolvedIdleId and ResolvedWalkId then
+				IdleFileList = BuildSingleAnimationFileList(ResolvedIdleId)
+				WalkFileList = BuildSingleAnimationFileList(ResolvedWalkId)
 			end
 		end
 	end

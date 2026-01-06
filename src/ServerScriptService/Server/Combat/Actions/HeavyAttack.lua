@@ -14,7 +14,7 @@ local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
 local Packets = require(Shared.Networking.Packets)
-local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local StyleConfig = require(Shared.Config.Styles.StyleConfig)
 local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local ActionValidator = require(Shared.Utility.ActionValidator)
@@ -30,6 +30,11 @@ HeavyAttack.ActionName = "HeavyAttack"
 HeavyAttack.ActionType = "Attack"
 
 local COOLDOWN_ID = "HeavyAttack"
+
+local PRESERVE_ANIMATION_INTERRUPTS = {
+	PerfectGuard = true,
+	Counter = true,
+}
 
 local function GetEquippedItemId(Entity: Entity, InputData: { [string]: any }?): string?
 	if InputData and InputData.ItemId then
@@ -65,45 +70,44 @@ function HeavyAttack.BuildMetadata(Entity: Entity, InputData: { [string]: any }?
 		return nil
 	end
 
-	local AnimationSetName = ItemData.AnimationSet
-	if not AnimationSetName then
+	local StyleName = ItemData.Style
+	if not StyleName then
 		return nil
 	end
 
-	local AttackData = AnimationSets.GetAttack(AnimationSetName, "M2", 1)
-	local SetMetadata = AnimationSets.GetMetadata(AnimationSetName)
+	local AttackData = StyleConfig.GetAttack(StyleName, "M2", 1)
+	local Timing = StyleConfig.GetTiming(StyleName)
 
 	if not AttackData then
 		return nil
 	end
 
-	local StatModifiers = ItemData.StatModifiers
+	local Modifiers = ItemData.Modifiers
 
 	local Metadata: ActionMetadata = {
 		ActionName = "HeavyAttack",
 		ActionType = "Attack",
-		AnimationSet = AnimationSetName,
+		AnimationSet = StyleName,
 		AnimationId = AttackData.AnimationId,
 
-		Damage = ApplyStatModifiers(AttackData.Damage, StatModifiers and StatModifiers.DamageMultiplier),
-		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, StatModifiers and StatModifiers.StaminaCostMultiplier),
+		Damage = ApplyStatModifiers(AttackData.Damage, Modifiers and Modifiers.DamageMultiplier),
+		StaminaCost = ApplyStatModifiers(AttackData.StaminaCost, Modifiers and Modifiers.StaminaCostMultiplier),
 		HitStun = AttackData.HitStun,
-		--PostureDamage = AttackData.PostureDamage,
 
 		HitboxSize = AttackData.Hitbox and AttackData.Hitbox.Size,
 		HitboxOffset = AttackData.Hitbox and AttackData.Hitbox.Offset,
 
-		Feintable = SetMetadata.Feintable,
-		FeintEndlag = SetMetadata.FeintEndlag,
-		FeintCooldown = SetMetadata.FeintCooldown,
-		ActionCooldown = SetMetadata.HeavyAttackCooldown,
-		StaminaCostHitReduction = SetMetadata.StaminaCostHitReduction,
+		Feintable = Timing.Feintable,
+		FeintEndlag = Timing.FeintEndlag,
+		FeintCooldown = Timing.FeintCooldown,
+		ActionCooldown = Timing.HeavyAttackCooldown,
+		StaminaCostHitReduction = Timing.StaminaCostHitReduction,
 
 		Knockback = AttackData.Knockback,
 
-		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart,
-		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd,
-		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length,
+		FallbackHitStart = Timing.FallbackHitStart,
+		FallbackHitEnd = Timing.FallbackHitEnd,
+		FallbackLength = Timing.FallbackLength,
 
 		Flag = AttackData.Flag,
 		Flags = AttackData.Flags,
@@ -128,8 +132,8 @@ function HeavyAttack.CanExecute(Context: ActionContext): (boolean, string?)
 		return false, "NoStamina"
 	end
 
-	local ActionCooldown = Context.Metadata.ActionCooldown or 0
-	if ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown) then
+	local CooldownSeconds = Context.Metadata.ActionCooldown or 0
+	if CooldownSeconds > 0 and ActionExecutor.IsOnCooldown(Context.Entity, COOLDOWN_ID, CooldownSeconds) then
 		return false, "OnCooldown"
 	end
 
@@ -143,11 +147,6 @@ function HeavyAttack.OnStart(Context: ActionContext)
 	Context.CustomData.CanFeint = Context.Metadata.Feintable
 
 	Context.Entity.States:SetState("Attacking", true)
-
-	local ActionCooldown = Context.Metadata.ActionCooldown or 0
-	if ActionCooldown > 0 then
-		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, ActionCooldown)
-	end
 
 	local Multiplier = Context.Metadata.MovementSpeedMultiplier
 		or CombatBalance.Attacking.MovementSpeedMultiplier
@@ -184,21 +183,35 @@ function HeavyAttack.OnHit(Context: ActionContext, Target: Entity, HitPosition: 
 	AttackBase.ProcessHit(Context, Target, HitPosition)
 end
 
-function HeavyAttack.OnInterrupt(Context: ActionContext)
-	if Context.InterruptReason == "Feint" then
-		local AnimationId = Context.Metadata.AnimationId
-		if not AnimationId then return  end
+function HeavyAttack.OnComplete(Context: ActionContext)
+	local CooldownSeconds = Context.Metadata.ActionCooldown or 0
+	if CooldownSeconds > 0 then
+		ActionExecutor.StartCooldown(Context.Entity, COOLDOWN_ID, CooldownSeconds)
+	end
 
+	Ensemble.Events.Publish(CombatEvents.AttackCompleted, {
+		Entity = Context.Entity,
+		ActionName = "HeavyAttack",
+		Context = Context,
+	})
+end
+
+function HeavyAttack.OnInterrupt(Context: ActionContext)
+	local AnimationId = Context.Metadata.AnimationId
+	local ShouldStopAnimation = not PRESERVE_ANIMATION_INTERRUPTS[Context.InterruptReason]
+	if not AnimationId then return end
+
+	if ShouldStopAnimation then
 		local Player = Context.Entity.Player
 		local Character = Context.Entity.Character
 		if Player then
-			Packets.StopAnimation:FireClient(Player, AnimationId, 0.25)
+			Packets.StopAnimation:FireClient(Player, AnimationId, 0.15)
 		elseif Character then
-			EntityAnimator.Stop(Character, AnimationId, 0.25)
+			EntityAnimator.Stop(Character, AnimationId, 0.15)
 		end
+	end
 
-		ActionExecutor.ClearCooldown(Context.Entity, COOLDOWN_ID)
-
+	if Context.InterruptReason == "Feint" then
 		local FeintEndlag = Context.Metadata.FeintEndlag or 0
 		if FeintEndlag > 0 then
 			task.wait(FeintEndlag)

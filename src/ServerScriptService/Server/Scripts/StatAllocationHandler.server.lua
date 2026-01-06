@@ -21,7 +21,7 @@ local TRAINABLE_STATS = {
 	StatTypes.MAX_STAMINA,
 }
 
-local RATE_LIMIT_WINDOW = 0.5
+local RATE_LIMIT_WINDOW = 0.1
 local LastAllocationTimes: { [number]: number } = {}
 
 local function IsTrainableStat(StatName: string): boolean

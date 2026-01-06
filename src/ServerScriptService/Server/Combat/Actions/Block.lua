@@ -14,7 +14,7 @@ local AttackFlags = require(script.Parent.Parent.Utility.AttackFlags)
 local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
-local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local StyleConfig = require(Shared.Config.Styles.StyleConfig)
 local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local StateTypes = require(Shared.Config.Enums.StateTypes)
@@ -193,7 +193,7 @@ local function HandleBlockedHit(Context: ActionContext, Attacker: Entity, Incomi
 	Ensemble.Events.Publish("DamageIndicatorTriggered", {
 		Attacker = Attacker,
 		Target = Context.Entity,
-		DamageAmount = ReducedDamage,
+		DamageAmount = 0,
 		HitPosition = HitPosition or Context.Entity.Character:GetPivot().Position,
 		IndicatorType = "Blocked",
 	})
@@ -218,7 +218,7 @@ end
 
 function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): ActionMetadata?
 	local ItemId = InputData and InputData.ItemId
-	local AnimationSetName = "Fists"
+	local StyleName = "Fists"
 
 	if not ItemId then
 		local ToolComponent = Entity:GetComponent("Tool")
@@ -232,23 +232,20 @@ function Block.BuildMetadata(Entity: Entity, InputData: { [string]: any }?): Act
 
 	if ItemId then
 		local ItemData = ItemDatabase.GetItem(ItemId)
-		if ItemData and ItemData.AnimationSet then
-			AnimationSetName = ItemData.AnimationSet
+		if ItemData and ItemData.Style then
+			StyleName = ItemData.Style
 		end
 	end
 
-	local AnimationSet = AnimationSets.Get(AnimationSetName)
-	if not AnimationSet then
-		AnimationSet = AnimationSets.Get("Fists")
+	local AnimationId = StyleConfig.GetAnimation(StyleName, "Block")
+	if not AnimationId then
+		AnimationId = StyleConfig.GetAnimation("Fists", "Block")
 	end
-
-	local BlockData = AnimationSet and AnimationSet.Block
-	local AnimationId = BlockData and BlockData.AnimationId
 
 	local Metadata: ActionMetadata = {
 		ActionName = "Block",
 		ActionType = "Defensive",
-		AnimationSet = AnimationSetName,
+		AnimationSet = StyleName,
 		DamageReduction = CombatBalance.Blocking.DamageReduction,
 		StaminaDrainOnHit = CombatBalance.Blocking.StaminaDrainOnHit,
 		StaminaDrainScalar = CombatBalance.Blocking.StaminaDrainScalar,
@@ -309,13 +306,6 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 	end
 
 	if not IsBlockAngleValid(Context, Attacker) then
-		Ensemble.Events.Publish(CombatEvents.BlockMissed, {
-			Entity = Context.Entity,
-			Attacker = Attacker,
-			IncomingDamage = IncomingDamage,
-			Reason = "AttackFromBehind",
-			Context = Context,
-		})
 		return false
 	end
 
@@ -324,11 +314,8 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 		return true
 	end
 
-	local IsGuardBreak = AttackFlags.HasFlag(Flags, AttackFlags.GUARD_BREAK)
-
-	if IsGuardBreak then
-		HandleGuardBreakAttack(Context, Attacker, IncomingDamage)
-		return true
+	if Flags and AttackFlags.HasFlag(Flags, "GuardBreak") then
+		return HandleGuardBreakAttack(Context, Attacker, IncomingDamage)
 	end
 
 	HandleBlockedHit(Context, Attacker, IncomingDamage, HitPosition)
@@ -336,18 +323,17 @@ function Block.OnHit(Context: ActionContext, Attacker: Entity, IncomingDamage: n
 end
 
 function Block.OnInterrupt(Context: ActionContext)
-	Ensemble.Events.Publish(CombatEvents.BlockEnded, {
-		Entity = Context.Entity,
-		Reason = Context.InterruptReason,
-		Context = Context,
-	})
+	StopAnimation(Context, Context.Metadata.AnimationId, 0.1)
 end
 
 function Block.OnCleanup(Context: ActionContext)
 	Context.Entity.States:SetState("Blocking", false)
 	MovementModifiers.ClearModifier(Context.Entity, "Blocking")
-	StopAnimation(Context, Context.Metadata.AnimationId)
-	StopAnimation(Context, "BlockHit", 0.1)
+
+	Ensemble.Events.Publish(CombatEvents.BlockEnded, {
+		Entity = Context.Entity,
+		Context = Context,
+	})
 end
 
 return Block

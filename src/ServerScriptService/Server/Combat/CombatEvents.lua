@@ -11,6 +11,7 @@ local CombatEvents = {
 	AttackBlocked = "AttackBlocked",
 	AttackParried = "AttackParried",
 	AttackMissed = "AttackMissed",
+	AttackCompleted = "AttackCompleted",
 
 	HitWindowOpened = "HitWindowOpened",
 	HitWindowClosed = "HitWindowClosed",

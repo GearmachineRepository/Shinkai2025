@@ -5,6 +5,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Packets = require(Shared.Networking.Packets)
+local Formulas = require(Shared.Utility.Formulas)
 
 local INDICATOR_LIFETIME = 0.25
 local RISE_DISTANCE = 2.5
@@ -64,7 +65,7 @@ local function CreateIndicator(_TargetCharacter: Model, DamageAmount: number, Wo
 	local TextLabel = Instance.new("TextLabel")
 	TextLabel.Size = UDim2.fromScale(1, 1)
 	TextLabel.BackgroundTransparency = 1
-	TextLabel.Text = tostring(math.floor(DamageAmount))
+	TextLabel.Text = tostring(Formulas.Round(DamageAmount, 2))
 	TextLabel.TextColor3 = Style.TextColor
 	TextLabel.TextStrokeColor3 = Style.TextStrokeColor
 	TextLabel.TextStrokeTransparency = 0

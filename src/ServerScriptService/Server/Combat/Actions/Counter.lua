@@ -15,7 +15,7 @@ local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
 
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
-local AnimationSets = require(Shared.Config.Data.AnimationSets)
+local StyleConfig = require(Shared.Config.Styles.StyleConfig)
 local ItemDatabase = require(Shared.Config.Data.ItemDatabase)
 local Packets = require(Shared.Networking.Packets)
 local Ensemble = require(Server.Ensemble)
@@ -33,7 +33,7 @@ Counter.SpamCooldown = CombatBalance.Counter.SpamCooldownSeconds
 Counter.StaggerDuration = CombatBalance.Counter.StaggerDuration
 Counter.MaxAngle = CombatBalance.Counter.MaxAngle
 
-local DAMAGE_MULTIPLIER = 0.8
+local DAMAGE_MULTIPLIER = 1.0
 
 local function GetCounterData(Entity: Entity): { [string]: any }?
 	local ToolComponent = Entity:GetComponent("Tool")
@@ -46,31 +46,26 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		end
 	end
 
-	local AnimationSetName = "Fists"
+	local StyleName = "Fists"
 	if ItemId then
 		local ItemData = ItemDatabase.GetItem(ItemId)
-		if ItemData and ItemData.AnimationSet then
-			AnimationSetName = ItemData.AnimationSet
+		if ItemData and ItemData.Style then
+			StyleName = ItemData.Style
 		end
 	end
 
-	local AnimationSet = AnimationSets.Get(AnimationSetName) or AnimationSets.Get("Fists")
-	if not AnimationSet then
-		return nil
+	local ComboLength = StyleConfig.GetComboLength(StyleName, "M1")
+	local LastM1Data = StyleConfig.GetAttack(StyleName, "M1", ComboLength)
+
+	if not LastM1Data then
+		LastM1Data = StyleConfig.GetAttack("Fists", "M1", 4)
 	end
 
-	local M1Table = AnimationSet.M1
-	if not M1Table then
-		return nil
-	end
-
-	local LastIndex = #M1Table
-	local LastM1Data = M1Table[LastIndex]
 	if not LastM1Data then
 		return nil
 	end
 
-	local SetMetadata = AnimationSets.GetMetadata(AnimationSetName)
+	local Timing = StyleConfig.GetTiming(StyleName)
 
 	return {
 		AnimationId = LastM1Data.AnimationId,
@@ -79,9 +74,9 @@ local function GetCounterData(Entity: Entity): { [string]: any }?
 		Knockback = LastM1Data.Knockback or 40,
 		HitboxSize = LastM1Data.Hitbox and LastM1Data.Hitbox.Size or Vector3.new(6, 5, 7),
 		HitboxOffset = LastM1Data.Hitbox and LastM1Data.Hitbox.Offset or Vector3.new(0, 0, -4),
-		FallbackHitStart = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitStart or 0.2,
-		FallbackHitEnd = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.HitEnd or 0.5,
-		FallbackLength = SetMetadata.FallbackTimings and SetMetadata.FallbackTimings.Length or 1.0,
+		FallbackHitStart = Timing.FallbackHitStart or 0.2,
+		FallbackHitEnd = Timing.FallbackHitEnd or 0.5,
+		FallbackLength = Timing.FallbackLength or 1.0,
 	}
 end
 

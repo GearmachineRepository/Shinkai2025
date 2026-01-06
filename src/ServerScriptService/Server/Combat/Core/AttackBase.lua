@@ -16,11 +16,12 @@ local Block = require(script.Parent.Parent.Actions.Block)
 local KnockbackManager = require(script.Parent.Parent.Utility.KnockbackManager)
 local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
 local EntityAnimator = require(script.Parent.Parent.Utility.EntityAnimator)
---local HitValidation = require(script.Parent.Parent.Utility.HitValidation)
 
 local StateTypes = require(Shared.Config.Enums.StateTypes)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 local ActionValidator = require(Shared.Utility.ActionValidator)
+local StatScalingFormulas = require(Shared.Utility.StatScalingFormulas)
+
 local Ensemble = require(Server.Ensemble)
 local Packets = require(Shared.Networking.Packets)
 local Hitbox = require(Shared.Packages.Hitbox)
@@ -32,7 +33,70 @@ local AttackBase = {}
 
 AttackBase.Debug = false
 
---local DefenderGraceWindow = 0.05
+local function GetEntityStats(Entity: any): StatScalingFormulas.PlayerStats?
+	if not Entity then
+		return nil
+	end
+
+	local PlayerData = Entity.Context and Entity.Context.Data
+	if not PlayerData then
+		return nil
+	end
+
+	local Height = 1.0
+	if Entity.Character then
+		Height = Entity.Character:GetAttribute("Height") or 1.0
+	end
+
+	return StatScalingFormulas.GetStatsFromPlayerData(PlayerData, Height)
+end
+
+local function GetEntityStyle(Entity: any): string
+	local ToolComponent = Entity:GetComponent("Tool")
+	if not ToolComponent then
+		return "Fists"
+	end
+
+	local EquippedTool = ToolComponent:GetEquippedTool()
+	if not EquippedTool then
+		return "Fists"
+	end
+
+	return EquippedTool.AnimationSet or EquippedTool.ToolId or "Fists"
+end
+
+local function GetOrCalculateScaling(Context: ActionContext): StatScalingFormulas.ScalingResult
+	if Context.CustomData.CachedScaling then
+		return Context.CustomData.CachedScaling
+	end
+
+	local DefaultScaling: StatScalingFormulas.ScalingResult = {
+		Damage = 1.0,
+		Speed = 1.0,
+		Range = 1.0,
+		Stun = 1.0,
+		StaminaCost = 1.0,
+	}
+
+	local AttackerStats = GetEntityStats(Context.Entity)
+	if not AttackerStats then
+		Context.CustomData.CachedScaling = DefaultScaling
+		return DefaultScaling
+	end
+
+	local StyleName = Context.Metadata.AnimationSet or GetEntityStyle(Context.Entity)
+	local Boosts = StatScalingFormulas.GetBoostsFromEntity(Context.Entity)
+
+	local Scaling = StatScalingFormulas.Scale({
+		Style = StyleName,
+		IsSkill = Context.Metadata.IsSkill or false,
+	}, AttackerStats, Boosts)
+
+	Context.CustomData.CachedScaling = Scaling
+	Context.CustomData.AttackerStats = AttackerStats
+
+	return Scaling
+end
 
 local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacter: Model): Vector3?
 	local TargetPivot = TargetCharacter:GetPivot()
@@ -56,7 +120,9 @@ local function GetFallbackHitPosition(AttackerRootPart: BasePart, TargetCharacte
 end
 
 local function CheckLineOfSight(AttackerRootPart: BasePart, TargetCharacter: Model): boolean
-	if not AttackerRootPart or not AttackerRootPart.Parent then return false end
+	if not AttackerRootPart or not AttackerRootPart.Parent then
+		return false
+	end
 
 	local TargetRootPart = TargetCharacter:FindFirstChild("HumanoidRootPart") :: BasePart?
 		or TargetCharacter:FindFirstChild("Torso") :: BasePart?
@@ -110,12 +176,29 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 	end
 
 	local Metadata = Context.Metadata
-	local HitboxSize = Metadata.HitboxSize or Vector3.new(4, 4, 4)
-	local HitboxOffset = CFrame.new(Metadata.HitboxOffset or Vector3.new(0, 0, -3))
+	local BaseHitboxSize = Metadata.HitboxSize or Vector3.new(4, 4, 4)
+	local BaseHitboxOffset = Metadata.HitboxOffset or Vector3.new(0, 0, -3)
+
+	local Scaling = GetOrCalculateScaling(Context)
+	local RangeMultiplier = Scaling.Range
+
+	local ScaledHitboxSize = Vector3.new(
+		BaseHitboxSize.X * RangeMultiplier,
+		BaseHitboxSize.Y,
+		BaseHitboxSize.Z * RangeMultiplier
+	)
+
+	local ScaledHitboxOffset = Vector3.new(
+		BaseHitboxOffset.X,
+		BaseHitboxOffset.Y,
+		BaseHitboxOffset.Z * RangeMultiplier
+	)
+
+	local HitboxOffsetCFrame = CFrame.new(ScaledHitboxOffset)
 
 	local NewHitbox = Hitbox.new({
-		SizeOrPart = HitboxSize,
-		InitialCframe = RootPart.CFrame * HitboxOffset,
+		SizeOrPart = ScaledHitboxSize,
+		InitialCframe = RootPart.CFrame * HitboxOffsetCFrame,
 		VelocityPrediction = true,
 		Debug = AttackBase.Debug,
 		LifeTime = 0,
@@ -129,7 +212,7 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 		NewHitbox.Part.CastShadow = false
 	end
 
-	NewHitbox:WeldTo(RootPart, HitboxOffset)
+	NewHitbox:WeldTo(RootPart, HitboxOffsetCFrame)
 
 	NewHitbox.OnHit:Connect(function(HitCharacters: { Model }, HitParts: { BasePart }?)
 		if not Context.CustomData.HitWindowOpen or Context.CustomData.HasHit then
@@ -154,16 +237,11 @@ function AttackBase.SetupHitbox(Context: ActionContext, OnHitCallback: (Entity, 
 				HitPosition = GetFallbackHitPosition(RootPart, TargetCharacter)
 			end
 
-			-- local ValidationResult = HitValidation.ValidateHit(Context :: any, TargetEntity, HitPosition)
-			-- if not ValidationResult.IsValid then
-			-- 	continue
-			-- end
-
 			if not CheckLineOfSight(RootPart, TargetCharacter) then
 				continue
 			end
 
-			local FinalHitPosition = HitPosition --ValidationResult.RewindedPosition or HitPosition
+			local FinalHitPosition = HitPosition
 
 			Context.CustomData.HasHit = true
 			Context.CustomData.LastHitTarget = TargetEntity
@@ -190,22 +268,29 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 		return
 	end
 
-	local AnimationLength = AnimationTimingCache.GetLength(AnimationId) or Metadata.FallbackLength or 1.0
-	local HitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", Metadata.FallbackHitStart or 0.2)
-	local HitEndTime = AnimationTimingCache.GetTiming(AnimationId, "HitStop", Metadata.FallbackHitEnd or 0.5)
+	local Scaling = GetOrCalculateScaling(Context)
+	local SpeedMultiplier = Scaling.Speed
 
-	if not HitStartTime or not HitEndTime then
+	local BaseAnimationLength = AnimationTimingCache.GetLength(AnimationId) or Metadata.FallbackLength or 1.0
+	local BaseHitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", Metadata.FallbackHitStart or 0.2)
+	local BaseHitEndTime = AnimationTimingCache.GetTiming(AnimationId, "HitStop", Metadata.FallbackHitEnd or 0.5)
+
+	if not BaseHitStartTime or not BaseHitEndTime then
 		return
 	end
+
+	local AnimationLength = BaseAnimationLength / SpeedMultiplier
+	local HitStartTime = BaseHitStartTime / SpeedMultiplier
+	local HitEndTime = BaseHitEndTime / SpeedMultiplier
 
 	local InputTimestamp = Context.InputData and Context.InputData.InputTimestamp
 	local InputCompensation = LatencyCompensation.GetCompensation(InputTimestamp)
 	Context.CustomData.InputCompensation = InputCompensation
 
 	if Player then
-		Packets.PlayAnimation:FireClient(Player, AnimationId)
+		Packets.PlayAnimation:FireClient(Player, AnimationId, { Speed = SpeedMultiplier })
 	elseif Character then
-		EntityAnimator.Play(Character, AnimationId)
+		EntityAnimator.Play(Character, AnimationId, { Speed = SpeedMultiplier })
 	end
 
 	local StartTimestamp = os.clock() - InputCompensation
@@ -273,7 +358,7 @@ end
 function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, HitPosition: Vector3?): boolean
 	local TargetContext = ActionExecutor.GetActiveContext(Target)
 	local Metadata = AttackerContext.Metadata
-	local Damage = Metadata.Damage or 10
+	local BaseDamage = Metadata.Damage or 10
 	local Flags = AttackFlags.GetFlags(Metadata)
 
 	if AttackerContext.Interrupted or AttackerContext.Entity.States:GetState("Stunned") then
@@ -291,21 +376,11 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 		Ensemble.Events.Publish(CombatEvents.DamageDodged, {
 			Entity = Target,
 			Attacker = AttackerContext.Entity,
-			Damage = Damage,
+			Damage = BaseDamage,
 			HitPosition = HitPosition,
 		})
 		return true
 	end
-
-	-- if HitValidation.ShouldFavorDefender(Target, DefenderGraceWindow) then
-	-- 	Ensemble.Events.Publish(CombatEvents.DamageDodged, {
-	-- 		Entity = Target,
-	-- 		Attacker = AttackerContext.Entity,
-	-- 		Damage = Damage,
-	-- 		HitPosition = HitPosition,
-	-- 	})
-	-- 	return true
-	-- end
 
 	if TargetIsDodging then
 		ActionExecutor.Interrupt(Target, "Hit")
@@ -331,13 +406,16 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 	end
 
 	if TargetContext and TargetContext.Metadata.ActionName == "Block" then
-		local WasBlocked = Block.OnHit(TargetContext, AttackerContext.Entity, Damage, Flags, HitPosition)
+		local Scaling = GetOrCalculateScaling(AttackerContext)
+		local ScaledDamage = StatScalingFormulas.ApplyScalingToDamage(BaseDamage, Scaling)
+
+		local WasBlocked = Block.OnHit(TargetContext, AttackerContext.Entity, ScaledDamage, Flags, HitPosition)
 
 		if WasBlocked then
 			Ensemble.Events.Publish(CombatEvents.AttackBlocked, {
 				Attacker = AttackerContext.Entity,
 				Target = Target,
-				Damage = Damage,
+				Damage = ScaledDamage,
 				Flags = Flags,
 				HitPosition = HitPosition,
 				AttackerContext = AttackerContext,
@@ -356,10 +434,13 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 	AttackBase.ApplyHitStun(AttackerContext, Target)
 	AttackBase.ApplyKnockback(AttackerContext, Target)
 
+	local Scaling = GetOrCalculateScaling(AttackerContext)
+	local ScaledDamage = StatScalingFormulas.ApplyScalingToDamage(BaseDamage, Scaling)
+
 	Ensemble.Events.Publish(CombatEvents.AttackHit, {
 		Entity = AttackerContext.Entity,
 		Target = Target,
-		Damage = Damage,
+		Damage = ScaledDamage,
 		Flags = Flags,
 		HitPosition = HitPosition,
 		Context = AttackerContext,
@@ -369,11 +450,19 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 end
 
 function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosition: Vector3?)
-	local Damage = Context.Metadata.Damage or 10
+	local BaseDamage = Context.Metadata.Damage or 10
+
+	local Scaling = GetOrCalculateScaling(Context)
+	local ScaledDamage = StatScalingFormulas.ApplyScalingToDamage(BaseDamage, Scaling)
+
+	local DefenderStats = GetEntityStats(Target)
+	if DefenderStats then
+		ScaledDamage = StatScalingFormulas.ApplyDamageReduction(ScaledDamage, DefenderStats.Durability)
+	end
 
 	local DamageComponent = Target:GetComponent("Damage")
 	if DamageComponent then
-		DamageComponent:DealDamage(Damage, Context.Entity.Player or Context.Entity.Character)
+		DamageComponent:DealDamage(ScaledDamage, Context.Entity.Player or Context.Entity.Character)
 	end
 
 	local SelfState = Context.Entity:GetComponent("States")
@@ -389,7 +478,8 @@ function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosit
 	Ensemble.Events.Publish(CombatEvents.DamageDealt, {
 		Entity = Context.Entity,
 		Target = Target,
-		Damage = Damage,
+		Damage = ScaledDamage,
+		BaseDamage = BaseDamage,
 		HitPosition = HitPosition,
 		ActionName = Context.Metadata.ActionName,
 		Context = Context,
@@ -398,7 +488,7 @@ function AttackBase.ApplyDamage(Context: ActionContext, Target: Entity, HitPosit
 	Ensemble.Events.Publish("DamageIndicatorTriggered", {
 		Attacker = Context.Entity,
 		Target = Target,
-		DamageAmount = Damage,
+		DamageAmount = ScaledDamage,
 		HitPosition = HitPosition or Target.Character:GetPivot().Position,
 		IndicatorType = "Normal",
 	})
@@ -414,27 +504,34 @@ function AttackBase.ApplyKnockback(Context: ActionContext, Target: Entity)
 end
 
 function AttackBase.ApplyHitStun(Context: ActionContext, Target: Entity)
-	local HitStun = Context.Metadata.HitStun or 0
-
-	if HitStun > 0 then
-		StunManager.ApplyStun(Target, HitStun, Context.Metadata.ActionName)
-	end
-end
-
-function AttackBase.ConsumeStamina(Context: ActionContext)
-	local StaminaCost = Context.Metadata.StaminaCost or 0
-	if StaminaCost <= 0 then
+	local BaseHitStun = Context.Metadata.HitStun or 0
+	if BaseHitStun <= 0 then
 		return
 	end
 
+	local Scaling = GetOrCalculateScaling(Context)
+	local ScaledHitStun = StatScalingFormulas.ApplyScalingToStun(BaseHitStun, Scaling)
+
+	StunManager.ApplyStun(Target, ScaledHitStun, Context.Metadata.ActionName)
+end
+
+function AttackBase.ConsumeStamina(Context: ActionContext)
+	local BaseStaminaCost = Context.Metadata.StaminaCost or 0
+	if BaseStaminaCost <= 0 then
+		return
+	end
+
+	local Scaling = GetOrCalculateScaling(Context)
+	local ScaledStaminaCost = StatScalingFormulas.ApplyScalingToStaminaCost(BaseStaminaCost, Scaling)
+
 	local StaminaComponent = Context.Entity:GetComponent("Stamina")
 	if StaminaComponent then
-		StaminaComponent:ConsumeStamina(StaminaCost)
-		Context.CustomData.StaminaConsumed = StaminaCost
+		StaminaComponent:ConsumeStamina(ScaledStaminaCost)
+		Context.CustomData.StaminaConsumed = ScaledStaminaCost
 
 		Ensemble.Events.Publish(CombatEvents.StaminaConsumed, {
 			Entity = Context.Entity,
-			Amount = StaminaCost,
+			Amount = ScaledStaminaCost,
 			ActionName = Context.Metadata.ActionName,
 		})
 	end
