@@ -296,7 +296,14 @@ local function OnCharacterAdded(Character: Model)
 
 	Character:GetAttributeChangedSignal("Stunned"):Connect(function()
 		local IsStunned = Character:GetAttribute("Stunned") == true
+		ClientCombatState.SetState("Stunned", IsStunned)
+
 		if IsStunned then
+			if ClientCombatState.GetState("Dodging") then
+				ClientDodgeHandler.Rollback()
+				ClientCombatState.SetState("Dodging", false)
+			end
+			InputBuffer.ClearAllBuffers()
 			return
 		end
 
