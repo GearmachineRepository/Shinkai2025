@@ -146,7 +146,7 @@ function StatScalingFormulas.Scale(
 		StaminaCost = 1.0,
 	}
 
-	--Result.Damage *= Balance.BaseDamage
+	Result.Damage *= Balance.BaseDamage
 	Result.Speed *= Balance.BaseSpeed
 	Result.Range *= Balance.BaseRange
 	Result.Stun *= Balance.BaseStun

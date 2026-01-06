@@ -271,17 +271,13 @@ function AttackBase.ExecuteTimedAttack(Context: ActionContext, Config: {
 	local Scaling = GetOrCalculateScaling(Context)
 	local SpeedMultiplier = Scaling.Speed
 
-	local BaseAnimationLength = AnimationTimingCache.GetLength(AnimationId) or Metadata.FallbackLength or 1.0
-	local BaseHitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", Metadata.FallbackHitStart or 0.2)
-	local BaseHitEndTime = AnimationTimingCache.GetTiming(AnimationId, "HitStop", Metadata.FallbackHitEnd or 0.5)
+	local AnimationLength = AnimationTimingCache.GetLength(AnimationId, SpeedMultiplier) or Metadata.FallbackLength or 1.0
+	local HitStartTime = AnimationTimingCache.GetTiming(AnimationId, "HitStart", Metadata.FallbackHitStart or 0.2, SpeedMultiplier)
+	local HitEndTime = AnimationTimingCache.GetTiming(AnimationId, "HitStop", Metadata.FallbackHitEnd or 0.5, SpeedMultiplier)
 
-	if not BaseHitStartTime or not BaseHitEndTime then
+	if not HitStartTime or not HitEndTime then
 		return
 	end
-
-	local AnimationLength = BaseAnimationLength / SpeedMultiplier
-	local HitStartTime = BaseHitStartTime / SpeedMultiplier
-	local HitEndTime = BaseHitEndTime / SpeedMultiplier
 
 	local InputTimestamp = Context.InputData and Context.InputData.InputTimestamp
 	local InputCompensation = LatencyCompensation.GetCompensation(InputTimestamp)
@@ -427,6 +423,8 @@ function AttackBase.ProcessHit(AttackerContext: ActionContext, Target: Entity, H
 			end
 
 			return true
+		else
+			ActionExecutor.Interrupt(Target, "Hit")
 		end
 	end
 
