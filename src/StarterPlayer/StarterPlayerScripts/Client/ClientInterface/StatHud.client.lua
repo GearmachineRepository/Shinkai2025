@@ -37,6 +37,19 @@ local function WaitForHud(): ScreenGui
 	end
 end
 
+local function GetXPThresholdForNextPoint(StatName: string, TotalPointsEarned: number): number
+	local BaseThreshold = ProgressionBalance.XPThresholds[StatName]
+	local TierIncrement = ProgressionBalance.XPTierIncrement[StatName]
+	local TierSize = ProgressionBalance.XPTierSize
+
+	if not BaseThreshold or not TierIncrement or not TierSize then
+		return 0
+	end
+
+	local TierIndex = math.floor(TotalPointsEarned / TierSize)
+	return BaseThreshold + (TierIndex * TierIncrement)
+end
+
 local function InitializeStatFrames()
 	if IsInitialized then
 		return
@@ -100,7 +113,7 @@ local function InitializeStatFrames()
 					return
 				end
 
-				local AllocatablePoints = CurrentCharacter:GetAttribute(Stat .. "_AvailablePoints") or 0
+				local AllocatablePoints = CurrentCharacter:GetAttribute(Stat .. "_Points") or 0
 				if AllocatablePoints <= 0 then
 					return
 				end
@@ -185,12 +198,12 @@ local function UpdateStatValue(BaseStatName: string)
 	end
 end
 
-local function UpdateAvailablePoints(BaseStatName: string)
+local function UpdatePoints(BaseStatName: string)
 	if not CurrentCharacter then
 		return
 	end
 
-	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0 :: number
+	local Points = CurrentCharacter:GetAttribute(BaseStatName .. "_Points") or 0
 	local StatFrame = StatFrames[BaseStatName]
 
 	if not StatFrame then
@@ -199,12 +212,12 @@ local function UpdateAvailablePoints(BaseStatName: string)
 
 	local PointsLabel = StatFrame:FindFirstChild("Points")
 	if PointsLabel and PointsLabel:IsA("TextLabel") then
-		PointsLabel.Text = POINT_TEXT .. AvailablePoints
+		PointsLabel.Text = POINT_TEXT .. Points
 	end
 
 	local AllocateButton = StatFrame:FindFirstChild("Allocate")
 	if AllocateButton then
-		AllocateButton.Visible = AvailablePoints > 0
+		AllocateButton.Visible = Points > 0
 	end
 end
 
@@ -213,9 +226,9 @@ local function UpdateXPProgress(BaseStatName: string)
 		return
 	end
 
-	local CurrentXP = CurrentCharacter:GetAttribute(BaseStatName .. "_XP") or 0 :: number
-	local AvailablePoints = CurrentCharacter:GetAttribute(BaseStatName .. "_AvailablePoints") or 0 :: number
-	local AllocatedStars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0 :: number
+	local CurrentXP = CurrentCharacter:GetAttribute(BaseStatName .. "_XP") or 0
+	local Points = CurrentCharacter:GetAttribute(BaseStatName .. "_Points") or 0
+	local Stars = CurrentCharacter:GetAttribute(BaseStatName .. "_Stars") or 0
 
 	local StatFrame = StatFrames[BaseStatName]
 
@@ -228,31 +241,15 @@ local function UpdateXPProgress(BaseStatName: string)
 		return
 	end
 
-	local BaseThreshold = ProgressionBalance.XPThresholds[BaseStatName]
-	local TierIncrement = ProgressionBalance.XPTierIncrement[BaseStatName]
-	local TierSize = ProgressionBalance.XPTierSize
+	local TotalPointsEarned = Stars + Points
+	local Threshold = GetXPThresholdForNextPoint(BaseStatName, TotalPointsEarned)
 
-	if not BaseThreshold or not TierIncrement or not TierSize then
+	if Threshold <= 0 then
 		ProgressLabel.Text = "(0/0)"
 		return
 	end
 
-	local TotalPointsEarned = AllocatedStars + AvailablePoints
-
-	local TotalXPSpent = 0
-	for Star = 1, TotalPointsEarned do
-		local TierIndex = math.floor((Star - 1) / TierSize)
-		local StarXP = BaseThreshold + (TierIndex * TierIncrement)
-		TotalXPSpent += StarXP
-	end
-
-	local NextPointNumber = TotalPointsEarned + 1
-	local NextTierIndex = math.floor((NextPointNumber - 1) / TierSize)
-	local NextPointXP = BaseThreshold + (NextTierIndex * TierIncrement)
-
-	local XPTowardNextPoint = math.max(0, CurrentXP - TotalXPSpent)
-
-	ProgressLabel.Text = string.format("(%d/%d)", math.floor(XPTowardNextPoint), NextPointXP)
+	ProgressLabel.Text = string.format("(%d/%d)", math.floor(CurrentXP), Threshold)
 end
 
 local function UpdateAllStats()
@@ -263,7 +260,7 @@ local function UpdateAllStats()
 	for _, Stat in StatUtils.TRAINABLE_STATS do
 		UpdateStatStars(Stat)
 		UpdateStatValue(Stat)
-		UpdateAvailablePoints(Stat)
+		UpdatePoints(Stat)
 		UpdateXPProgress(Stat)
 	end
 end
@@ -273,10 +270,12 @@ local function SetupCharacterListeners(Character: Model)
 		Character:GetAttributeChangedSignal(Stat .. "_Stars"):Connect(function()
 			UpdateStatStars(Stat)
 			UpdateStatValue(Stat)
+			UpdateXPProgress(Stat)
 		end)
 
-		Character:GetAttributeChangedSignal(Stat .. "_AvailablePoints"):Connect(function()
-			UpdateAvailablePoints(Stat)
+		Character:GetAttributeChangedSignal(Stat .. "_Points"):Connect(function()
+			UpdatePoints(Stat)
+			UpdateXPProgress(Stat)
 		end)
 
 		Character:GetAttributeChangedSignal(Stat .. "_XP"):Connect(function()

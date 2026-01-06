@@ -15,7 +15,6 @@ local Config: StatConfig = {
 		[StatTypes.HEALTH] = {
 			Default = StatDefaults.Health,
 			Min = 0,
-			Max = StatDefaults.MaxHealth,
 			Replication = "All",
 		},
 
@@ -34,7 +33,6 @@ local Config: StatConfig = {
 		[StatTypes.STAMINA] = {
 			Default = StatDefaults.Stamina,
 			Min = 0,
-			Max = StatDefaults.MaxStamina,
 			Replication = "Owner",
 		},
 

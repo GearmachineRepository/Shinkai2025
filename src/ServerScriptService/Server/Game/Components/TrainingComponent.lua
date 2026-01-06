@@ -39,11 +39,11 @@ function TrainingComponent.new(Entity: Types.Entity, Context: Types.EntityContex
 		for _, StatName in { "MaxStamina", "Durability", "RunSpeed", "StrikingPower", "StrikeSpeed", "Muscle" } do
 			local XP = self.PlayerData.Stats[StatName .. "_XP"] or 0
 			local Stars = self.PlayerData.Stats[StatName .. "_Stars"] or 0
-			local AvailablePoints = self.PlayerData.Stats[StatName .. "_AvailablePoints"] or 0
+			local Points = self.PlayerData.Stats[StatName .. "_Points"] or 0
 
 			Character:SetAttribute(StatName .. "_XP", XP)
 			Character:SetAttribute(StatName .. "_Stars", Stars)
-			Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
+			Character:SetAttribute(StatName .. "_Points", Points)
 		end
 	end
 
@@ -75,17 +75,15 @@ function TrainingComponent.GrantStatGain(self: Self, StatName: string, Amount: n
 		FinalAmount = Amount * Sweat:GetStatGainMultiplier()
 	end
 
-	local _XPAwarded = ProgressionSystem.AwardTrainingXP(self.PlayerData, StatName, FinalAmount, self.Entity)
-
-	StatSystem.UpdateAvailablePoints(self.PlayerData, StatName)
+	ProgressionSystem.AwardTrainingXP(self.PlayerData, StatName, FinalAmount, self.Entity)
 
 	local Character = self.Entity.Character
 	if Character then
 		local XPValue = self.PlayerData.Stats[StatName .. "_XP"]
 		Character:SetAttribute(StatName .. "_XP", XPValue)
 
-		local AvailablePoints = self.PlayerData.Stats[StatName .. "_AvailablePoints"]
-		Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
+		local Points = self.PlayerData.Stats[StatName .. "_Points"]
+		Character:SetAttribute(StatName .. "_Points", Points)
 	end
 end
 
@@ -115,8 +113,7 @@ function TrainingComponent.AllocateStatPoint(self: Self, StatName: string): bool
 	local Character = self.Entity.Character
 	if Character then
 		Character:SetAttribute(StatName .. "_Stars", NewStars)
-		StatSystem.UpdateAvailablePoints(self.PlayerData, StatName)
-		Character:SetAttribute(StatName .. "_AvailablePoints", self.PlayerData.Stats[StatName .. "_AvailablePoints"])
+		Character:SetAttribute(StatName .. "_Points", self.PlayerData.Stats[StatName .. "_Points"])
 	end
 
 	return true

@@ -8,13 +8,13 @@ local StatDefaults = require(Shared.Config.Balance.StatDefaults)
 
 local ProgressionFormulas = {}
 
-function ProgressionFormulas.GetXPForNextStar(StatName: string, CurrentStars: number): number
+function ProgressionFormulas.GetXPForNextPoint(StatName: string, TotalPointsEarned: number): number
 	local BaseThreshold = ProgressionBalance.XPThresholds[StatName]
 	if not BaseThreshold then
 		return 100
 	end
 
-	local TierIndex = math.floor(CurrentStars / ProgressionBalance.XPTierSize)
+	local TierIndex = math.floor(TotalPointsEarned / ProgressionBalance.XPTierSize)
 	local Increment = ProgressionBalance.XPTierIncrement[StatName] or 100
 
 	return BaseThreshold + (TierIndex * Increment)

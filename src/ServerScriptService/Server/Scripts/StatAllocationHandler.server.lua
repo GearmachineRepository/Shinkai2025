@@ -85,11 +85,8 @@ local function HandleAllocateStatPoint(Player: Player, StatName: string)
 
 	Character:SetAttribute(StatName .. "_Stars", NewStars)
 
-	StatSystem.UpdateAvailablePoints(PlayerData, StatName)
-	local AvailablePoints = PlayerData.Stats[StatName .. "_AvailablePoints"]
-	Character:SetAttribute(StatName .. "_AvailablePoints", AvailablePoints)
-
-	-- DebugLogger.Info("StatAllocationHandler", "%s allocated point to %s", Player.Name, StatName)
+	local Points = PlayerData.Stats[StatName .. "_Points"]
+	Character:SetAttribute(StatName .. "_Points", Points)
 end
 
 Packets.AllocateStatPoint.OnServerEvent:Connect(HandleAllocateStatPoint)

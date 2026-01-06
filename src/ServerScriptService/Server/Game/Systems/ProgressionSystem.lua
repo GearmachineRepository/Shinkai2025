@@ -77,16 +77,17 @@ function ProgressionSystem.AwardTrainingXP(PlayerData: any, StatType: string, Ba
 			Entity.Stats:SetStat(StatTypes.BODY_FATIGUE, NewFatigue)
 		end
 
-		StatSystem.UpdateAvailablePoints(PlayerData, StatType)
+		StatSystem.ProcessXPGain(PlayerData, StatType)
 	end
 
 	return FinalXP
 end
+
 function ProgressionSystem.RestoreFatigue(PlayerData: any)
 	PlayerData.Stats[StatTypes.BODY_FATIGUE] = 0
 end
 
-function ProgressionSystem.ProcessHunger(_: any, DeltaTime: number, CharacterController: any?) -- PlayerData is unused
+function ProgressionSystem.ProcessHunger(_: any, DeltaTime: number, CharacterController: any?)
 	if not CharacterController or not CharacterController.StatManager then
 		return
 	end
@@ -101,7 +102,7 @@ function ProgressionSystem.ProcessHunger(_: any, DeltaTime: number, CharacterCon
 	end
 end
 
-function ProgressionSystem.ConsumeFood(_: any, HungerRestoreAmount: number, CharacterController: any?) -- PlayerData is unused
+function ProgressionSystem.ConsumeFood(_: any, HungerRestoreAmount: number, CharacterController: any?)
 	if not CharacterController or not CharacterController.StatManager then
 		return
 	end
@@ -113,11 +114,7 @@ function ProgressionSystem.ConsumeFood(_: any, HungerRestoreAmount: number, Char
 	CharacterController.StatManager:SetStat(StatTypes.HUNGER, NewHunger)
 end
 
-function ProgressionSystem.ProcessMuscleTraining(
-	_: any,
-	MuscleXP: number,
-	CharacterController: any?
-): boolean -- PlayerData is unused
+function ProgressionSystem.ProcessMuscleTraining(_: any, MuscleXP: number, CharacterController: any?): boolean
 	if not CharacterController or not CharacterController.StatManager then
 		return false
 	end
@@ -140,7 +137,7 @@ function ProgressionSystem.ProcessMuscleTraining(
 	return true
 end
 
-function ProgressionSystem.ProcessFat(_: any, DeltaTime: number, CharacterController: any?) -- PlayerData
+function ProgressionSystem.ProcessFat(_: any, DeltaTime: number, CharacterController: any?)
 	if not CharacterController or not CharacterController.StatManager then
 		return
 	end
@@ -151,17 +148,14 @@ function ProgressionSystem.ProcessFat(_: any, DeltaTime: number, CharacterContro
 
 	local HungerPercent = (CurrentHunger / MaxHunger) * 100
 
-	-- Gain fat when above X% hunger
 	if HungerPercent >= BodyBalance.Fat.GainThresholdPercent then
 		local MaxFat = BodyBalance.Fat.MaxFat
-		-- TODO: Check for Jigoro clan, set MaxFat = 750 if they have it
 
 		if CurrentFat < MaxFat then
 			local FatGain = BodyBalance.Fat.GainRatePerSecond * DeltaTime
 			local NewFat = math.min(MaxFat, CurrentFat + FatGain)
 			CharacterController.StatManager:SetStat(StatTypes.FAT, NewFat)
 		end
-		-- Lose fat when below X% hunger
 	else
 		if CurrentFat > 0 then
 			local FatLoss = BodyBalance.Fat.LossRatePerSecond * DeltaTime

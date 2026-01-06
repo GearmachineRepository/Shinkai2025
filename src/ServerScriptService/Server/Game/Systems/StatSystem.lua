@@ -11,7 +11,7 @@ type StarTier = {
 	Min: number,
 	Max: number,
 	Name: string,
-	Color: { R: number, G: number, B: number}
+	Color: { R: number, G: number, B: number }
 }
 
 function StatSystem.CalculateStatValue(BaseStat: number, AllocatedStars: number, StatType: string): number
@@ -19,7 +19,7 @@ function StatSystem.CalculateStatValue(BaseStat: number, AllocatedStars: number,
 	return BaseStat + (AllocatedStars * BonusPerStar)
 end
 
-function StatSystem.GetXPThresholdForStar(StatType: string, StarNumber: number): number
+function StatSystem.GetXPThresholdForNextPoint(StatType: string, TotalPointsEarned: number): number
 	local BaseThreshold = ProgressionBalance.XPThresholds[StatType]
 	local TierIncrement = ProgressionBalance.XPTierIncrement[StatType]
 	local TierSize = ProgressionBalance.XPTierSize
@@ -28,40 +28,40 @@ function StatSystem.GetXPThresholdForStar(StatType: string, StarNumber: number):
 		return 0
 	end
 
-	local TierIndex = math.floor((StarNumber - 1) / TierSize)
+	local TierIndex = math.floor(TotalPointsEarned / TierSize)
 	return BaseThreshold + (TierIndex * TierIncrement)
 end
 
-function StatSystem.GetTotalXPNeededForStars(StatType: string, TargetStars: number): number
-	local TotalXP = 0
-
-	for Star = 1, TargetStars do
-		TotalXP += StatSystem.GetXPThresholdForStar(StatType, Star)
-	end
-
-	return TotalXP
+function StatSystem.GetTotalPointsEarned(PlayerData: any, StatType: string): number
+	local Stars = PlayerData.Stats[StatType .. "_Stars"] or 0
+	local Points = PlayerData.Stats[StatType .. "_Points"] or 0
+	return Stars + Points
 end
 
-function StatSystem.GetAvailablePointsFromXP(XPValue: number, StatType: string): number
-	local Stars = 0
-	local AccumulatedXP = 0
+function StatSystem.ProcessXPGain(PlayerData: any, StatType: string): number
+	local CurrentXP = PlayerData.Stats[StatType .. "_XP"] or 0
+	local TotalPointsEarned = StatSystem.GetTotalPointsEarned(PlayerData, StatType)
+	local Threshold = StatSystem.GetXPThresholdForNextPoint(StatType, TotalPointsEarned)
 
-	while true do
-		local NextStarXP = StatSystem.GetXPThresholdForStar(StatType, Stars + 1)
-		if NextStarXP == 0 or AccumulatedXP + NextStarXP > XPValue then
-			break
-		end
+	local PointsAwarded = 0
 
-		AccumulatedXP += NextStarXP
-		Stars += 1
+	while CurrentXP >= Threshold and Threshold > 0 do
+		CurrentXP = CurrentXP - Threshold
+		PlayerData.Stats[StatType .. "_Points"] = (PlayerData.Stats[StatType .. "_Points"] or 0) + 1
+		PointsAwarded += 1
+
+		TotalPointsEarned = StatSystem.GetTotalPointsEarned(PlayerData, StatType)
+		Threshold = StatSystem.GetXPThresholdForNextPoint(StatType, TotalPointsEarned)
 	end
 
-	return Stars
+	PlayerData.Stats[StatType .. "_XP"] = CurrentXP
+
+	return PointsAwarded
 end
 
 function StatSystem.CanAllocateStar(PlayerData: any, StatType: string): (boolean, string?)
 	local CurrentStars = PlayerData.Stats[StatType .. "_Stars"] or 0
-	local AvailablePoints = PlayerData.Stats[StatType .. "_AvailablePoints"] or 0
+	local AvailablePoints = PlayerData.Stats[StatType .. "_Points"] or 0
 
 	if CurrentStars >= ProgressionBalance.Caps.MaxStarsPerStat then
 		return false, "Stat already at maximum (" .. ProgressionBalance.Caps.MaxStarsPerStat .. " stars)"
@@ -86,7 +86,7 @@ function StatSystem.AllocateStar(PlayerData: any, StatType: string): (boolean, s
 	end
 
 	PlayerData.Stats[StatType .. "_Stars"] += 1
-	PlayerData.Stats[StatType .. "_AvailablePoints"] -= ProgressionBalance.Caps.PointsPerStar
+	PlayerData.Stats[StatType .. "_Points"] -= ProgressionBalance.Caps.PointsPerStar
 
 	return true
 end
@@ -94,21 +94,11 @@ end
 function StatSystem.GetTotalAllocatedStars(PlayerData: any): number
 	local Total = 0
 
-	for StatType : any, _ in ProgressionBalance.StarBonuses do
+	for StatType: any, _ in ProgressionBalance.StarBonuses do
 		Total += PlayerData.Stats[StatType .. "_Stars"] or 0
 	end
 
 	return Total
-end
-
-function StatSystem.UpdateAvailablePoints(PlayerData: any, StatType: string)
-	local XPValue = PlayerData.Stats[StatType .. "_XP"] or 0
-	local AllocatedStars = PlayerData.Stats[StatType .. "_Stars"] or 0
-
-	local TotalPointsEarned = StatSystem.GetAvailablePointsFromXP(XPValue, StatType)
-	local PointsSpent = AllocatedStars * ProgressionBalance.Caps.PointsPerStar
-
-	PlayerData.Stats[StatType .. "_AvailablePoints"] = TotalPointsEarned - PointsSpent
 end
 
 function StatSystem.GetStarTier(TotalStars: number): StarTier

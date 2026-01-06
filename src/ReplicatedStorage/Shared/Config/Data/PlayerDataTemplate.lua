@@ -36,12 +36,12 @@ return {
 		StrikeSpeed_Stars = 0,
 		Muscle_Stars = 0,
 
-		MaxStamina_AvailablePoints = 0,
-		Durability_AvailablePoints = 0,
-		RunSpeed_AvailablePoints = 0,
-		StrikingPower_AvailablePoints = 0,
-		StrikeSpeed_AvailablePoints = 0,
-		Muscle_AvailablePoints = 0,
+		MaxStamina_Points = 25,
+		Durability_Points = 25,
+		RunSpeed_Points = 25,
+		StrikingPower_Points = 25,
+		StrikeSpeed_Points = 25,
+		Muscle_Points = 25,
 	},
 
 	Backpack = {},
