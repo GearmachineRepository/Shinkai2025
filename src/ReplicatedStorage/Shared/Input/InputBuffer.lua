@@ -2,6 +2,8 @@
 
 local UserInputService = game:GetService("UserInputService")
 
+local KeybindDefaults = require(script.Parent.KeybindDefaults)
+
 local INPUT_BUFFER_WINDOW = 0.25
 local INPUT_LOOP_INTERVAL = 0.15
 
@@ -11,36 +13,54 @@ type InputState = {
 	LastLoopTime: number,
 }
 
-type KeybindEntry = {
-	ActionName: string,
-	CanLoop: boolean,
-	IsHoldAction: boolean?,
+type KeybindEntry = KeybindDefaults.KeybindEntry
+type KeybindTable = KeybindDefaults.KeybindTable
+type InputStates = { [Enum.KeyCode | Enum.UserInputType]: InputState }
+type InputMode = "PC" | "Console"
+
+local GAMEPAD_INPUT_TYPES: { [Enum.UserInputType]: boolean } = {
+	[Enum.UserInputType.Gamepad1] = true,
+	[Enum.UserInputType.Gamepad2] = true,
+	[Enum.UserInputType.Gamepad3] = true,
+	[Enum.UserInputType.Gamepad4] = true,
+	[Enum.UserInputType.Gamepad5] = true,
+	[Enum.UserInputType.Gamepad6] = true,
+	[Enum.UserInputType.Gamepad7] = true,
+	[Enum.UserInputType.Gamepad8] = true,
 }
 
-type Keybinds = { [Enum.KeyCode | Enum.UserInputType]: KeybindEntry }
-type InputStates = { [Enum.KeyCode | Enum.UserInputType]: InputState }
-
 local InputStates: InputStates = {}
-local Keybinds: Keybinds = {}
+local Keybinds: KeybindTable = {}
+local CurrentInputMode: InputMode?
 
 local ActionCallbacks: { (ActionName: string) -> () } = {}
 local ReleaseCallbacks: { (ActionName: string) -> () } = {}
 
 local InputBuffer = {}
 
-local DEFAULT_KEYBINDS: Keybinds = {
-	[Enum.UserInputType.MouseButton1] = { ActionName = "M1", CanLoop = true, IsHoldAction = false },
-	[Enum.UserInputType.MouseButton2] = { ActionName = "M2", CanLoop = false, IsHoldAction = false },
-	[Enum.KeyCode.F] = { ActionName = "Block", CanLoop = false, IsHoldAction = true },
-	[Enum.KeyCode.Q] = { ActionName = "Dodge", CanLoop = true, IsHoldAction = false },
-	[Enum.KeyCode.W] = { ActionName = "Sprint", CanLoop = false, IsHoldAction = true },
-	[Enum.KeyCode.C] = { ActionName = "Skill1", CanLoop = false, IsHoldAction = false },
-	[Enum.KeyCode.E] = { ActionName = "Skill2", CanLoop = false, IsHoldAction = false },
-	[Enum.KeyCode.U] = { ActionName = "Skill3", CanLoop = false, IsHoldAction = false },
-	[Enum.KeyCode.T] = { ActionName = "Skill4", CanLoop = false, IsHoldAction = false },
-	[Enum.KeyCode.Y] = { ActionName = "Skill5", CanLoop = false, IsHoldAction = false },
-	[Enum.KeyCode.B] = { ActionName = "Skill6", CanLoop = false, IsHoldAction = false },
-}
+local function IsGamepadInput(UserInputType: Enum.UserInputType): boolean
+	return GAMEPAD_INPUT_TYPES[UserInputType] == true
+end
+
+local function GetInputKey(InputObject: InputObject): Enum.KeyCode | Enum.UserInputType
+	local UserInputType = InputObject.UserInputType
+
+	if UserInputType == Enum.UserInputType.Keyboard or IsGamepadInput(UserInputType) then
+		return InputObject.KeyCode
+	end
+
+	return UserInputType
+end
+
+local function GetInputModeFromPreferred(): InputMode
+	local Preferred = UserInputService.PreferredInput
+
+	if Preferred == Enum.PreferredInput.Gamepad then
+		return "Console"
+	end
+
+	return "PC"
+end
 
 function InputBuffer.OnAction(Callback: (ActionName: string) -> ())
 	table.insert(ActionCallbacks, Callback)
@@ -50,7 +70,7 @@ function InputBuffer.OnRelease(Callback: (ActionName: string) -> ())
 	table.insert(ReleaseCallbacks, Callback)
 end
 
-function InputBuffer.LoadKeybinds(KeybindTable: { [Enum.KeyCode | Enum.UserInputType]: KeybindEntry })
+function InputBuffer.LoadKeybinds(KeybindTable: KeybindTable)
 	table.clear(Keybinds)
 	table.clear(InputStates)
 
@@ -62,6 +82,10 @@ function InputBuffer.LoadKeybinds(KeybindTable: { [Enum.KeyCode | Enum.UserInput
 			LastLoopTime = 0,
 		}
 	end
+end
+
+function InputBuffer.GetInputMode(): InputMode
+	return CurrentInputMode or "PC"
 end
 
 function InputBuffer.BufferAction(ActionName: string)
@@ -157,17 +181,28 @@ local function FireRelease(ActionName: string)
 	end
 end
 
+local function SetInputMode(Mode: InputMode)
+	if CurrentInputMode == Mode then
+		return
+	end
+
+	CurrentInputMode = Mode
+
+	if Mode == "PC" then
+		InputBuffer.LoadKeybinds(KeybindDefaults.PC)
+	else
+		InputBuffer.LoadKeybinds(KeybindDefaults.Console)
+	end
+end
+
 local function OnInputBegan(InputObject: InputObject, GameProcessed: boolean)
 	if GameProcessed then
 		return
 	end
 
-	local InputType = if InputObject.UserInputType ~= Enum.UserInputType.Keyboard
-		then InputObject.UserInputType
-		else InputObject.KeyCode
-
-	local Entry = Keybinds[InputType]
-	local State = InputStates[InputType]
+	local InputKey = GetInputKey(InputObject)
+	local Entry = Keybinds[InputKey]
+	local State = InputStates[InputKey]
 
 	if not Entry or not State then
 		return
@@ -184,12 +219,9 @@ local function OnInputEnded(InputObject: InputObject, GameProcessed: boolean)
 		return
 	end
 
-	local InputType = if InputObject.UserInputType ~= Enum.UserInputType.Keyboard
-		then InputObject.UserInputType
-		else InputObject.KeyCode
-
-	local Entry = Keybinds[InputType]
-	local State = InputStates[InputType]
+	local InputKey = GetInputKey(InputObject)
+	local Entry = Keybinds[InputKey]
+	local State = InputStates[InputKey]
 
 	if not Entry or not State then
 		return
@@ -204,8 +236,14 @@ local function OnInputEnded(InputObject: InputObject, GameProcessed: boolean)
 	end
 end
 
+local function OnPreferredInputChanged()
+	SetInputMode(GetInputModeFromPreferred())
+end
+
 UserInputService.InputBegan:Connect(OnInputBegan)
 UserInputService.InputEnded:Connect(OnInputEnded)
+
+UserInputService:GetPropertyChangedSignal("PreferredInput"):Connect(OnPreferredInputChanged)
 
 task.spawn(function()
 	while true do
@@ -230,6 +268,6 @@ task.spawn(function()
 	end
 end)
 
-InputBuffer.LoadKeybinds(DEFAULT_KEYBINDS)
+SetInputMode(GetInputModeFromPreferred())
 
 return InputBuffer

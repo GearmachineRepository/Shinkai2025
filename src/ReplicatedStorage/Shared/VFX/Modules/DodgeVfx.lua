@@ -239,7 +239,7 @@ function DodgeVfx.Play(_Character: Model, VfxData: unknown): VfxInstance?
 	local MaxLifetime = 0
 	local IsCleanedUp = false
 
-	SoundPlayer.Play(Target, DodgeSound)
+	local DashSound = SoundPlayer.Play(Target, DodgeSound)
 
 	for _, Pair in AttachmentPairs do
 		local TrailClone = TrailTemplate:Clone()
@@ -260,6 +260,10 @@ function DodgeVfx.Play(_Character: Model, VfxData: unknown): VfxInstance?
 	local function Stop()
 		if GroundSmokeInstance and GroundSmokeInstance.Stop then
 			GroundSmokeInstance.Stop()
+		end
+
+		if DashSound then
+			DashSound:Stop()
 		end
 
 		for _, TrailInstance in CreatedTrails do

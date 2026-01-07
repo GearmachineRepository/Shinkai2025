@@ -10,7 +10,7 @@ type Configurations = {
 	Volume: number?,
 }
 
-function SoundPlayer.Play(Character: Model, SoundReference: string | Sound, Configurations: Configurations?)
+function SoundPlayer.Play(Character: Model, SoundReference: string | Sound, Configurations: Configurations?): Sound?
 	local TemplateSound = nil :: Sound?
 
 	if typeof(SoundReference) == "string" then
