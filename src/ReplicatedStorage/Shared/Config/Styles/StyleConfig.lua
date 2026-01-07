@@ -188,8 +188,8 @@ local Styles: { [string]: StyleDefinition } = {
 		Category = "Unarmed",
 
 		Balance = {
-			BaseDamage = 1.15,
-			BaseSpeed = 0.9,
+			BaseDamage = 1.0,
+			BaseSpeed = 1.0,
 			BaseRange = 1.0,
 			BaseStun = 1.0,
 			BaseStaminaCost = 0.85,
