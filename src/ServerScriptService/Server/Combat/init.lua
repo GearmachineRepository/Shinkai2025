@@ -58,9 +58,9 @@ local InputResolver = require(script.Core.InputResolver)
 local AttackBase = require(script.Core.AttackBase)
 
 local ComboTracker = require(script.Core.ComboTracker)
-local CooldownManager = require(script.Core.CooldownManager)
+local CooldownManager = require(script.Utility.CooldownManager)
 local WindowManager = require(script.Core.WindowManager)
-local ThreadScheduler = require(script.Core.ThreadScheduler)
+local ThreadScheduler = require(script.Utility.ThreadScheduler)
 local MetadataBuilders = require(script.Core.MetadataBuilders)
 
 local CombatTypes = require(script.CombatTypes)

@@ -2,8 +2,8 @@
 
 local CombatTypes = require(script.Parent.Parent.CombatTypes)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
-local CooldownManager = require(script.Parent.CooldownManager)
-local ThreadScheduler = require(script.Parent.ThreadScheduler)
+local CooldownManager = require(script.Parent.Parent.Utility.CooldownManager)
+local ThreadScheduler = require(script.Parent.Parent.Utility.ThreadScheduler)
 local AngleValidator = require(script.Parent.Parent.Utility.AngleValidator)
 local LatencyCompensation = require(script.Parent.Parent.Utility.LatencyCompensation)
 

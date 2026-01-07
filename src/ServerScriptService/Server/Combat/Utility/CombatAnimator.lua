@@ -4,11 +4,11 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 
-local CombatTypes = require(script.Parent.Parent.CombatTypes)
+local EnsembleTypes = require(script.Parent.Parent.Parent.Ensemble.Types)
 local EntityAnimator = require(script.Parent.EntityAnimator)
 local Packets = require(Shared.Networking.Packets)
 
-type Entity = CombatTypes.Entity
+type Entity = EnsembleTypes.Entity
 
 local CombatAnimator = {}
 

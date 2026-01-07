@@ -10,9 +10,9 @@ local CombatEvents = require(script.Parent.Parent.CombatEvents)
 local ActionRegistry = require(script.Parent.ActionRegistry)
 
 local ComboTracker = require(script.Parent.ComboTracker)
-local CooldownManager = require(script.Parent.CooldownManager)
+local CooldownManager = require(script.Parent.Parent.Utility.CooldownManager)
 local WindowManager = require(script.Parent.WindowManager)
-local ThreadScheduler = require(script.Parent.ThreadScheduler)
+local ThreadScheduler = require(script.Parent.Parent.Utility.ThreadScheduler)
 
 type Entity = CombatTypes.Entity
 type ActionContext = CombatTypes.ActionContext

@@ -8,7 +8,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 
 local Ensemble = require(Server.Ensemble)
 local CombatEvents = require(script.Parent.Parent.CombatEvents)
-local MovementModifiers = require(script.Parent.Parent.Utility.MovementModifiers)
+local MovementModifiers = require(script.Parent.MovementModifiers)
 local StateTypes = require(Shared.Config.Enums.StateTypes)
 local CombatBalance = require(Shared.Config.Balance.CombatBalance)
 
